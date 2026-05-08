@@ -1516,6 +1516,8 @@ function MisReservasView({reservas,onNew}) {
 // ─── Mis Horarios ─────────────────────────────────────────────
 function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,notify}) {
   const [mH,setMH] = useState(null);
+  const [vistos,setVistos] = useState([]);
+  const [showHist,setShowHist] = useState(false);
   const mF = horarios.filter(function(h){return h.psico&&user&&h.psico.trim().toLowerCase()===user.trim().toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
   const mE = reservas.filter(function(r){return r.psico===user&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
   const mS = solicitudes.filter(function(s){return s.psico===user;}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
@@ -1527,7 +1529,8 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   }
 
   const pend = mS.filter(function(s){return s.estado==="pendiente";});
-  const recientes = mS.filter(function(s){return s.estado!=="pendiente"&&s.fechaRes&&new Date(s.fechaRes)>new Date(Date.now()-7*86400000);});
+  const recientes = mS.filter(function(s){return s.estado!=="pendiente"&&s.fechaRes&&!vistos.includes(s.id);});
+  const historial = mS.filter(function(s){return s.estado!=="pendiente"&&(s.fechaRes||vistos.includes(s.id));});
 
   return (
     <div>
@@ -1550,26 +1553,53 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       )}
       {recientes.map(function(s) {
         return (
-          <div key={s.id} style={{background:s.estado==="aprobada"?ob:eb,borderRadius:10,padding:12,marginBottom:10,border:s.estado==="aprobada"?"1px solid #A7E3C0":"1px solid #F5B8B3"}}>
-            <div style={{color:s.estado==="aprobada"?ok:er,fontWeight:700}}>
-              {s.estado==="aprobada"?"Solicitud aprobada":"Solicitud rechazada"}{s.nota?" - "+s.nota:""}
+          <div key={s.id} style={{background:s.estado==="aprobada"?ob:eb,borderRadius:10,padding:"12px 14px",marginBottom:10,border:s.estado==="aprobada"?"1px solid #A7E3C0":"1px solid #F5B8B3",display:"flex",alignItems:"flex-start",gap:10}}>
+            <div style={{flex:1}}>
+              <div style={{color:s.estado==="aprobada"?ok:er,fontWeight:700,fontSize:13}}>
+                {s.estado==="aprobada"?"Solicitud aprobada":"Solicitud rechazada"}
+              </div>
+              <div style={{color:mu,fontSize:12,marginTop:2}}>
+                {s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Liberar"} horario
+                {s.datos&&s.datos.diaSemana?" - "+DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin:""}
+                {s.nota?" - Motivo: "+s.nota:""}
+              </div>
             </div>
+            <button onClick={function(){setVistos(function(v){return v.concat([s.id]);});}} style={{background:"transparent",border:"none",color:mu,fontSize:16,cursor:"pointer",padding:"0 4px",lineHeight:1,fontFamily:"inherit"}}>X</button>
           </div>
         );
       })}
+      {historial.length>0 && (
+        <div style={{marginBottom:16}}>
+          <button onClick={function(){setShowHist(function(v){return !v;});}} style={{background:"transparent",border:"none",color:mu,fontSize:12,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline",padding:0}}>
+            {showHist?"Ocultar historial":"Ver historial ("+historial.length+")"}
+          </button>
+          {showHist && historial.map(function(s) {
+            return (
+              <div key={s.id} style={{background:bg,borderRadius:8,padding:"10px 12px",marginTop:8,border:"1px solid #C9E4EF"}}>
+                <div style={{color:s.estado==="aprobada"?ok:er,fontWeight:600,fontSize:12}}>
+                  {s.estado==="aprobada"?"Aprobada":"Rechazada"} - {s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Liberar"} horario
+                  {s.datos&&s.datos.diaSemana?" - "+DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin:""}
+                </div>
+                {s.fechaRes&&<div style={{color:mu,fontSize:11}}>{new Date(s.fechaRes).toLocaleDateString("es-AR")}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div style={{marginBottom:20}}>
         <div style={{color:dk,fontSize:12,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Horarios Fijos</div>
         {!mF.length && <div style={{color:mu,fontSize:13}}>Sin horarios fijos.</div>}
         {mF.map(function(h) {
           return (
-            <div key={h.id} style={sCard}>
-              <div style={{flex:1}}>
-                <div style={{color:tx,fontWeight:600}}>{DIAS[h.diaSemana]} - {h.inicio}-{h.fin}</div>
-                <div style={{color:mu,fontSize:12}}>{h.consultorio} - {ars(calcPrecio(h.inicio,h.fin).sub)}/sem</div>
+            <div key={h.id} style={{background:wh,borderRadius:12,padding:"14px 16px",marginBottom:10,border:"1.5px solid #C9E4EF"}}>
+              <div style={{marginBottom:8}}>
+                <div style={{color:tx,fontWeight:700,fontSize:14}}>{DIAS[h.diaSemana]}</div>
+                <div style={{color:tx,fontSize:13}}>{h.inicio} - {h.fin} ({calcHrs(h.inicio,h.fin).toFixed(1)}hs)</div>
+                <div style={{color:mu,fontSize:12}}>{h.consultorio} - {ars(calcPrecio(h.inicio,h.fin).sub)}/semana</div>
               </div>
-              <div style={{display:"flex",gap:6}}>
-                <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setMH({type:"edit",h:h});}}>Modificar</button>
-                <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setMH({type:"del",h:h});}}>Liberar</button>
+              <div style={{display:"flex",gap:8}}>
+                <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{flex:1,fontSize:13,padding:"8px 10px"})} onClick={function(){setMH({type:"edit",h:h});}}>Modificar</button>
+                <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1,fontSize:13,padding:"8px 10px"})} onClick={function(){setMH({type:"del",h:h});}}>Liberar horario</button>
               </div>
             </div>
           );
