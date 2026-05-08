@@ -88,6 +88,19 @@ const PBASE = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────
+// Local date string (avoids UTC timezone shift)
+function localDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,"0");
+  const d = String(date.getDate()).padStart(2,"0");
+  return y+"-"+m+"-"+d;
+}
+// Parse date string as LOCAL date (not UTC)
+function parseLocalDate(str) {
+  const parts = str.split("-");
+  return new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]));
+}
+
 function toMin(t) { const [h,m] = t.split(":").map(Number); return h*60+m; }
 function calcHrs(a,b) { return (toMin(b)-toMin(a))/60; }
 function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",minimumFractionDigits:0}).format(n); }
@@ -280,7 +293,7 @@ export default function App() {
   }
 
   function getEvts(date) {
-    const ds = date.getDay()===0?7:date.getDay(), str = date.toISOString().split("T")[0];
+    const ds = date.getDay()===0?7:date.getDay(), str = localDateStr(date);
     const fj = horarios.filter(function(h){return h.diaSemana===ds&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
     const ex = reservas.filter(function(r){return r.fecha===str&&r.estado==="aprobada"&&(fCons==="todos"||r.consultorio===fCons)&&(fPsico==="todas"||r.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(r){return Object.assign({},r,{tipo:"extra"});});
     const bl = bloques.filter(function(b){return b.fecha===str;}).map(function(b){return Object.assign({},b,{tipo:"bloqueado"});});
@@ -583,7 +596,7 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
               {vis.map(function(date,di) {
                 const evs = getEvts(date).filter(function(e){return e.inicio&&parseInt(e.inicio.split(":")[0])===h;});
                 return (
-                  <div key={di} style={{height:56,borderLeft:"1px solid #EBF6FA",borderTop:"1px solid #EBF6FA",position:"relative",cursor:"pointer"}} onClick={function(){onSlot({date:date.toISOString().split("T")[0],hour:h});}}>
+                  <div key={di} style={{height:56,borderLeft:"1px solid #EBF6FA",borderTop:"1px solid #EBF6FA",position:"relative",cursor:"pointer"}} onClick={function(){onSlot({date:localDateStr(date),hour:h});}}>
                     {evs.map(function(e,ei) {
                       const sm=toMin(e.inicio)-h*60, dm=toMin(e.fin)-toMin(e.inicio);
                       const bloq = e.tipo==="bloqueado";
@@ -618,7 +631,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
   const [fin,setFin] = useState(String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
   const [cons,setCons] = useState("C1");
   const [psico,setPsico] = useState(psicos&&psicos[0]?psicos[0].nombre:user);
-  const [diaSemana,setDiaSemana] = useState(new Date(slot.date).getDay()===0?7:(new Date(slot.date).getDay()||1));
+  const [diaSemana,setDiaSemana] = useState(parseLocalDate(slot.date).getDay()===0?7:(parseLocalDate(slot.date).getDay()||1));
   const pr = calcPrecio(ini,fin);
 
   function checkConflicto(tipoCheck,consCheck,iniCheck,finCheck,diaCheck) {
@@ -628,7 +641,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
       const c=(horarios||[]).filter(function(x){return x.consultorio===consCheck&&Number(x.diaSemana)===Number(diaCheck)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
       return c.length?("Conflicto con "+c.map(function(x){return x.psico;}).join(", ")):null;
     }
-    const fijos=(horarios||[]).filter(function(x){const ds=new Date(slot.date).getDay();const jd=ds===0?7:ds;return x.consultorio===consCheck&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+    const fijos=(horarios||[]).filter(function(x){const ds=parseLocalDate(slot.date).getDay();const jd=ds===0?7:ds;return x.consultorio===consCheck&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
     const extras=(reservas||[]).filter(function(x){return x.fecha===slot.date&&x.consultorio===consCheck&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
     const todos=fijos.concat(extras);
     return todos.length?("Conflicto con "+todos.map(function(x){return x.psico;}).join(", ")):null;
@@ -1540,12 +1553,19 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       </div>
       {pend.length>0 && (
         <div style={{background:lt,borderRadius:10,padding:14,marginBottom:16,border:"1px solid #C9E4EF"}}>
-          <div style={{color:dk,fontWeight:700,fontSize:13,marginBottom:8}}>Solicitudes pendientes</div>
+          <div style={{color:dk,fontWeight:700,fontSize:13,marginBottom:8}}>Solicitudes pendientes de aprobacion</div>
           {pend.map(function(s) {
             return (
-              <div key={s.id} style={{color:tx,fontSize:13,padding:"3px 0"}}>
-                {s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Eliminar"} horario {s.tipo}
-                {s.datos&&s.datos.diaSemana?" - "+DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin:""}
+              <div key={s.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #C9E4EF"}}>
+                <div style={{color:tx,fontSize:13}}>
+                  {s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Liberar"} horario
+                  {s.datos&&s.datos.diaSemana?" - "+DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin:""}
+                </div>
+                <button
+                  style={{background:"transparent",border:"none",color:er,fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"2px 8px",fontWeight:600}}
+                  onClick={function(){if(window.confirm("Cancelar esta solicitud?"))delDoc("solHor",s.id);}}>
+                  Cancelar
+                </button>
               </div>
             );
           })}
