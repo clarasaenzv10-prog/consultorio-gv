@@ -171,12 +171,20 @@ const sXBtn = {background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer"
 function Logo({size,col}) {
   const s = size||36, c = col||"#fff";
   return (
-    <svg viewBox="0 0 100 100" width={s} height={s} fill="none">
-      <circle cx="50" cy="50" r="43" stroke={c} strokeWidth="6.5" strokeDasharray="13 6" strokeLinecap="round"/>
-      <circle cx="50" cy="50" r="29" stroke={c} strokeWidth="5.5" strokeDasharray="9 5" strokeLinecap="round"/>
-      <path d="M50 22 Q72 30 71 50 Q70 67 54 71 Q39 74 33 61" stroke={c} strokeWidth="5.5" strokeLinecap="round" fill="none"/>
-      <circle cx="64" cy="30" r="3.5" fill={c}/>
-      <circle cx="50" cy="50" r="4" fill={c}/>
+    <svg viewBox="0 0 120 120" width={s} height={s} fill="none">
+      {/* Outer ring - dashed circle */}
+      <circle cx="60" cy="60" r="52" stroke={c} strokeWidth="5" strokeDasharray="14 7" strokeLinecap="round"/>
+      {/* Second ring */}
+      <circle cx="60" cy="60" r="38" stroke={c} strokeWidth="4.5" strokeDasharray="10 6" strokeLinecap="round"/>
+      {/* Third ring - partial, forming the G opening */}
+      <path d="M60 26 A34 34 0 1 1 26 60" stroke={c} strokeWidth="4" strokeLinecap="round" fill="none" strokeDasharray="8 5"/>
+      {/* G horizontal bar */}
+      <path d="M60 60 L78 60" stroke={c} strokeWidth="4" strokeLinecap="round"/>
+      {/* Inner G curve */}
+      <path d="M78 60 A20 20 0 0 0 60 40 A20 20 0 0 0 40 60 A20 20 0 0 0 60 80 A20 20 0 0 0 78 72" stroke={c} strokeWidth="4" strokeLinecap="round" fill="none"/>
+      {/* Small dot accent */}
+      <circle cx="78" cy="38" r="3" fill={c}/>
+      <circle cx="60" cy="60" r="3" fill={c}/>
     </svg>
   );
 }
@@ -515,9 +523,16 @@ export default function App() {
         </nav>
 
         {mod && mod.type==="slot" && (
-          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos}
-            onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Reserva creada":"Solicitud enviada");setMod(null);}}
+          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
+            onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Reserva extra creada":"Solicitud enviada");setMod(null);}}
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
+            onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
+            onEliminar={function(ev){
+              if(ev.tipo==="bloqueado") delDoc("bloques",ev.id);
+              else if(ev.tipo==="extra") delDoc("reservas",ev.id);
+              else if(ev.tipo==="fijo") delDoc("horarios",ev.id);
+              notify("Eliminado");setMod(null);
+            }}
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
@@ -651,9 +666,11 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
                       const top = (sm/60)*56;
                       const ht = Math.max((dm/60)*56-2,14);
                       return (
-                        <div key={ei} style={{position:"absolute",left:2,right:2,borderRadius:4,padding:"2px 4px",color:wh,fontSize:9,overflow:"hidden",zIndex:1,top:top+"px",height:ht+"px",background:col}}>
-                          <div style={{fontWeight:700}}>{bloq?"X":(role==="admin"?e.psico:"Ocupado")}</div>
-                          <div style={{opacity:.8}}>{e.consultorio} {e.inicio}</div>
+                        <div key={ei}
+                          style={{position:"absolute",left:2,right:2,borderRadius:4,padding:"2px 4px",color:wh,fontSize:9,overflow:"hidden",zIndex:2,top:top+"px",height:ht+"px",background:col,cursor:"pointer"}}
+                          onClick={function(ev){ev.stopPropagation();onSlot({date:date.toISOString().split("T")[0],hour:h,evento:e});}}>
+                          <div style={{fontWeight:700}}>{bloq?"Bloqueado":(role==="admin"?e.psico:"Ocupado")}</div>
+                          <div style={{opacity:.8}}>{e.consultorio} {e.inicio}-{e.fin}</div>
                         </div>
                       );
                     })}
@@ -669,36 +686,109 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
 }
 
 // ─── Slot Modal ───────────────────────────────────────────────
-function SlotModal({slot,role,user,psicos,onReservar,onBloquear,onClose}) {
+function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquear,onAgregarFijo,onEliminar,onClose}) {
+  const ev = slot.evento; // if clicking on existing event
   const [tipo,setTipo] = useState(role==="admin"?"bloquear":"reservar");
-  const [ini,setIni] = useState(String(slot.hour).padStart(2,"0")+":00");
-  const [fin,setFin] = useState(String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
-  const [cons,setCons] = useState("C1");
-  const [psico,setPsico] = useState(user);
+  const [ini,setIni] = useState(ev?ev.inicio:String(slot.hour).padStart(2,"0")+":00");
+  const [fin,setFin] = useState(ev?ev.fin:String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
+  const [cons,setCons] = useState(ev?ev.consultorio:"C1");
+  const [psico,setPsico] = useState(ev?ev.psico:user);
+  const [diaSemana,setDiaSemana] = useState(1);
   const pr = calcPrecio(ini,fin);
+
+  // Check conflicts for fijo and extra
+  function checkFijoConflicto() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al de inicio.";
+    const sMin=toMin(ini), eMin=toMin(fin);
+    const conflictos=(horarios||[]).filter(function(x){
+      if(x.consultorio!==cons) return false;
+      if(x.diaSemana!==Number(diaSemana)) return false;
+      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+    });
+    if(conflictos.length===0) return null;
+    return "Conflicto con "+conflictos.map(function(x){return x.psico;}).join(", ")+" en "+cons;
+  }
+  function checkExtraConflicto() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al de inicio.";
+    const sMin=toMin(ini), eMin=toMin(fin);
+    const fijosDia=(horarios||[]).filter(function(x){
+      if(x.consultorio!==cons) return false;
+      const ds=new Date(slot.date).getDay();
+      const jsDay=ds===0?7:ds;
+      if(x.diaSemana!==jsDay) return false;
+      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+    });
+    const extrasdia=(reservas||[]).filter(function(x){
+      return x.fecha===slot.date&&x.consultorio===cons&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+    });
+    const todos=fijosDia.concat(extrasdia);
+    if(todos.length===0) return null;
+    return "Conflicto con "+todos.map(function(x){return x.psico;}).join(", ")+" en "+cons;
+  }
+  const conflictoFijo = tipo==="fijo" ? checkFijoConflicto() : null;
+  const conflictoExtra = tipo==="reservar" ? checkExtraConflicto() : null;
+
+  // If clicking on existing event: show detail + delete
+  if(ev) {
+    const esBloq = ev.tipo==="bloqueado";
+    const esExtra = ev.tipo==="extra";
+    const esFijo = ev.tipo==="fijo";
+    return (
+      <div style={sOverlay} onClick={onClose}>
+        <div style={sModal} onClick={function(e){e.stopPropagation();}}>
+          <div style={sModH}>
+            <h3 style={{margin:0,color:tx}}>{esBloq?"Bloque":esFijo?"Horario Fijo":"Reserva extra"}</h3>
+            <button style={sXBtn} onClick={onClose}>X</button>
+          </div>
+          <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{background:bg,borderRadius:10,padding:14,border:"1px solid #C9E4EF"}}>
+              {!esBloq && <div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:4}}>{ev.psico}</div>}
+              <div style={{color:mu,fontSize:14}}>{ev.consultorio} - {CONS.find(function(c){return c.id===ev.consultorio;})||{sn:""}.sn}</div>
+              <div style={{color:tx,fontSize:14}}>{ev.inicio} - {ev.fin} ({calcHrs(ev.inicio,ev.fin)}hs)</div>
+              {esFijo && <div style={{color:mu,fontSize:13}}>{DIAS[ev.diaSemana]} - Horario fijo semanal</div>}
+              {esExtra && <div style={{color:mu,fontSize:13}}>{new Date(ev.fecha).toLocaleDateString("es-AR")} - Hora extra</div>}
+              {ev.motivo && <div style={{color:mu,fontSize:13}}>Motivo: {ev.motivo}</div>}
+              {!esBloq && <div style={{color:ok,fontWeight:700,fontSize:15,marginTop:6}}>{ars(calcPrecio(ev.inicio,ev.fin).sub)}{esFijo?"/sem":""}</div>}
+            </div>
+            {role==="admin" && (
+              <button style={btnO(eb,er,"1.5px solid #F5B8B3")} onClick={function(){if(window.confirm("Eliminar este "+(esBloq?"bloque":esFijo?"horario fijo":"reserva")+"?"))onEliminar(ev);}}>
+                Eliminar {esBloq?"bloque":esFijo?"horario fijo":"reserva"}
+              </button>
+            )}
+            <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Creating new slot
   return (
     <div style={sOverlay} onClick={onClose}>
       <div style={sModal} onClick={function(e){e.stopPropagation();}}>
         <div style={sModH}>
-          <h3 style={{margin:0,color:tx}}>Fecha: {new Date(slot.date).toLocaleDateString("es-AR")}</h3>
+          <h3 style={{margin:0,color:tx}}>{new Date(slot.date).toLocaleDateString("es-AR")}</h3>
           <button style={sXBtn} onClick={onClose}>X</button>
         </div>
         {role==="admin" && (
           <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF"}}>
-            <button style={{flex:1,padding:"10px",border:"none",background:"transparent",color:tipo==="bloquear"?br:mu,cursor:"pointer",fontFamily:"inherit",borderBottom:tipo==="bloquear"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("bloquear");}}>Bloquear</button>
-            <button style={{flex:1,padding:"10px",border:"none",background:"transparent",color:tipo==="reservar"?br:mu,cursor:"pointer",fontFamily:"inherit",borderBottom:tipo==="reservar"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("reservar");}}>Crear reserva</button>
+            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="bloquear"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="bloquear"?700:400,borderBottom:tipo==="bloquear"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("bloquear");}}>Bloquear</button>
+            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="reservar"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="reservar"?700:400,borderBottom:tipo==="reservar"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("reservar");}}>Extra</button>
+            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="fijo"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="fijo"?700:400,borderBottom:tipo==="fijo"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("fijo");}}>Fijo</button>
           </div>
         )}
         <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
+          {tipo==="fijo" && (
+            <div>
+              <label style={sLbl}>Dia de la semana</label>
+              <select style={sInp} value={diaSemana} onChange={function(e){setDiaSemana(Number(e.target.value));}}>
+                {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
+              </select>
+            </div>
+          )}
           <div style={{display:"flex",gap:10}}>
-            <div style={{flex:1}}>
-              <label style={sLbl}>Desde</label>
-              <input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
-            </div>
-            <div style={{flex:1}}>
-              <label style={sLbl}>Hasta</label>
-              <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
-            </div>
+            <div style={{flex:1}}><label style={sLbl}>Desde</label><input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/></div>
+            <div style={{flex:1}}><label style={sLbl}>Hasta</label><input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/></div>
           </div>
           <div>
             <label style={sLbl}>Consultorio</label>
@@ -706,7 +796,7 @@ function SlotModal({slot,role,user,psicos,onReservar,onBloquear,onClose}) {
               {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
             </select>
           </div>
-          {tipo==="reservar" && (
+          {(tipo==="reservar"||tipo==="fijo") && (
             <div>
               <label style={sLbl}>Psicologa</label>
               {role==="admin"
@@ -715,12 +805,40 @@ function SlotModal({slot,role,user,psicos,onReservar,onBloquear,onClose}) {
               }
             </div>
           )}
-          <div style={{background:bg,borderRadius:8,padding:12,border:"1px solid #C9E4EF"}}>
+          <div style={{background:bg,borderRadius:8,padding:10,border:"1px solid #C9E4EF"}}>
             <div style={{color:mu,fontSize:12}}>Horas: <b style={{color:tx}}>{Math.max((toMin(fin)-toMin(ini))/60,0).toFixed(1)}hs</b></div>
-            {tipo==="reservar" && <div style={{color:mu,fontSize:12}}>Costo: <b style={{color:ok}}>{ars(pr.sub)}</b>{pr.ley&&" - "+pr.ley}</div>}
+            {(tipo==="reservar"||tipo==="fijo") && <div style={{color:mu,fontSize:12}}>Costo: <b style={{color:ok}}>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}{pr.ley&&" - "+pr.ley}</div>}
+            {tipo==="fijo" && <div style={{color:br,fontSize:11,marginTop:2}}>Se agrega como horario fijo semanal e impacta en facturacion</div>}
           </div>
-          <button style={btn(br,wh)} onClick={function(){tipo==="bloquear"?onBloquear({fecha:slot.date,inicio:ini,fin:fin,consultorio:cons}):onReservar({fecha:slot.date,inicio:ini,fin:fin,consultorio:cons,psico:role==="psico"?user:psico});}}>
-            {tipo==="bloquear"?"Bloquear":(role==="admin"?"Crear reserva":"Enviar solicitud")}
+          {conflictoFijo && (
+            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
+              {conflictoFijo}
+            </div>
+          )}
+          {conflictoExtra && (
+            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
+              {conflictoExtra}
+            </div>
+          )}
+          {(tipo==="fijo"&&!conflictoFijo&&ini&&fin&&toMin(fin)>toMin(ini)) && (
+            <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",color:ok,fontSize:13}}>
+              Horario disponible
+            </div>
+          )}
+          {(tipo==="reservar"&&!conflictoExtra&&ini&&fin&&toMin(fin)>toMin(ini)) && (
+            <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",color:ok,fontSize:13}}>
+              Horario disponible
+            </div>
+          )}
+          <button style={Object.assign({},btn(br,wh),{opacity:(conflictoFijo||conflictoExtra)?0.4:1})} disabled={!!(conflictoFijo||conflictoExtra)} onClick={function(){
+            if(tipo==="bloquear") onBloquear({fecha:slot.date,inicio:ini,fin:fin,consultorio:cons});
+            else if(tipo==="fijo") {
+              const c=CONS.find(function(x){return x.id===cons;});
+              onAgregarFijo({diaSemana:diaSemana,inicio:ini,fin:fin,consultorio:cons,sede:c?c.sede:"VL",psico:psico});
+            }
+            else onReservar({fecha:slot.date,inicio:ini,fin:fin,consultorio:cons,psico:role==="psico"?user:psico});
+          }}>
+            {tipo==="bloquear"?"Bloquear":tipo==="fijo"?"Agregar horario fijo":(role==="admin"?"Crear reserva extra":"Enviar solicitud")}
           </button>
         </div>
       </div>
@@ -1521,7 +1639,7 @@ function MisReservasView({reservas,onNew}) {
 // ─── Mis Horarios ─────────────────────────────────────────────
 function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,notify}) {
   const [mH,setMH] = useState(null);
-  const mF = horarios.filter(function(h){return h.psico.toLowerCase()===user.toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  const mF = horarios.filter(function(h){return h.psico&&user&&h.psico.trim().toLowerCase()===user.trim().toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
   const mE = reservas.filter(function(r){return r.psico===user&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
   const mS = solicitudes.filter(function(s){return s.psico===user;}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
 
@@ -1638,7 +1756,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
               </div>
             )}
             {(mH.type==="add"||mH.type==="edit") && (
-              <SolHorarioForm tipo={mH.type} h={mH.h} onSol={function(datos){sol("fijo",mH.type==="add"?"agregar":"modificar",datos,mH.h&&mH.h.id);}} onClose={function(){setMH(null);}}/>
+              <SolHorarioForm tipo={mH.type} h={mH.h} horarios={horarios} user={user} onSol={function(datos){sol("fijo",mH.type==="add"?"agregar":"modificar",datos,mH.h&&mH.h.id);}} onClose={function(){setMH(null);}}/>
             )}
           </div>
         </div>
@@ -1823,12 +1941,40 @@ function CambiarPassBtn({user,setPsicos,notify}) {
   );
 }
 
-function SolHorarioForm({tipo,h,onSol,onClose}) {
+function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
   const [dia,setDia] = useState(h?h.diaSemana:1);
   const [ini,setIni] = useState(h?h.inicio:"09:00");
   const [fin,setFin] = useState(h?h.fin:"14:00");
   const [cons,setCons] = useState(h?h.consultorio:"C1");
   const pr = calcPrecio(ini,fin);
+
+  // Check if requested slot conflicts with existing schedules
+  function checkConflicto() {
+    const sMin = toMin(ini);
+    const eMin = toMin(fin);
+    if(eMin <= sMin) return "El horario de fin debe ser mayor al de inicio.";
+    const conflictos = (horarios||[]).filter(function(x) {
+      if(x.consultorio !== cons) return false;
+      if(x.diaSemana !== Number(dia)) return false;
+      // exclude own horario when editing
+      if(h && x.id === h.id) return false;
+      const xS = toMin(x.inicio);
+      const xE = toMin(x.fin);
+      return sMin < xE && eMin > xS;
+    });
+    if(conflictos.length === 0) return null;
+    const nombres = conflictos.map(function(x){return x.psico;}).join(", ");
+    return "Ese horario se superpone con "+nombres+" en "+cons+". Elegí otro horario o consultorio.";
+  }
+
+  function handleEnviar() {
+    const err = checkConflicto();
+    if(err) { alert(err); return; }
+    onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});
+  }
+
+  const conflicto = checkConflicto();
+
   return (
     <div>
       <div style={sModH}>
@@ -1858,13 +2004,19 @@ function SolHorarioForm({tipo,h,onSol,onClose}) {
             <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
           </div>
         </div>
-        <div style={{background:bg,borderRadius:8,padding:10,color:mu,fontSize:12,border:"1px solid #C9E4EF"}}>
-          Costo estimado: <b style={{color:ok}}>{ars(pr.sub)}/semana</b>
-          {pr.ley&&" - "+pr.ley}
-          <br/>Quedara pendiente de aprobacion.
-        </div>
+        {conflicto && (
+          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
+            {conflicto}
+          </div>
+        )}
+        {!conflicto && ini && fin && toMin(fin)>toMin(ini) && (
+          <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",color:ok,fontSize:13}}>
+            Horario disponible - Costo estimado: <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}
+          </div>
+        )}
+        <div style={{color:mu,fontSize:12}}>La solicitud queda pendiente de aprobacion.</div>
         <div style={{display:"flex",gap:10}}>
-          <button style={btn(br,wh)} onClick={function(){onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});}}>Enviar solicitud</button>
+          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={handleEnviar}>Enviar solicitud</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cancelar</button>
         </div>
       </div>
