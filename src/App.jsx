@@ -172,17 +172,11 @@ function Logo({size,col}) {
   const s = size||36, c = col||"#fff";
   return (
     <svg viewBox="0 0 120 120" width={s} height={s} fill="none">
-      {/* Outer ring - dashed circle */}
       <circle cx="60" cy="60" r="52" stroke={c} strokeWidth="5" strokeDasharray="14 7" strokeLinecap="round"/>
-      {/* Second ring */}
       <circle cx="60" cy="60" r="38" stroke={c} strokeWidth="4.5" strokeDasharray="10 6" strokeLinecap="round"/>
-      {/* Third ring - partial, forming the G opening */}
       <path d="M60 26 A34 34 0 1 1 26 60" stroke={c} strokeWidth="4" strokeLinecap="round" fill="none" strokeDasharray="8 5"/>
-      {/* G horizontal bar */}
       <path d="M60 60 L78 60" stroke={c} strokeWidth="4" strokeLinecap="round"/>
-      {/* Inner G curve */}
       <path d="M78 60 A20 20 0 0 0 60 40 A20 20 0 0 0 40 60 A20 20 0 0 0 60 80 A20 20 0 0 0 78 72" stroke={c} strokeWidth="4" strokeLinecap="round" fill="none"/>
-      {/* Small dot accent */}
       <circle cx="78" cy="38" r="3" fill={c}/>
       <circle cx="60" cy="60" r="3" fill={c}/>
     </svg>
@@ -210,102 +204,33 @@ export default function App() {
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [dbReady,setDbReady] = useState(false);
 
-  // ─── Firebase sync ───────────────────────────────────────────
   useEffect(function() {
-    // Seed initial data then listen for changes
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
-    const TAB_INICIAL = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
-
+    const TAB_INI = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
     Promise.all([
       seedIfEmpty("psicos", PBASE),
       seedIfEmpty("horarios", HORARIOS_WITH_IDS),
-      seedIfEmpty("tabP", TAB_INICIAL),
-    ]).then(function() {
-      setDbReady(true);
-    });
-
+      seedIfEmpty("tabP", TAB_INI),
+    ]).then(function(){ setDbReady(true); });
     const unsubs = [
-      listenCol("psicos", function(data){ setPsicosLocal(data.sort(function(a,b){return a.nombre.localeCompare(b.nombre);})); }),
-      listenCol("horarios", function(data){ setHorariosLocal(data); }),
-      listenCol("reservas", function(data){ setReservasLocal(data); }),
-      listenCol("bloques", function(data){ setBloquesLocal(data); }),
-      listenCol("anuncios", function(data){ setAnunciosLocal(data.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
-      listenCol("solHor", function(data){ setSolHorLocal(data.sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);})); }),
-      listenCol("tabP", function(data){ setTabPLocal(data.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("psicos", function(d){ setPsicosLocal(d); }),
+      listenCol("horarios", function(d){ setHorariosLocal(d); }),
+      listenCol("reservas", function(d){ setReservasLocal(d); }),
+      listenCol("bloques", function(d){ setBloquesLocal(d); }),
+      listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
+      listenCol("solHor", function(d){ setSolHorLocal(d); }),
+      listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
     ];
-    return function() { unsubs.forEach(function(u){u();}); };
+    return function(){ unsubs.forEach(function(u){u();}); };
   }, []);
 
-  // ─── Firebase write helpers (surgical — only touch changed docs) ─
-  // Each helper intercepts the React-style updater and writes ONLY
-  // the added/changed/removed document to Firestore.
-
-  function setPsicos(updater) {
-    const prev = psicos;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(p) { saveDoc("psicos", p.id, p); });
-    prev.forEach(function(p) { if (!next.find(function(x){return x.id===p.id;})) delDoc("psicos", p.id); });
-  }
-
-  function setHorarios(updater) {
-    const prev = horarios;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(h) { saveDoc("horarios", h.id, h); });
-    prev.forEach(function(h) { if (!next.find(function(x){return x.id===h.id;})) delDoc("horarios", h.id); });
-  }
-
-  function addReserva(r) { saveDoc("reservas", r.id, r); }
-  function updateReserva(id, changes) {
-    const r = reservas.find(function(x){return x.id===id;});
-    if (r) saveDoc("reservas", id, Object.assign({}, r, changes));
-  }
-  function setReservas(updater) {
-    const prev = reservas;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(r) { saveDoc("reservas", r.id, r); });
-    prev.forEach(function(r) { if (!next.find(function(x){return x.id===r.id;})) delDoc("reservas", r.id); });
-  }
-
-  function addBloque(b) { saveDoc("bloques", b.id, b); }
-  function delBloque(id) { delDoc("bloques", id); }
-  function setBloques(updater) {
-    const prev = bloques;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(b) { saveDoc("bloques", b.id, b); });
-    prev.forEach(function(b) { if (!next.find(function(x){return x.id===b.id;})) delDoc("bloques", b.id); });
-  }
-
-  function addAnuncio(a) { saveDoc("anuncios", a.id, a); }
-  function delAnuncio(id) { delDoc("anuncios", id); }
-  function updateAnuncio(id, changes) {
-    const a = anuncios.find(function(x){return x.id===id;});
-    if (a) saveDoc("anuncios", id, Object.assign({}, a, changes));
-  }
-  function setAnuncios(updater) {
-    const prev = anuncios;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(a) { saveDoc("anuncios", a.id, a); });
-    prev.forEach(function(a) { if (!next.find(function(x){return x.id===a.id;})) delDoc("anuncios", a.id); });
-  }
-
-  function addSolHor(s) { saveDoc("solHor", s.id, s); }
-  function updateSolHor(id, changes) {
-    const s = solHor.find(function(x){return x.id===id;});
-    if (s) saveDoc("solHor", id, Object.assign({}, s, changes));
-  }
-  function setSolHor(updater) {
-    const prev = solHor;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(s) { saveDoc("solHor", s.id, s); });
-    prev.forEach(function(s) { if (!next.find(function(x){return x.id===s.id;})) delDoc("solHor", s.id); });
-  }
-
-  function setTabP(updater) {
-    const prev = tabP;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    next.forEach(function(t) { saveDoc("tabP", t.id, t); });
-    prev.forEach(function(t) { if (!next.find(function(x){return x.id===t.id;})) delDoc("tabP", t.id); });
-  }
+  function setPsicos(u2) { const n=typeof u2==="function"?u2(psicos):u2; n.forEach(function(p){saveDoc("psicos",p.id,p);}); psicos.forEach(function(p){if(!n.find(function(x){return x.id===p.id;}))delDoc("psicos",p.id);}); }
+  function setHorarios(u2) { const n=typeof u2==="function"?u2(horarios):u2; n.forEach(function(h){saveDoc("horarios",h.id,h);}); horarios.forEach(function(h){if(!n.find(function(x){return x.id===h.id;}))delDoc("horarios",h.id);}); }
+  function setReservas(u2) { const n=typeof u2==="function"?u2(reservas):u2; n.forEach(function(r){saveDoc("reservas",r.id,r);}); reservas.forEach(function(r){if(!n.find(function(x){return x.id===r.id;}))delDoc("reservas",r.id);}); }
+  function setBloques(u2) { const n=typeof u2==="function"?u2(bloques):u2; n.forEach(function(b){saveDoc("bloques",b.id,b);}); bloques.forEach(function(b){if(!n.find(function(x){return x.id===b.id;}))delDoc("bloques",b.id);}); }
+  function setAnuncios(u2) { const n=typeof u2==="function"?u2(anuncios):u2; n.forEach(function(a){saveDoc("anuncios",a.id,a);}); anuncios.forEach(function(a){if(!n.find(function(x){return x.id===a.id;}))delDoc("anuncios",a.id);}); }
+  function setSolHor(u2) { const n=typeof u2==="function"?u2(solHor):u2; n.forEach(function(s){saveDoc("solHor",s.id,s);}); solHor.forEach(function(s){if(!n.find(function(x){return x.id===s.id;}))delDoc("solHor",s.id);}); }
+  function setTabP(u2) { const n=typeof u2==="function"?u2(tabP):u2; n.forEach(function(t){saveDoc("tabP",t.id,t);}); tabP.forEach(function(t){if(!n.find(function(x){return x.id===t.id;}))delDoc("tabP",t.id);}); }
 
   const cmap = {};
   psicos.forEach(function(p,i){ cmap[p.nombre.toLowerCase()] = PCOLS[i%PCOLS.length]; });
@@ -372,7 +297,7 @@ export default function App() {
   const wkD = wkDates(wk);
 
   if(!dbReady) return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#EBF6FA,#F0F8FB)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#EBF6FA,#F0F8FB)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Sans,sans-serif"}}>
       <div style={{textAlign:"center"}}>
         <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#4BA3C3,#2E86AB)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
           <Logo size={38}/>
@@ -523,16 +448,9 @@ export default function App() {
         </nav>
 
         {mod && mod.type==="slot" && (
-          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
-            onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Reserva extra creada":"Solicitud enviada");setMod(null);}}
-            onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
-            onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
-            onEliminar={function(ev){
-              if(ev.tipo==="bloqueado") delDoc("bloques",ev.id);
-              else if(ev.tipo==="extra") delDoc("reservas",ev.id);
-              else if(ev.tipo==="fijo") delDoc("horarios",ev.id);
-              notify("Eliminado");setMod(null);
-            }}
+          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos}
+            onReservar={function(d){setReservas(function(p){return p.concat([Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"})]);});notify(role==="admin"?"Reserva creada":"Solicitud enviada");setMod(null);}}
+            onBloquear={function(d){setBloques(function(p){return p.concat([Object.assign({id:Date.now()},d)]);});notify("Bloqueado");setMod(null);}}
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
@@ -687,72 +605,52 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
 
 // ─── Slot Modal ───────────────────────────────────────────────
 function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquear,onAgregarFijo,onEliminar,onClose}) {
-  const ev = slot.evento; // if clicking on existing event
+  const ev = slot.evento;
   const [tipo,setTipo] = useState(role==="admin"?"bloquear":"reservar");
-  const [ini,setIni] = useState(ev?ev.inicio:String(slot.hour).padStart(2,"0")+":00");
-  const [fin,setFin] = useState(ev?ev.fin:String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
-  const [cons,setCons] = useState(ev?ev.consultorio:"C1");
-  const [psico,setPsico] = useState(ev?ev.psico:user);
-  const [diaSemana,setDiaSemana] = useState(1);
+  const [ini,setIni] = useState(String(slot.hour).padStart(2,"0")+":00");
+  const [fin,setFin] = useState(String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
+  const [cons,setCons] = useState("C1");
+  const [psico,setPsico] = useState(psicos&&psicos[0]?psicos[0].nombre:user);
+  const [diaSemana,setDiaSemana] = useState(new Date(slot.date).getDay()===0?7:(new Date(slot.date).getDay()||1));
   const pr = calcPrecio(ini,fin);
 
-  // Check conflicts for fijo and extra
-  function checkFijoConflicto() {
-    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al de inicio.";
-    const sMin=toMin(ini), eMin=toMin(fin);
-    const conflictos=(horarios||[]).filter(function(x){
-      if(x.consultorio!==cons) return false;
-      if(x.diaSemana!==Number(diaSemana)) return false;
-      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
-    });
-    if(conflictos.length===0) return null;
-    return "Conflicto con "+conflictos.map(function(x){return x.psico;}).join(", ")+" en "+cons;
+  function checkConflicto(tipoCheck,consCheck,iniCheck,finCheck,diaCheck) {
+    const sMin=toMin(iniCheck), eMin=toMin(finCheck);
+    if(eMin<=sMin) return null;
+    if(tipoCheck==="fijo") {
+      const c=(horarios||[]).filter(function(x){return x.consultorio===consCheck&&Number(x.diaSemana)===Number(diaCheck)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+      return c.length?("Conflicto con "+c.map(function(x){return x.psico;}).join(", ")):null;
+    }
+    const fijos=(horarios||[]).filter(function(x){const ds=new Date(slot.date).getDay();const jd=ds===0?7:ds;return x.consultorio===consCheck&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+    const extras=(reservas||[]).filter(function(x){return x.fecha===slot.date&&x.consultorio===consCheck&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+    const todos=fijos.concat(extras);
+    return todos.length?("Conflicto con "+todos.map(function(x){return x.psico;}).join(", ")):null;
   }
-  function checkExtraConflicto() {
-    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al de inicio.";
-    const sMin=toMin(ini), eMin=toMin(fin);
-    const fijosDia=(horarios||[]).filter(function(x){
-      if(x.consultorio!==cons) return false;
-      const ds=new Date(slot.date).getDay();
-      const jsDay=ds===0?7:ds;
-      if(x.diaSemana!==jsDay) return false;
-      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
-    });
-    const extrasdia=(reservas||[]).filter(function(x){
-      return x.fecha===slot.date&&x.consultorio===cons&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
-    });
-    const todos=fijosDia.concat(extrasdia);
-    if(todos.length===0) return null;
-    return "Conflicto con "+todos.map(function(x){return x.psico;}).join(", ")+" en "+cons;
-  }
-  const conflictoFijo = tipo==="fijo" ? checkFijoConflicto() : null;
-  const conflictoExtra = tipo==="reservar" ? checkExtraConflicto() : null;
+  const conflicto = (tipo==="fijo"||tipo==="reservar") ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
 
-  // If clicking on existing event: show detail + delete
   if(ev) {
-    const esBloq = ev.tipo==="bloqueado";
-    const esExtra = ev.tipo==="extra";
-    const esFijo = ev.tipo==="fijo";
+    const consNombre = (CONS.find(function(c){return c.id===ev.consultorio;})||{sn:""}).sn;
+    const esBloq=ev.tipo==="bloqueado", esFijo=ev.tipo==="fijo", esExtra=ev.tipo==="extra";
     return (
       <div style={sOverlay} onClick={onClose}>
         <div style={sModal} onClick={function(e){e.stopPropagation();}}>
           <div style={sModH}>
-            <h3 style={{margin:0,color:tx}}>{esBloq?"Bloque":esFijo?"Horario Fijo":"Reserva extra"}</h3>
+            <h3 style={{margin:0,color:tx}}>{esBloq?"Bloque":esFijo?"Horario Fijo":"Hora Extra"}</h3>
             <button style={sXBtn} onClick={onClose}>X</button>
           </div>
           <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
             <div style={{background:bg,borderRadius:10,padding:14,border:"1px solid #C9E4EF"}}>
-              {!esBloq && <div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:4}}>{ev.psico}</div>}
-              <div style={{color:mu,fontSize:14}}>{ev.consultorio} - {CONS.find(function(c){return c.id===ev.consultorio;})||{sn:""}.sn}</div>
-              <div style={{color:tx,fontSize:14}}>{ev.inicio} - {ev.fin} ({calcHrs(ev.inicio,ev.fin)}hs)</div>
-              {esFijo && <div style={{color:mu,fontSize:13}}>{DIAS[ev.diaSemana]} - Horario fijo semanal</div>}
-              {esExtra && <div style={{color:mu,fontSize:13}}>{new Date(ev.fecha).toLocaleDateString("es-AR")} - Hora extra</div>}
-              {ev.motivo && <div style={{color:mu,fontSize:13}}>Motivo: {ev.motivo}</div>}
-              {!esBloq && <div style={{color:ok,fontWeight:700,fontSize:15,marginTop:6}}>{ars(calcPrecio(ev.inicio,ev.fin).sub)}{esFijo?"/sem":""}</div>}
+              {!esBloq && <div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:6}}>{ev.psico}</div>}
+              <div style={{color:mu,fontSize:13}}>{ev.consultorio}{consNombre?" - "+consNombre:""}</div>
+              <div style={{color:tx,fontSize:14,fontWeight:600}}>{ev.inicio} - {ev.fin} ({calcHrs(ev.inicio,ev.fin).toFixed(1)}hs)</div>
+              {esFijo&&<div style={{color:br,fontSize:13}}>{DIAS[ev.diaSemana]} - Se repite cada semana</div>}
+              {esExtra&&<div style={{color:mu,fontSize:13}}>{new Date(ev.fecha).toLocaleDateString("es-AR")} - Hora extra</div>}
+              {ev.motivo&&<div style={{color:mu,fontSize:12}}>Motivo: {ev.motivo}</div>}
+              {!esBloq&&<div style={{color:ok,fontWeight:700,fontSize:15,marginTop:6}}>{ars(calcPrecio(ev.inicio,ev.fin).sub)}{esFijo?"/sem":""}</div>}
             </div>
-            {role==="admin" && (
-              <button style={btnO(eb,er,"1.5px solid #F5B8B3")} onClick={function(){if(window.confirm("Eliminar este "+(esBloq?"bloque":esFijo?"horario fijo":"reserva")+"?"))onEliminar(ev);}}>
-                Eliminar {esBloq?"bloque":esFijo?"horario fijo":"reserva"}
+            {role==="admin"&&(
+              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontWeight:700})} onClick={function(){if(window.confirm("Eliminar este "+(esBloq?"bloque":esFijo?"horario fijo":"hora extra")+"?"))onEliminar(ev);}}>
+                Eliminar {esBloq?"bloque":esFijo?"horario fijo":"hora extra"}
               </button>
             )}
             <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cerrar</button>
@@ -762,7 +660,6 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     );
   }
 
-  // Creating new slot
   return (
     <div style={sOverlay} onClick={onClose}>
       <div style={sModal} onClick={function(e){e.stopPropagation();}}>
@@ -770,17 +667,17 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
           <h3 style={{margin:0,color:tx}}>{new Date(slot.date).toLocaleDateString("es-AR")}</h3>
           <button style={sXBtn} onClick={onClose}>X</button>
         </div>
-        {role==="admin" && (
+        {role==="admin"&&(
           <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF"}}>
             <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="bloquear"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="bloquear"?700:400,borderBottom:tipo==="bloquear"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("bloquear");}}>Bloquear</button>
-            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="reservar"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="reservar"?700:400,borderBottom:tipo==="reservar"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("reservar");}}>Extra</button>
-            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="fijo"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="fijo"?700:400,borderBottom:tipo==="fijo"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("fijo");}}>Fijo</button>
+            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="reservar"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="reservar"?700:400,borderBottom:tipo==="reservar"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("reservar");}}>Hora extra</button>
+            <button style={{flex:1,padding:"9px 4px",border:"none",background:"transparent",color:tipo==="fijo"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:tipo==="fijo"?700:400,borderBottom:tipo==="fijo"?"2px solid #4BA3C3":"none"}} onClick={function(){setTipo("fijo");}}>Horario fijo</button>
           </div>
         )}
         <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
-          {tipo==="fijo" && (
+          {tipo==="fijo"&&(
             <div>
-              <label style={sLbl}>Dia de la semana</label>
+              <label style={sLbl}>Dia de la semana (se repite cada semana)</label>
               <select style={sInp} value={diaSemana} onChange={function(e){setDiaSemana(Number(e.target.value));}}>
                 {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
               </select>
@@ -796,49 +693,31 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
               {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
             </select>
           </div>
-          {(tipo==="reservar"||tipo==="fijo") && (
+          {(tipo==="reservar"||tipo==="fijo")&&(
             <div>
               <label style={sLbl}>Psicologa</label>
               {role==="admin"
-                ? <select style={sInp} value={psico} onChange={function(e){setPsico(e.target.value);}}>{psicos.map(function(p){return <option key={p.id}>{p.nombre}</option>;})}</select>
-                : <input style={sInp} value={user} disabled/>
+                ?<select style={sInp} value={psico} onChange={function(e){setPsico(e.target.value);}}>{psicos.map(function(p){return <option key={p.id}>{p.nombre}</option>;})}</select>
+                :<input style={sInp} value={user} disabled/>
               }
             </div>
           )}
-          <div style={{background:bg,borderRadius:8,padding:10,border:"1px solid #C9E4EF"}}>
-            <div style={{color:mu,fontSize:12}}>Horas: <b style={{color:tx}}>{Math.max((toMin(fin)-toMin(ini))/60,0).toFixed(1)}hs</b></div>
-            {(tipo==="reservar"||tipo==="fijo") && <div style={{color:mu,fontSize:12}}>Costo: <b style={{color:ok}}>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}{pr.ley&&" - "+pr.ley}</div>}
-            {tipo==="fijo" && <div style={{color:br,fontSize:11,marginTop:2}}>Se agrega como horario fijo semanal e impacta en facturacion</div>}
-          </div>
-          {conflictoFijo && (
-            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
-              {conflictoFijo}
+          {conflicto&&(
+            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13,fontWeight:600}}>
+              {conflicto}
             </div>
           )}
-          {conflictoExtra && (
-            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
-              {conflictoExtra}
+          {!conflicto&&(tipo==="fijo"||tipo==="reservar")&&ini&&fin&&toMin(fin)>toMin(ini)&&(
+            <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>
+              Horario disponible - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
             </div>
           )}
-          {(tipo==="fijo"&&!conflictoFijo&&ini&&fin&&toMin(fin)>toMin(ini)) && (
-            <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",color:ok,fontSize:13}}>
-              Horario disponible
-            </div>
-          )}
-          {(tipo==="reservar"&&!conflictoExtra&&ini&&fin&&toMin(fin)>toMin(ini)) && (
-            <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",color:ok,fontSize:13}}>
-              Horario disponible
-            </div>
-          )}
-          <button style={Object.assign({},btn(br,wh),{opacity:(conflictoFijo||conflictoExtra)?0.4:1})} disabled={!!(conflictoFijo||conflictoExtra)} onClick={function(){
+          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){
             if(tipo==="bloquear") onBloquear({fecha:slot.date,inicio:ini,fin:fin,consultorio:cons});
-            else if(tipo==="fijo") {
-              const c=CONS.find(function(x){return x.id===cons;});
-              onAgregarFijo({diaSemana:diaSemana,inicio:ini,fin:fin,consultorio:cons,sede:c?c.sede:"VL",psico:psico});
-            }
+            else if(tipo==="fijo"){const c=CONS.find(function(x){return x.id===cons;});onAgregarFijo({diaSemana:Number(diaSemana),inicio:ini,fin:fin,consultorio:cons,sede:c?c.sede:"VL",psico:psico});}
             else onReservar({fecha:slot.date,inicio:ini,fin:fin,consultorio:cons,psico:role==="psico"?user:psico});
           }}>
-            {tipo==="bloquear"?"Bloquear":tipo==="fijo"?"Agregar horario fijo":(role==="admin"?"Crear reserva extra":"Enviar solicitud")}
+            {tipo==="bloquear"?"Bloquear":tipo==="fijo"?"Agregar horario fijo":(role==="admin"?"Agregar hora extra":"Enviar solicitud")}
           </button>
         </div>
       </div>
@@ -1044,33 +923,17 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";});
 
   function aprobar(s) {
-    if(s.accion==="eliminar" && s.tipo==="fijo") {
-      const h = horarios.find(function(x){return x.id===s.horarioId;});
-      delDoc("horarios", s.horarioId);
-      if(h) {
-        const an={id:Date.now(),texto:"Se libero horario: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
-        saveDoc("anuncios",an.id,an);
-      }
-    } else if(s.accion==="modificar" && s.tipo==="fijo") {
-      const c = CONS.find(function(x){return x.id===s.datos.consultorio;});
-      const h = horarios.find(function(x){return x.id===s.horarioId;});
-      if(h) saveDoc("horarios",s.horarioId,Object.assign({},h,s.datos,{sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana)}));
-    } else if(s.accion==="agregar" && s.tipo==="fijo") {
-      const c = CONS.find(function(x){return x.id===s.datos.consultorio;});
-      const h = Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});
-      saveDoc("horarios",h.id,h);
-    } else if(s.accion==="eliminar" && s.tipo==="extra") {
-      delDoc("reservas", s.reservaId);
-    } else if(s.accion==="agregar" && s.tipo==="extra") {
-      const r = Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});
-      saveDoc("reservas",r.id,r);
-    }
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});delDoc("horarios",s.horarioId);if(h){const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
+    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h)saveDoc("horarios",s.horarioId,Object.assign({},h,s.datos,{sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana)}));}
+    else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
+    else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
+    else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
     notify("Aprobado");
   }
   function rechazar(id) {
-    const s = solicitudes.find(function(x){return x.id===id;});
-    if(s) saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
+    const s=solicitudes.find(function(x){return x.id===id;});
+    if(s)saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
     notify("Rechazado");
   }
 
@@ -1320,14 +1183,10 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
   ];
   function saveNew() {
     if(!nf.label||!nf.vigencia){notify("Completa nombre y vigencia","err");return;}
-    const t = Object.assign({id:"tp"+Date.now()},nf);
-    saveDoc("tabP",t.id,t);
+    setTabP(function(p){return p.concat([Object.assign({id:"tp"+Date.now()},nf)]).sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);});});
     setShowNew(false); setNf({label:"",vigencia:"",p:Object.assign({},PD)}); notify("Tabla creada");
   }
-  function updSel(k,v) {
-    const t = tabP.find(function(x){return x.id===selId;});
-    if(t) saveDoc("tabP",selId,Object.assign({},t,{p:Object.assign({},t.p,{[k]:Number(v)})}));
-  }
+  function updSel(k,v) { setTabP(function(p){return p.map(function(t){return t.id!==selId?t:Object.assign({},t,{p:Object.assign({},t.p,{[k]:Number(v)})});});}); }
   function sWA(ps) {
     if(!ps.wa){notify("Sin WA: "+ps.nombre,"err");return;}
     if(!sel) return;
@@ -1385,7 +1244,7 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
                 <div style={{color:tx,fontSize:18,fontWeight:700}}>{sel.label}</div>
                 <div style={{color:mu,fontSize:13}}>Vigente desde {new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")}</div>
               </div>
-              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12})} onClick={function(){if(!window.confirm("Eliminar?"))return;delDoc("tabP",selId);setSelId(null);notify("Eliminada");}}>Eliminar</button>
+              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12})} onClick={function(){if(!window.confirm("Eliminar?"))return;setTabP(function(p){return p.filter(function(t){return t.id!==selId;});});setSelId(null);notify("Eliminada");}}>Eliminar</button>
             </div>
             {CAMPOS.map(function(c) {
               return (
@@ -1419,7 +1278,7 @@ function GestionPsicoRow({p,setPsicos,notify}) {
   const [newPass,setNewPass] = useState("");
   function savePass() {
     if(newPass.length < 4) { notify("Minimo 4 caracteres","err"); return; }
-    saveDoc("psicos",p.id,Object.assign({},p,{pass:newPass}));
+    setPsicos(function(ps){return ps.map(function(x){return x.id===p.id?Object.assign({},x,{pass:newPass}):x;});});
     setNewPass(""); setEditPass(false); notify("Contrasena actualizada");
   }
   return (
@@ -1492,21 +1351,20 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
   const misH = selP ? horarios.filter(function(h){return h.psico.toLowerCase()===selP.toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);}) : [];
 
   function addH() {
-    const c = CONS.find(function(x){return x.id===nh.consultorio;});
-    const h = Object.assign({},nh,{id:"h"+Date.now(),psico:selP,sede:c?c.sede:"VL",diaSemana:Number(nh.diaSemana)});
+    const c=CONS.find(function(x){return x.id===nh.consultorio;});
+    const h=Object.assign({},nh,{id:"h"+Date.now(),psico:selP,sede:c?c.sede:"VL",diaSemana:Number(nh.diaSemana)});
     saveDoc("horarios",h.id,h);
-    setShowAdd(false); notify("Horario agregado");
+    setShowAdd(false); notify("Horario fijo agregado");
   }
   function saveEdit() {
-    const c = CONS.find(function(x){return x.id===ef.consultorio;});
-    const updated = Object.assign({},ef,{sede:c?c.sede:ef.sede,diaSemana:Number(ef.diaSemana)});
-    saveDoc("horarios",eid,updated);
+    const c=CONS.find(function(x){return x.id===ef.consultorio;});
+    saveDoc("horarios",eid,Object.assign({},ef,{sede:c?c.sede:ef.sede,diaSemana:Number(ef.diaSemana)}));
     setEid(null); notify("Actualizado");
   }
   function addPsico() {
     if(!nn.trim()) return;
     const newId = "px"+Date.now();
-    saveDoc("psicos",newId,{id:newId,nombre:nn,wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"});
+    setPsicos(function(p){return p.concat([{id:newId,nombre:nn,wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"}]);});
     setNn(""); notify("Agregada");
   }
 
@@ -1916,12 +1774,14 @@ function CambiarPassBtn({user,setPsicos,notify}) {
   function cambiar() {
     if(nueva.length<4){notify("Minimo 4 caracteres","err");return;}
     if(nueva!==conf){notify("Las contrasenas no coinciden","err");return;}
-    const p = psicos.find(function(x){return x.nombre===user;});
-    if(!p){notify("Error","err");return;}
-    if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return;}
-    saveDoc("psicos",p.id,Object.assign({},p,{pass:nueva}));
-    notify("Contrasena cambiada");
-    setOpen(false);setActual("");setNueva("");setConf("");
+    setPsicos(function(ps){
+      const p = ps.find(function(x){return x.nombre===user;});
+      if(!p){notify("Error","err");return ps;}
+      if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return ps;}
+      notify("Contrasena cambiada");
+      setOpen(false);setActual("");setNueva("");setConf("");
+      return ps.map(function(x){return x.nombre===user?Object.assign({},x,{pass:nueva}):x;});
+    });
   }
   return (
     <div>
@@ -1947,34 +1807,18 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
   const [fin,setFin] = useState(h?h.fin:"14:00");
   const [cons,setCons] = useState(h?h.consultorio:"C1");
   const pr = calcPrecio(ini,fin);
-
-  // Check if requested slot conflicts with existing schedules
   function checkConflicto() {
-    const sMin = toMin(ini);
-    const eMin = toMin(fin);
-    if(eMin <= sMin) return "El horario de fin debe ser mayor al de inicio.";
-    const conflictos = (horarios||[]).filter(function(x) {
-      if(x.consultorio !== cons) return false;
-      if(x.diaSemana !== Number(dia)) return false;
-      // exclude own horario when editing
-      if(h && x.id === h.id) return false;
-      const xS = toMin(x.inicio);
-      const xE = toMin(x.fin);
-      return sMin < xE && eMin > xS;
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
+    const sMin=toMin(ini),eMin=toMin(fin);
+    const c=(horarios||[]).filter(function(x){
+      if(x.consultorio!==cons) return false;
+      if(Number(x.diaSemana)!==Number(dia)) return false;
+      if(h&&x.id===h.id) return false;
+      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
     });
-    if(conflictos.length === 0) return null;
-    const nombres = conflictos.map(function(x){return x.psico;}).join(", ");
-    return "Ese horario se superpone con "+nombres+" en "+cons+". Elegí otro horario o consultorio.";
+    return c.length?"Conflicto con "+c.map(function(x){return x.psico;}).join(", ")+" en "+cons:null;
   }
-
-  function handleEnviar() {
-    const err = checkConflicto();
-    if(err) { alert(err); return; }
-    onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});
-  }
-
   const conflicto = checkConflicto();
-
   return (
     <div>
       <div style={sModH}>
@@ -2004,19 +1848,11 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
             <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
           </div>
         </div>
-        {conflicto && (
-          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
-            {conflicto}
-          </div>
-        )}
-        {!conflicto && ini && fin && toMin(fin)>toMin(ini) && (
-          <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",color:ok,fontSize:13}}>
-            Horario disponible - Costo estimado: <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}
-          </div>
-        )}
-        <div style={{color:mu,fontSize:12}}>La solicitud queda pendiente de aprobacion.</div>
+        {conflicto&&<div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13,fontWeight:600}}>{conflicto}</div>}
+        {!conflicto&&ini&&fin&&toMin(fin)>toMin(ini)&&<div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>Horario disponible - <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}</div>}
+        <div style={{color:mu,fontSize:11}}>Queda pendiente de aprobacion.</div>
         <div style={{display:"flex",gap:10}}>
-          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={handleEnviar}>Enviar solicitud</button>
+          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});}}>Enviar solicitud</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cancelar</button>
         </div>
       </div>
