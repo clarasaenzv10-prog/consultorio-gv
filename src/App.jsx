@@ -418,7 +418,7 @@ export default function App() {
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
-          {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
+          {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
         </main>
 
@@ -448,9 +448,16 @@ export default function App() {
         </nav>
 
         {mod && mod.type==="slot" && (
-          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos}
-            onReservar={function(d){setReservas(function(p){return p.concat([Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"})]);});notify(role==="admin"?"Reserva creada":"Solicitud enviada");setMod(null);}}
-            onBloquear={function(d){setBloques(function(p){return p.concat([Object.assign({id:Date.now()},d)]);});notify("Bloqueado");setMod(null);}}
+          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
+            onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
+            onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
+            onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
+            onEliminar={function(ev){
+              if(ev.tipo==="bloqueado") delDoc("bloques",ev.id);
+              else if(ev.tipo==="extra") delDoc("reservas",ev.id);
+              else if(ev.tipo==="fijo") delDoc("horarios",ev.id);
+              notify("Eliminado"); setMod(null);
+            }}
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
@@ -794,13 +801,25 @@ function PerfilesView({psicos,setPsicos,gc,role,notify}) {
               ) : (
                 <div style={{width:"100%"}}>
                   <div style={{color:tx,fontWeight:700,fontSize:14}}>{p.nombre}</div>
-                  {p.wa && <div style={{color:mu,fontSize:12}}>WA: {p.wa}</div>}
-                  {p.email && <div style={{color:mu,fontSize:12}}>Mail: {p.email}</div>}
-                  <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:4}}>
-                    <span style={bge(p.disponible?ob:eb,p.disponible?ok:er)}>{p.disponible?"Disponible":"No disponible"}</span>
-                    {p.fijas && <span style={bge(lt,dk)}>Fijos</span>}
-                    {(p.descuento||0)>0 && <span style={bge(eb,er)}>{p.descuento}% desc.</span>}
+                  {role==="admin" && p.wa && <div style={{color:mu,fontSize:12}}>WA: {p.wa}</div>}
+                  {role==="admin" && p.email && <div style={{color:mu,fontSize:12}}>Mail: {p.email}</div>}
+                  {(p.analisis||[]).length>0 && (
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:6}}>
+                      {(p.analisis||[]).map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
+                    </div>
+                  )}
+                  {(p.poblacion||[]).length>0 && (
+                    <div style={{color:mu,fontSize:11,marginTop:4}}>{(p.poblacion||[]).join(" · ")}</div>
+                  )}
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:6}}>
+                    <span style={bge(p.disponible?ob:eb,p.disponible?ok:er)}>{p.disponible?"Disponible para derivar":"No disponible"}</span>
                   </div>
+                  {role==="admin" && (
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:4}}>
+                      {p.fijas && <span style={bge(lt,dk)}>Fijos</span>}
+                      {(p.descuento||0)>0 && <span style={bge(eb,er)}>{p.descuento}% desc.</span>}
+                    </div>
+                  )}
                   {role==="admin" && p.nota && (
                     <div style={{background:bg,borderRadius:8,padding:"8px 10px",fontSize:12,color:mu,textAlign:"left",width:"100%",marginTop:4,border:"1px solid #C9E4EF"}}>
                       {p.nota}
