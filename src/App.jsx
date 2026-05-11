@@ -202,6 +202,7 @@ export default function App() {
   const [role,setRole] = useState(null);
   const [user,setUser] = useState(null);
   const [tab,setTab] = useState("calendario");
+  const [perfilSel,setPerfilSel] = useState(null);
   const [wk,setWk] = useState(new Date());
   const [fSede,setFSede] = useState("todas");
   const [fCons,setFCons] = useState("todos");
@@ -294,7 +295,7 @@ export default function App() {
 
   function getEvts(date) {
     const ds = date.getDay()===0?7:date.getDay(), str = localDateStr(date);
-    const fj = horarios.filter(function(h){return h.diaSemana===ds&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
+    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
     const ex = reservas.filter(function(r){return r.fecha===str&&r.estado==="aprobada"&&(fCons==="todos"||r.consultorio===fCons)&&(fPsico==="todas"||r.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(r){return Object.assign({},r,{tipo:"extra"});});
     const bl = bloques.filter(function(b){return b.fecha===str;}).map(function(b){return Object.assign({},b,{tipo:"bloqueado"});});
     return fj.concat(ex).concat(bl);
@@ -423,7 +424,7 @@ export default function App() {
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
-          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify}/>}
+          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify}/>}
@@ -466,10 +467,17 @@ export default function App() {
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
             onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
             onEliminar={function(ev){
-              if(ev.tipo==="bloqueado") delDoc("bloques",ev.id);
-              else if(ev.tipo==="extra") delDoc("reservas",ev.id);
-              else if(ev.tipo==="fijo") delDoc("horarios",ev.id);
-              notify("Eliminado"); setMod(null);
+              if(ev.tipo==="bloqueado") { delDoc("bloques",ev.id); notify("Eliminado"); }
+              else if(ev.tipo==="extra") { delDoc("reservas",ev.id); notify("Hora extra cancelada"); }
+              else if(ev.tipo==="fijo") {
+                if(role==="admin") { delDoc("horarios",ev.id); notify("Horario eliminado"); }
+                else {
+                  const s={id:Date.now(),psico:user,tipo:"fijo",accion:"eliminar",datos:{},horarioId:ev.id,reservaId:null,estado:"pendiente",fechaSol:new Date().toISOString()};
+                  saveDoc("solHor",s.id,s);
+                  notify("Solicitud enviada - pendiente de aprobacion");
+                }
+              }
+              setMod(null);
             }}
             onClose={function(){setMod(null);}}/>
         )}
@@ -668,9 +676,15 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
               {ev.motivo&&<div style={{color:mu,fontSize:12}}>Motivo: {ev.motivo}</div>}
               {!esBloq&&<div style={{color:ok,fontWeight:700,fontSize:15,marginTop:6}}>{ars(calcPrecio(ev.inicio,ev.fin).sub)}{esFijo?"/sem":""}</div>}
             </div>
-            {role==="admin"&&(
-              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontWeight:700})} onClick={function(){if(window.confirm("Eliminar este "+(esBloq?"bloque":esFijo?"horario fijo":"hora extra")+"?"))onEliminar(ev);}}>
-                Eliminar {esBloq?"bloque":esFijo?"horario fijo":"hora extra"}
+            {(role==="admin"||(role==="psico"&&ev.psico===user&&!esBloq))&&(
+              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontWeight:700})} onClick={function(){
+                if(esFijo){
+                  if(window.confirm("Se enviara una solicitud para liberar este horario. Quedara pendiente de aprobacion de la admin."))onEliminar(ev);
+                } else {
+                  if(window.confirm("Cancelar esta hora extra?"))onEliminar(ev);
+                }
+              }}>
+                {esFijo?"Solicitar liberar horario":"Cancelar hora extra"}
               </button>
             )}
             <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cerrar</button>
@@ -775,7 +789,7 @@ function NuevaModal({user,onReservar,onClose}) {
 }
 
 // ─── Perfiles ─────────────────────────────────────────────────
-function PerfilesView({psicos,setPsicos,gc,role,notify}) {
+function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
   const [eid,setEid] = useState(null);
   const [form,setForm] = useState({});
   function save() { saveDoc("psicos",eid,Object.assign({},form)); setEid(null); notify("Perfil actualizado"); }
@@ -785,7 +799,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify}) {
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
         {psicos.map(function(p) {
           return (
-            <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center"}}>
+            <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
               <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
                 {p.nombre[0].toUpperCase()}
               </div>
@@ -847,6 +861,67 @@ function PerfilesView({psicos,setPsicos,gc,role,notify}) {
           );
         })}
       </div>
+    </div>
+
+      {perfilSel && (
+        <div style={{position:"fixed",inset:0,background:"rgba(28,58,74,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}} onClick={function(){setPerfilSel(null);}}>
+          <div style={{background:wh,borderRadius:18,width:"min(420px,95vw)",border:"1.5px solid #C9E4EF",boxShadow:"0 24px 60px rgba(75,163,195,.18)",maxHeight:"90vh",overflowY:"auto"}} onClick={function(e){e.stopPropagation();}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 22px",borderBottom:"1px solid #EBF6FA"}}>
+              <h3 style={{margin:0,color:tx}}>Perfil</h3>
+              <button style={{background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,fontFamily:"inherit"}} onClick={function(){setPerfilSel(null);}}>X</button>
+            </div>
+            <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
+              <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
+                {perfilSel.nombre[0].toUpperCase()}
+              </div>
+              <div style={{textAlign:"center"}}>
+                <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
+                <span style={{background:perfilSel.disponible?ob:eb,color:perfilSel.disponible?ok:er,fontSize:12,padding:"3px 12px",borderRadius:20,fontWeight:600,marginTop:6,display:"inline-block"}}>{perfilSel.disponible?"Disponible para derivaciones":"No disponible"}</span>
+              </div>
+              {(perfilSel.analisis||[]).length>0 && (
+                <div style={{width:"100%"}}>
+                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de analisis</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {perfilSel.analisis.map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:12,padding:"4px 12px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
+                  </div>
+                </div>
+              )}
+              {(perfilSel.poblacion||[]).length>0 && (
+                <div style={{width:"100%"}}>
+                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Poblacion</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {perfilSel.poblacion.map(function(p){return <span key={p} style={{background:bg,color:tx,fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #C9E4EF"}}>{p}</span>;})}
+                  </div>
+                </div>
+              )}
+              {(perfilSel.wa||perfilSel.email) && (
+                <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase"}}>Contacto</div>
+                  {perfilSel.wa && (
+                    <button style={{background:"#25D366",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={function(){
+                      const url="https://wa.me/"+perfilSel.wa+"?text="+encodeURIComponent("Hola "+perfilSel.nombre+"! Te contacto desde el sistema del consultorio.");
+                      const a=document.createElement("a");a.href=url;a.target="_blank";document.body.appendChild(a);a.click();document.body.removeChild(a);
+                    }}>
+                      Escribir por WhatsApp
+                    </button>
+                  )}
+                  {perfilSel.email && (
+                    <button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
+                      const a=document.createElement("a");a.href="mailto:"+perfilSel.email;document.body.appendChild(a);a.click();document.body.removeChild(a);
+                    }}>
+                      Enviar email
+                    </button>
+                  )}
+                  {!perfilSel.wa && !perfilSel.email && <div style={{color:mu,fontSize:13}}>Sin datos de contacto cargados.</div>}
+                </div>
+              )}
+              {!perfilSel.wa && !perfilSel.email && (
+                <div style={{color:mu,fontSize:13,textAlign:"center"}}>Sin datos de contacto cargados aun.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1888,6 +1963,21 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
     return c.length?"Conflicto con "+c.map(function(x){return x.psico;}).join(", ")+" en "+cons:null;
   }
   const conflicto = checkConflicto();
+
+  // Find available consultorios at same time same day
+  function getLibres() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return [];
+    const sMin=toMin(ini),eMin=toMin(fin);
+    return CONS.filter(function(c){
+      if(c.id===cons) return false;
+      const ocupado=(horarios||[]).some(function(x){
+        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      });
+      return !ocupado;
+    });
+  }
+  const libres = conflicto ? getLibres() : [];
+
   return (
     <div>
       <div style={sModH}>
@@ -1917,7 +2007,26 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
             <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
           </div>
         </div>
-        {conflicto&&<div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13,fontWeight:600}}>{conflicto}</div>}
+        {conflicto&&(
+          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"12px 14px",color:er,fontSize:13}}>
+            <div style={{fontWeight:700,marginBottom:6}}>{conflicto}</div>
+            {libres.length>0?(
+              <div>
+                <div style={{color:tx,fontSize:12,fontWeight:600,marginBottom:4}}>Consultorios disponibles en ese horario:</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {libres.map(function(c){return(
+                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"4px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setCons(c.id);}}>
+                      {c.id}
+                    </button>
+                  );})}
+                </div>
+                <div style={{color:mu,fontSize:11,marginTop:4}}>Toca uno para seleccionarlo</div>
+              </div>
+            ):(
+              <div style={{color:mu,fontSize:12,marginTop:4}}>No hay consultorios disponibles en ese horario ese dia.</div>
+            )}
+          </div>
+        )}
         {!conflicto&&ini&&fin&&toMin(fin)>toMin(ini)&&<div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>Horario disponible - <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}</div>}
         <div style={{color:mu,fontSize:11}}>Queda pendiente de aprobacion.</div>
         <div style={{display:"flex",gap:10}}>
