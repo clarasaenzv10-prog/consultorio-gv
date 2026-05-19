@@ -107,34 +107,62 @@ function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currenc
 
 function calcPrecio(ini,fin,P) {
   const p = P || PD;
-  // ── Exact module matches (priority) ───────────────────────────
-  if(ini==="08:00" && fin==="21:00") return {sub:p.dia,  ley:"Dia completo (08-21hs)", tipo:"mod"};
-  if(ini==="08:00" && fin==="14:00") return {sub:p.m1,   ley:"Modulo Manana (08-14hs)", tipo:"mod"};
-  if(ini==="14:00" && fin==="18:00") return {sub:p.m2,   ley:"Modulo Tarde (14-18hs)", tipo:"mod"};
-  if(ini==="18:00" && fin==="21:00") return {sub:p.m3,   ley:"Modulo Noche (18-21hs)", tipo:"mod"};
-  if(ini==="08:00" && fin==="18:00") return {sub:p.m1+p.m2, ley:"Modulo Manana + Tarde (08-18hs)", tipo:"mod"};
-  if(ini==="14:00" && fin==="21:00") return {sub:p.m2+p.m3, ley:"Modulo Tarde + Noche (14-21hs)", tipo:"mod"};
-  if(ini==="08:00" && fin==="21:00") return {sub:p.dia,  ley:"Dia completo (08-21hs)", tipo:"mod"};
-  // ── Hour-based calculation for non-module hours ────────────────
-  // Franjas: Manana 08-14 ($man/hs), Tarde 14-18 ($tar/hs), Noche 18-21 ($noc/hs)
-  const s=toMin(ini), e=toMin(fin);
+  const s = toMin(ini), e = toMin(fin);
+  // M1=480-840(08-14), M2=840-1080(14-18), M3=1080-1260(18-21)
+  const hasM1 = s<=480 && e>=840;   // 08-14 fully covered
+  const hasM2 = s<=840 && e>=1080;  // 14-18 fully covered
+  const hasM3 = s<=1080 && e>=1260; // 18-21 fully covered
+
+  // Exact combinations first
+  if(hasM1&&hasM2&&hasM3) return {sub:p.dia, ley:"Dia completo (08-21hs)", tipo:"mod"};
+  if(hasM1&&hasM2) return {sub:p.m1+p.m2, ley:"Mod. Manana + Tarde (08-18hs)", tipo:"mod"};
+  if(hasM2&&hasM3) return {sub:p.m2+p.m3, ley:"Mod. Tarde + Noche (14-21hs)", tipo:"mod"};
+  if(hasM1&&!hasM2&&e===840) return {sub:p.m1, ley:"Mod. Manana (08-14hs)", tipo:"mod"};
+  if(hasM2&&!hasM1&&!hasM3&&s===840) return {sub:p.m2, ley:"Mod. Tarde (14-18hs)", tipo:"mod"};
+  if(hasM3&&!hasM2&&s===1080) return {sub:p.m3, ley:"Mod. Noche (18-21hs)", tipo:"mod"};
+
+  // Mixed: use module price for fully-covered modules + hourly for the rest
   let tot=0; const pts=[];
-  // Manana: 480-840 (08:00-14:00)
-  const a1=Math.max(s,480), b1=Math.min(e,840);
-  if(b1>a1){const hs=(b1-a1)/60;tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}
-  // Tarde: 840-1080 (14:00-18:00)
-  const a2=Math.max(s,840), b2=Math.min(e,1080);
-  if(b2>a2){const hs=(b2-a2)/60;tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}
-  // Noche: 1080-1260 (18:00-21:00)
-  const a3=Math.max(s,1080),b3=Math.min(e,1260);
-  if(b3>a3){const hs=(b3-a3)/60;tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}
-  return {sub:tot, ley:null, tipo:"hora", des:pts.join(" | ")};
+  let pos=s; // current position in minutes
+
+  // Mañana partial (before M1 start or M1 not full)
+  if(pos<480&&e>480) { const hs=(Math.min(e,480)-pos)/60; if(hs>0){tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");} pos=480; }
+
+  if(hasM1) {
+    tot+=p.m1; pts.push("Mod. Manana 08-14hs ("+ars(p.m1)+")"); pos=840;
+  } else if(pos<840&&e>pos) {
+    const hs=(Math.min(e,840)-Math.max(pos,480))/60;
+    if(hs>0){tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}
+    pos=840;
+  }
+
+  if(hasM2) {
+    tot+=p.m2; pts.push("Mod. Tarde 14-18hs ("+ars(p.m2)+")"); pos=1080;
+  } else if(pos<=840&&e>840) {
+    const hs=(Math.min(e,1080)-840)/60;
+    if(hs>0){tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}
+    pos=1080;
+  }
+
+  if(hasM3) {
+    tot+=p.m3; pts.push("Mod. Noche 18-21hs ("+ars(p.m3)+")"); pos=1260;
+  } else if(pos<=1080&&e>1080) {
+    const hs=(Math.min(e,1260)-1080)/60;
+    if(hs>0){tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}
+  }
+
+  return {sub:tot, ley:null, tipo:"hora", des:pts.join(" + ")};
 }
 
 function wkDates(date) {
-  const d=new Date(date), day=d.getDay(), diff=d.getDate()-day+(day===0?-6:1);
-  const mon=new Date(d.setDate(diff));
-  return Array.from({length:7},(_,i)=>{const dd=new Date(mon);dd.setDate(mon.getDate()+i);return dd;});
+  // Use explicit year/month/day to avoid any timezone ambiguity
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day===0 ? -6 : 1);
+  const monDate = new Date(d.getFullYear(), d.getMonth(), diff);
+  return Array.from({length:7}, function(_,i) {
+    return new Date(monDate.getFullYear(), monDate.getMonth(), monDate.getDate()+i);
+  });
 }
 function mesFechas(mes,anio,dia) {
   const js=dia===7?0:dia, res=[], d=new Date(anio,mes,1);
@@ -679,14 +707,31 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
           </div>
           <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
             <div style={{background:bg,borderRadius:10,padding:14,border:"1px solid #C9E4EF"}}>
-              {!esBloq && <div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:6}}>{ev.psico}</div>}
+              {role==="admin"&&!esBloq&&<div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:6}}>{ev.psico}</div>}
+              {role==="psico"&&!esBloq&&<div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:6}}>{ev.psico===user?"Tu horario":"Ocupado"}</div>}
               <div style={{color:mu,fontSize:13}}>{ev.consultorio}{consNombre?" - "+consNombre:""}</div>
               <div style={{color:tx,fontSize:14,fontWeight:600}}>{ev.inicio} - {ev.fin} ({calcHrs(ev.inicio,ev.fin).toFixed(1)}hs)</div>
-              {esFijo&&<div style={{color:br,fontSize:13}}>{DIAS[ev.diaSemana]} - Se repite cada semana</div>}
-              {esExtra&&<div style={{color:mu,fontSize:13}}>{new Date(ev.fecha).toLocaleDateString("es-AR")} - Hora extra</div>}
+              {esFijo&&<div style={{color:br,fontSize:13}}>{DIAS[Number(ev.diaSemana)]} - Se repite cada semana</div>}
+              {esExtra&&<div style={{color:mu,fontSize:13}}>{ev.fecha?parseLocalDate(ev.fecha).toLocaleDateString("es-AR"):""} - Hora extra</div>}
               {ev.motivo&&<div style={{color:mu,fontSize:12}}>Motivo: {ev.motivo}</div>}
-              {!esBloq&&<div style={{color:ok,fontWeight:700,fontSize:15,marginTop:6}}>{ars(calcPrecio(ev.inicio,ev.fin).sub)}{esFijo?"/sem":""}</div>}
+              {role==="admin"&&!esBloq&&<div style={{color:ok,fontWeight:700,fontSize:15,marginTop:6}}>{ars(calcPrecio(ev.inicio,ev.fin).sub)}{esFijo?"/sem":""}</div>}
             </div>
+            {role==="psico"&&!esBloq&&ev.psico!==user&&(
+              <div>
+                <div style={{color:mu,fontSize:12,fontWeight:700,marginBottom:8}}>Consultorios disponibles:</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {(function(){
+                    const ds=parseLocalDate(slot.date).getDay();
+                    const jd=ds===0?7:ds;
+                    const sMin=toMin(ev.inicio),eMin=toMin(ev.fin);
+                    return CONS.filter(function(c){
+                      if(c.id===ev.consultorio) return false;
+                      return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+                    }).map(function(c){return <span key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"4px 12px",fontSize:13,fontWeight:700}}>{c.id}</span>;});
+                  })()}
+                </div>
+              </div>
+            )}
             {(role==="admin"||(role==="psico"&&ev.psico===user&&!esBloq))&&(
               <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontWeight:700})} onClick={function(){
                 if(esFijo){
