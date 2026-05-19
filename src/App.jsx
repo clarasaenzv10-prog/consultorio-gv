@@ -682,17 +682,25 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
   const [diaSemana,setDiaSemana] = useState(parseLocalDate(slot.date).getDay()===0?7:(parseLocalDate(slot.date).getDay()||1));
   const pr = calcPrecio(ini,fin);
 
+  // diaCheck: day of week (1=Mon...6=Sat) used for BOTH fijo and reservar checks
   function checkConflicto(tipoCheck,consCheck,iniCheck,finCheck,diaCheck) {
+    if(!iniCheck||!finCheck) return null;
     const sMin=toMin(iniCheck), eMin=toMin(finCheck);
-    if(eMin<=sMin) return null;
-    if(tipoCheck==="fijo") {
-      const c=(horarios||[]).filter(function(x){return x.consultorio===consCheck&&Number(x.diaSemana)===Number(diaCheck)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-      return c.length?("Conflicto con "+c.map(function(x){return x.psico;}).join(", ")):null;
+    if(eMin<=sMin) return "El horario de fin debe ser mayor al inicio.";
+    const jd=Number(diaCheck);
+    // Check fixed schedules for that weekday
+    const fijos=(horarios||[]).filter(function(x){
+      return x.consultorio===consCheck && Number(x.diaSemana)===jd && sMin<toMin(x.fin) && eMin>toMin(x.inicio);
+    });
+    if(fijos.length) return "Conflicto con "+fijos.map(function(x){return x.psico;}).join(", ")+" en "+consCheck;
+    if(tipoCheck==="reservar") {
+      // Also check extras on the same specific date
+      const extras=(reservas||[]).filter(function(x){
+        return x.fecha===slot.date && x.consultorio===consCheck && x.estado==="aprobada" && sMin<toMin(x.fin) && eMin>toMin(x.inicio);
+      });
+      if(extras.length) return "Conflicto con "+extras.map(function(x){return x.psico;}).join(", ")+" en "+consCheck;
     }
-    const fijos=(horarios||[]).filter(function(x){const ds=parseLocalDate(slot.date).getDay();const jd=ds===0?7:ds;return x.consultorio===consCheck&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-    const extras=(reservas||[]).filter(function(x){return x.fecha===slot.date&&x.consultorio===consCheck&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-    const todos=fijos.concat(extras);
-    return todos.length?("Conflicto con "+todos.map(function(x){return x.psico;}).join(", ")):null;
+    return null;
   }
   const conflicto = (tipo==="fijo"||tipo==="reservar") ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
 
@@ -2050,14 +2058,14 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
   const pr = calcPrecio(ini,fin);
   function checkConflicto() {
     if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
-    const sMin=toMin(ini),eMin=toMin(fin);
+    const sMin=toMin(ini), eMin=toMin(fin);
     const c=(horarios||[]).filter(function(x){
       if(x.consultorio!==cons) return false;
       if(Number(x.diaSemana)!==Number(dia)) return false;
-      if(h&&x.id===h.id) return false;
-      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      if(h && x.id===h.id) return false; // exclude own horario when editing
+      return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
     });
-    return c.length?"Conflicto con "+c.map(function(x){return x.psico;}).join(", ")+" en "+cons:null;
+    return c.length ? "Conflicto con "+c.map(function(x){return x.psico;}).join(", ")+" en "+cons : null;
   }
   const conflicto = checkConflicto();
 
