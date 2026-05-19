@@ -501,7 +501,7 @@ export default function App() {
         </nav>
 
         {mod && mod.type==="slot" && (
-          <SlotModal slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
+          <SlotModal key={mod.slot.date+(mod.slot.preCons||"")+(mod.slot.evento?mod.slot.evento.id:"")} slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
             onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
             onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
@@ -719,26 +719,49 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
             </div>
             {role==="psico"&&!esBloq&&ev.psico!==user&&(
               <div>
-                <div style={{color:mu,fontSize:12,fontWeight:700,marginBottom:8}}>Consultorios disponibles en este horario:</div>
+                <div style={{color:mu,fontSize:12,fontWeight:700,marginBottom:8}}>Disponibilidad para el {parseLocalDate(slot.date).toLocaleDateString("es-AR")} a las {slot.hour}:00hs:</div>
                 {(function(){
                   const ds=parseLocalDate(slot.date).getDay();
                   const jd=ds===0?7:ds;
-                  const sMin=toMin(ev.inicio),eMin=toMin(ev.fin);
-                  const libres=CONS.filter(function(c){
+                  // Check availability at the CLICKED hour (slot.hour to slot.hour+1)
+                  const clickMin=slot.hour*60;
+                  const clickMinEnd=(slot.hour+1)*60;
+                  
+                  // For each consultorio, find what free time they have around the clicked hour
+                  const resultados=CONS.filter(function(c){
                     if(c.id===ev.consultorio) return false;
-                    return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+                    // Check if clicked hour is free (not occupied by any horario)
+                    return !(horarios||[]).some(function(x){
+                      return x.consultorio===c.id&&Number(x.diaSemana)===jd&&clickMin<toMin(x.fin)&&clickMinEnd>toMin(x.inicio);
+                    });
+                  }).map(function(c){
+                    // Find the full free window around clicked hour
+                    const hsCons=(horarios||[]).filter(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd;}).sort(function(a,b){return toMin(a.inicio)-toMin(b.inicio);});
+                    // Find free windows: gaps between occupied slots (between 08:00 and 21:00)
+                    let freeStart=480, windows=[];
+                    hsCons.forEach(function(x){
+                      if(toMin(x.inicio)>freeStart) windows.push({ini:freeStart,fin:toMin(x.inicio)});
+                      freeStart=Math.max(freeStart,toMin(x.fin));
+                    });
+                    if(freeStart<1260) windows.push({ini:freeStart,fin:1260});
+                    // Find window that contains clicked hour
+                    const win=windows.find(function(w){return w.ini<=clickMin&&w.fin>=clickMinEnd;});
+                    const iniStr=win?String(Math.floor(win.ini/60)).padStart(2,"0")+":"+String(win.ini%60).padStart(2,"0"):"08:00";
+                    const finStr=win?String(Math.floor(win.fin/60)).padStart(2,"0")+":"+String(win.fin%60).padStart(2,"0"):"21:00";
+                    return {c:c, iniStr:iniStr, finStr:finStr};
                   });
-                  if(!libres.length) return <div style={{color:mu,fontSize:12}}>No hay consultorios disponibles en ese horario.</div>;
-                  return libres.map(function(c){
-                    const sedeNombre=c.sede==="VL"?"Vicente Lopez":"Uruguay";
+                  
+                  if(!resultados.length) return <div style={{color:mu,fontSize:13,padding:"8px 0"}}>No hay consultorios disponibles a esa hora.</div>;
+                  return resultados.map(function(r){
+                    const sedeNombre=r.c.sede==="VL"?"Vicente Lopez":"Uruguay";
                     return (
-                      <button key={c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:ob,border:"1px solid #A7E3C0",borderRadius:10,padding:"10px 14px",marginBottom:6,cursor:"pointer",fontFamily:"inherit"}}
-                        onClick={function(){onSelectAlternativo({date:slot.date,hour:parseInt(ev.inicio.split(":")[0]),cons:c.id,ini:ev.inicio,fin:ev.fin});}}>
-                        <div style={{textAlign:"left"}}>
-                          <div style={{color:ok,fontWeight:700,fontSize:14}}>{c.id}</div>
-                          <div style={{color:mu,fontSize:12}}>{sedeNombre}</div>
+                      <button key={r.c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:ob,border:"1px solid #A7E3C0",borderRadius:10,padding:"10px 14px",marginBottom:6,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}
+                        onClick={function(){onSelectAlternativo({date:slot.date,hour:slot.hour,cons:r.c.id,ini:r.iniStr,fin:r.finStr});}}>
+                        <div>
+                          <div style={{color:ok,fontWeight:700,fontSize:14}}>{r.c.id} — {sedeNombre}</div>
+                          <div style={{color:mu,fontSize:12}}>Libre {r.iniStr} - {r.finStr}</div>
                         </div>
-                        <div style={{color:ok,fontSize:12,fontWeight:600}}>Reservar →</div>
+                        <div style={{color:ok,fontSize:13,fontWeight:700}}>Reservar →</div>
                       </button>
                     );
                   });
