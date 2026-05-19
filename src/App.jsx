@@ -107,17 +107,28 @@ function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currenc
 
 function calcPrecio(ini,fin,P) {
   const p = P || PD;
-  if(ini==="08:00" && fin==="21:00") return {sub:p.dia, ley:"Dia completo", tipo:"dia"};
-  if(ini==="08:00" && fin==="14:00") return {sub:p.m1,  ley:"Modulo 1 Manana", tipo:"mod"};
-  if(ini==="14:00" && fin==="18:00") return {sub:p.m2,  ley:"Modulo 2 Tarde", tipo:"mod"};
-  if(ini==="18:00" && fin==="21:00") return {sub:p.m3,  ley:"Modulo 3 Noche", tipo:"mod"};
-  if(ini==="08:00" && fin==="18:00") return {sub:p.m1+p.m2, ley:"Modulo 1+2", tipo:"mod"};
-  if(ini==="14:00" && fin==="21:00") return {sub:p.m2+p.m3, ley:"Modulo 2+3", tipo:"mod"};
-  const s=toMin(ini), e=toMin(fin); let tot=0; const pts=[];
-  const a1=Math.max(s,480), b1=Math.min(e,840); if(b1>a1){const h=(b1-a1)/60;tot+=h*p.man;pts.push(h+"hs manana");}
-  const a2=Math.max(s,840), b2=Math.min(e,1080); if(b2>a2){const h=(b2-a2)/60;tot+=h*p.tar;pts.push(h+"hs tarde");}
-  const a3=Math.max(s,1080),b3=Math.min(e,1260); if(b3>a3){const h=(b3-a3)/60;tot+=h*p.noc;pts.push(h+"hs noche");}
-  return {sub:tot, ley:null, tipo:"hora", des:pts.join(" + ")};
+  // ── Exact module matches (priority) ───────────────────────────
+  if(ini==="08:00" && fin==="21:00") return {sub:p.dia,  ley:"Dia completo (08-21hs)", tipo:"mod"};
+  if(ini==="08:00" && fin==="14:00") return {sub:p.m1,   ley:"Modulo Manana (08-14hs)", tipo:"mod"};
+  if(ini==="14:00" && fin==="18:00") return {sub:p.m2,   ley:"Modulo Tarde (14-18hs)", tipo:"mod"};
+  if(ini==="18:00" && fin==="21:00") return {sub:p.m3,   ley:"Modulo Noche (18-21hs)", tipo:"mod"};
+  if(ini==="08:00" && fin==="18:00") return {sub:p.m1+p.m2, ley:"Modulo Manana + Tarde (08-18hs)", tipo:"mod"};
+  if(ini==="14:00" && fin==="21:00") return {sub:p.m2+p.m3, ley:"Modulo Tarde + Noche (14-21hs)", tipo:"mod"};
+  if(ini==="08:00" && fin==="21:00") return {sub:p.dia,  ley:"Dia completo (08-21hs)", tipo:"mod"};
+  // ── Hour-based calculation for non-module hours ────────────────
+  // Franjas: Manana 08-14 ($man/hs), Tarde 14-18 ($tar/hs), Noche 18-21 ($noc/hs)
+  const s=toMin(ini), e=toMin(fin);
+  let tot=0; const pts=[];
+  // Manana: 480-840 (08:00-14:00)
+  const a1=Math.max(s,480), b1=Math.min(e,840);
+  if(b1>a1){const hs=(b1-a1)/60;tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}
+  // Tarde: 840-1080 (14:00-18:00)
+  const a2=Math.max(s,840), b2=Math.min(e,1080);
+  if(b2>a2){const hs=(b2-a2)/60;tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}
+  // Noche: 1080-1260 (18:00-21:00)
+  const a3=Math.max(s,1080),b3=Math.min(e,1260);
+  if(b3>a3){const hs=(b3-a3)/60;tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}
+  return {sub:tot, ley:null, tipo:"hora", des:pts.join(" | ")};
 }
 
 function wkDates(date) {
@@ -268,10 +279,10 @@ export default function App() {
     const fp = horarios.filter(function(h){return h.psico.toLowerCase()===psico.nombre.toLowerCase();});
     let tf=0; const df=[];
     fp.forEach(function(h) {
-      const sem = mesFechas(mes,anio,h.diaSemana).length;
+      const sem = mesFechas(mes,anio,Number(h.diaSemana)).length;
       const p = calcPrecio(h.inicio,h.fin,pr);
       tf += p.sub*sem;
-      df.push({diaSemana:h.diaSemana,cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
+      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){return r.estado==="aprobada"&&r.psico===psico.nombre&&r.tipo==="extra"&&new Date(r.fecha).getMonth()===mes&&new Date(r.fecha).getFullYear()===anio;});
@@ -284,7 +295,7 @@ export default function App() {
   function genMsg(psico,mes,anio) {
     const r = calcFact(psico,mes,anio);
     let m = "Hola "+psico.nombre+" !\n\nResumen "+MESES[mes]+" "+anio+":\n\n";
-    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.tf)+"\n\n"; }
+    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley?d.ley:(d.des||calcHrs(d.ini,d.fin).toFixed(1)+"hs"))+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
     if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+new Date(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
     if(!r.df.length&&!r.de.length) m+="Sin horas este mes.\n\n";
     m += "----------------\n";
@@ -794,6 +805,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
   const [form,setForm] = useState({});
   function save() { saveDoc("psicos",eid,Object.assign({},form)); setEid(null); notify("Perfil actualizado"); }
   return (
+    <>
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Psicologas</h2>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
@@ -862,7 +874,6 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
         })}
       </div>
     </div>
-
       {perfilSel && (
         <div style={{position:"fixed",inset:0,background:"rgba(28,58,74,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}} onClick={function(){setPerfilSel(null);}}>
           <div style={{background:wh,borderRadius:18,width:"min(420px,95vw)",border:"1.5px solid #C9E4EF",boxShadow:"0 24px 60px rgba(75,163,195,.18)",maxHeight:"90vh",overflowY:"auto"}} onClick={function(e){e.stopPropagation();}}>
@@ -922,7 +933,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1219,11 +1230,16 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                 {res.df.map(function(d,i) {
                   return (
                     <div key={i} style={{background:bg,borderRadius:8,padding:"10px 12px",marginBottom:6,border:"1px solid #C9E4EF"}}>
-                      <div style={{display:"flex",justifyContent:"space-between"}}>
-                        <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons} - {d.ini}-{d.fin}</div>
-                        <div style={{color:ok,fontWeight:700}}>{ars(d.sub)}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div>
+                          <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
+                          <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({d.horas.toFixed?d.horas.toFixed(1):d.horas}hs)</div>
+                          {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
+                          {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} semanas = {ars(d.sub)}</div>
+                        </div>
+                        <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
-                      <div style={{color:mu,fontSize:11}}>{d.horas}hs x {d.sem} sem - {d.ley||d.des||""}</div>
                     </div>
                   );
                 })}
