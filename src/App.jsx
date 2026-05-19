@@ -324,7 +324,7 @@ export default function App() {
     const r = calcFact(psico,mes,anio);
     let m = "Hola "+psico.nombre+" !\n\nResumen "+MESES[mes]+" "+anio+":\n\n";
     if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley?d.ley:(d.des||calcHrs(d.ini,d.fin).toFixed(1)+"hs"))+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
-    if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+new Date(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
+    if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+parseLocalDate(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
     if(!r.df.length&&!r.de.length) m+="Sin horas este mes.\n\n";
     m += "----------------\n";
     if(r.desc>0) { m+="Subtotal: "+ars(r.bruto)+"\nDescuento "+r.desc+"%: -"+ars(r.montoDesc)+"\n"; }
@@ -505,6 +505,7 @@ export default function App() {
             onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
             onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
+            onSelectAlternativo={function(d){setMod({type:"slot",slot:{date:d.date,hour:d.hour,preIni:d.ini,preFin:d.fin,preCons:d.cons}});}}
             onEliminar={function(ev){
               if(ev.tipo==="bloqueado") { delDoc("bloques",ev.id); notify("Eliminado"); }
               else if(ev.tipo==="extra") { delDoc("reservas",ev.id); notify("Hora extra cancelada"); }
@@ -671,12 +672,12 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
 }
 
 // ─── Slot Modal ───────────────────────────────────────────────
-function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquear,onAgregarFijo,onEliminar,onClose}) {
+function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquear,onAgregarFijo,onEliminar,onSelectAlternativo,onClose}) {
   const ev = slot.evento;
-  const [tipo,setTipo] = useState(role==="admin"?"bloquear":"reservar");
-  const [ini,setIni] = useState(String(slot.hour).padStart(2,"0")+":00");
-  const [fin,setFin] = useState(String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
-  const [cons,setCons] = useState("C1");
+  const [tipo,setTipo] = useState(slot.preCons?"reservar":(role==="admin"?"bloquear":"reservar"));
+  const [ini,setIni] = useState(slot.preIni||String(slot.hour).padStart(2,"0")+":00");
+  const [fin,setFin] = useState(slot.preFin||String(Math.min(slot.hour+1,21)).padStart(2,"0")+":00");
+  const [cons,setCons] = useState(slot.preCons||"C1");
   const [psico,setPsico] = useState(psicos&&psicos[0]?psicos[0].nombre:user);
   const [diaSemana,setDiaSemana] = useState(parseLocalDate(slot.date).getDay()===0?7:(parseLocalDate(slot.date).getDay()||1));
   const pr = calcPrecio(ini,fin);
@@ -718,18 +719,30 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
             </div>
             {role==="psico"&&!esBloq&&ev.psico!==user&&(
               <div>
-                <div style={{color:mu,fontSize:12,fontWeight:700,marginBottom:8}}>Consultorios disponibles:</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {(function(){
-                    const ds=parseLocalDate(slot.date).getDay();
-                    const jd=ds===0?7:ds;
-                    const sMin=toMin(ev.inicio),eMin=toMin(ev.fin);
-                    return CONS.filter(function(c){
-                      if(c.id===ev.consultorio) return false;
-                      return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-                    }).map(function(c){return <span key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"4px 12px",fontSize:13,fontWeight:700}}>{c.id}</span>;});
-                  })()}
-                </div>
+                <div style={{color:mu,fontSize:12,fontWeight:700,marginBottom:8}}>Consultorios disponibles en este horario:</div>
+                {(function(){
+                  const ds=parseLocalDate(slot.date).getDay();
+                  const jd=ds===0?7:ds;
+                  const sMin=toMin(ev.inicio),eMin=toMin(ev.fin);
+                  const libres=CONS.filter(function(c){
+                    if(c.id===ev.consultorio) return false;
+                    return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+                  });
+                  if(!libres.length) return <div style={{color:mu,fontSize:12}}>No hay consultorios disponibles en ese horario.</div>;
+                  return libres.map(function(c){
+                    const sedeNombre=c.sede==="VL"?"Vicente Lopez":"Uruguay";
+                    return (
+                      <button key={c.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:ob,border:"1px solid #A7E3C0",borderRadius:10,padding:"10px 14px",marginBottom:6,cursor:"pointer",fontFamily:"inherit"}}
+                        onClick={function(){onSelectAlternativo({date:slot.date,hour:parseInt(ev.inicio.split(":")[0]),cons:c.id,ini:ev.inicio,fin:ev.fin});}}>
+                        <div style={{textAlign:"left"}}>
+                          <div style={{color:ok,fontWeight:700,fontSize:14}}>{c.id}</div>
+                          <div style={{color:mu,fontSize:12}}>{sedeNombre}</div>
+                        </div>
+                        <div style={{color:ok,fontSize:12,fontWeight:600}}>Reservar →</div>
+                      </button>
+                    );
+                  });
+                })()}
               </div>
             )}
             {(role==="admin"||(role==="psico"&&ev.psico===user&&!esBloq))&&(
@@ -754,7 +767,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     <div style={sOverlay} onClick={onClose}>
       <div style={sModal} onClick={function(e){e.stopPropagation();}}>
         <div style={sModH}>
-          <h3 style={{margin:0,color:tx}}>{new Date(slot.date).toLocaleDateString("es-AR")}</h3>
+          <h3 style={{margin:0,color:tx}}>{parseLocalDate(slot.date).toLocaleDateString("es-AR")}</h3>
           <button style={sXBtn} onClick={onClose}>X</button>
         </div>
         {role==="admin"&&(
@@ -1016,7 +1029,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
           <div key={a.id} style={{background:leido?wh:"#F0FDF4",border:leido?"1.5px solid #C9E4EF":"1.5px solid #A7E3C0",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <div style={{color:mu,fontSize:11}}>
-                {a.autor} - {new Date(a.fecha).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                {a.autor} - {parseLocalDate(a.fecha.split("T")[0]).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
                 {!leido && <span style={Object.assign({},bge(ob,ok),{marginLeft:8})}>Nuevo</span>}
               </div>
               <div style={{display:"flex",gap:6}}>
@@ -1049,7 +1062,7 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
             </div>
             <div style={{flex:1}}>
               <div style={{color:tx,fontWeight:700}}>{r.psico}</div>
-              <div style={{color:mu,fontSize:13}}>{new Date(r.fecha).toLocaleDateString("es-AR")} - {r.consultorio} - {r.inicio}-{r.fin}</div>
+              <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")} - {r.consultorio} - {r.inicio}-{r.fin}</div>
               <div style={{color:mu,fontSize:12}}>{calcHrs(r.inicio,r.fin)}hs - {ars(calcPrecio(r.inicio,r.fin).sub)}</div>
             </div>
             <div style={{display:"flex",gap:8}}>
@@ -1067,7 +1080,7 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
               <div key={r.id} style={Object.assign({},sCard,{opacity:.65})}>
                 <div style={{flex:1}}>
                   <div style={{color:tx,fontWeight:700}}>{r.psico} - {r.consultorio}</div>
-                  <div style={{color:mu,fontSize:13}}>{new Date(r.fecha).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
+                  <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
                 </div>
                 <span style={bge(r.estado==="aprobada"?ob:eb,r.estado==="aprobada"?ok:er)}>{r.estado==="aprobada"?"Aprobada":"Rechazada"}</span>
               </div>
@@ -1297,7 +1310,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                   return (
                     <div key={i} style={{background:bg,borderRadius:8,padding:"10px 12px",marginBottom:6,border:"1px solid #C9E4EF"}}>
                       <div style={{display:"flex",justifyContent:"space-between"}}>
-                        <div style={{color:tx,fontSize:13,fontWeight:600}}>{new Date(d.fecha).toLocaleDateString("es-AR")} - {d.cons} - {d.ini}-{d.fin}</div>
+                        <div style={{color:tx,fontSize:13,fontWeight:600}}>{parseLocalDate(d.fecha).toLocaleDateString("es-AR")} - {d.cons} - {d.ini}-{d.fin}</div>
                         <div style={{color:ok,fontWeight:700}}>{ars(d.sub)}</div>
                       </div>
                     </div>
@@ -1622,7 +1635,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
               return (
                 <div key={b.id} style={sCard}>
                   <div style={{flex:1}}>
-                    <div style={{color:tx}}>{b.consultorio} - {new Date(b.fecha).toLocaleDateString("es-AR")}</div>
+                    <div style={{color:tx}}>{b.consultorio} - {parseLocalDate(b.fecha).toLocaleDateString("es-AR")}</div>
                     <div style={{color:mu,fontSize:13}}>{b.inicio}-{b.fin}{b.motivo?" - "+b.motivo:""}</div>
                   </div>
                   <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){delDoc("bloques",b.id);notify("Eliminado");}}>Eliminar</button>
@@ -1649,7 +1662,7 @@ function MisReservasView({reservas,onNew}) {
         return (
           <div key={r.id} style={sCard}>
             <div style={{flex:1}}>
-              <div style={{color:tx,fontWeight:700}}>{r.consultorio} - {new Date(r.fecha).toLocaleDateString("es-AR")}</div>
+              <div style={{color:tx,fontWeight:700}}>{r.consultorio} - {parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")}</div>
               <div style={{color:mu,fontSize:13}}>{r.inicio}-{r.fin} - {calcHrs(r.inicio,r.fin)}hs</div>
             </div>
             <span style={bge(r.estado==="aprobada"?ob:r.estado==="rechazada"?eb:lt,r.estado==="aprobada"?ok:r.estado==="rechazada"?er:dk)}>
@@ -1768,7 +1781,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
           return (
             <div key={r.id} style={sCard}>
               <div style={{flex:1}}>
-                <div style={{color:tx,fontWeight:600}}>{new Date(r.fecha).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
+                <div style={{color:tx,fontWeight:600}}>{parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
                 <div style={{color:mu,fontSize:12}}>{r.consultorio}</div>
               </div>
               <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setMH({type:"delExtra",r:r});}}>Cancelar</button>
