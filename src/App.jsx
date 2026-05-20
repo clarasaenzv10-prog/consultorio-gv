@@ -505,7 +505,7 @@ export default function App() {
             onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
             onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
-            onSelectAlternativo={function(d){setMod({type:"slot",slot:{date:d.date,hour:d.hour,preIni:d.ini,preFin:d.fin,preCons:d.cons}});}}
+            onSelectAlternativo={function(d){setMod({type:"slot",slot:{date:d.date,hour:d.hour,preIni:d.ini,preFin:d.fin,preCons:d.cons,confirmedFree:true}});}}
             onEliminar={function(ev){
               if(ev.tipo==="bloqueado") { delDoc("bloques",ev.id); notify("Eliminado"); }
               else if(ev.tipo==="extra") { delDoc("reservas",ev.id); notify("Hora extra cancelada"); }
@@ -690,7 +690,11 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     const jd=Number(diaCheck);
     // Check fixed schedules for that weekday
     const fijos=(horarios||[]).filter(function(x){
-      return x.consultorio===consCheck && Number(x.diaSemana)===jd && sMin<toMin(x.fin) && eMin>toMin(x.inicio);
+      if(x.consultorio!==consCheck) return false;
+      if(Number(x.diaSemana)!==jd) return false;
+      const xIni=toMin(x.inicio), xFin=toMin(x.fin);
+      // Adjacent slots are NOT conflicts (e.g. booking 08-09 when Agus has 09-12 is fine)
+      return sMin < xFin && eMin > xIni;
     });
     if(fijos.length) return "Conflicto con "+fijos.map(function(x){return x.psico;}).join(", ")+" en "+consCheck;
     if(tipoCheck==="reservar") {
@@ -702,7 +706,10 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     }
     return null;
   }
-  const conflicto = (tipo==="fijo"||tipo==="reservar") ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
+  // Skip conflict check if coming from alternatives AND user hasn't changed time
+  const userChangedTime = !(ini===(slot.preIni||ini) && fin===(slot.preFin||fin));
+  const skipCheck = slot.confirmedFree && !userChangedTime;
+  const conflicto = (!skipCheck && (tipo==="fijo"||tipo==="reservar")) ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
 
   if(ev) {
     const consNombre = (CONS.find(function(c){return c.id===ev.consultorio;})||{sn:""}).sn;
@@ -843,7 +850,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
           )}
           {!conflicto&&(tipo==="fijo"||tipo==="reservar")&&ini&&fin&&toMin(fin)>toMin(ini)&&(
             <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>
-              Horario disponible - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
+              {skipCheck?"Horario verificado disponible":"Horario disponible"} - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
             </div>
           )}
           <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){
