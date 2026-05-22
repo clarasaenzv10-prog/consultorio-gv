@@ -1,4 +1,4 @@
-// build-fix-final
+// v2026-05-22 23:23
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, uploadFile, deleteFile } from "./firebase.js";
 
@@ -1201,6 +1201,20 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
 }
 
 // ─── Cambios Horario ──────────────────────────────────────────
+function confirmarPago(s) {
+  var config2 = {};
+  try { config2 = window.__gvConfig || {}; } catch(e) {}
+  var newId = "px" + Date.now();
+  var newP = {id:newId, nombre:s.nombre, wa:s.tel||"", email:s.email||"", analisis:[], poblacion:[], disponible:true, fijas:false, descuento:0, nota:"Desde solicitud invitada", pass:"psico123"};
+  saveDoc("psicos", newId, newP);
+  (s.slots||[]).forEach(function(sl) {
+    var c = CONS.find(function(x){ return x.id===sl.cons; });
+    var hId = "h" + Date.now() + String(Math.random()).slice(2,7);
+    saveDoc("horarios", hId, {id:hId, psico:s.nombre, consultorio:sl.cons, diaSemana:Number(sl.dia), inicio:sl.ini, fin:sl.fin, sede:c?c.sede:"VL"});
+  });
+  saveDoc("solHor", s.id, Object.assign({}, s, {estado:"completada", fechaRes:new Date().toISOString()}));
+}
+
 function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos}) {
   const [notas,setNotas] = useState({});
   const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";});
@@ -1241,28 +1255,22 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
               <div style={{color:tx,fontWeight:700,fontSize:15,marginBottom:4}}>{s.nombre}</div>
               <div style={{color:mu,fontSize:13,marginBottom:10}}>{s.consultorio} - {parseLocalDate(s.fecha).toLocaleDateString("es-AR")} - {s.inicio}-{s.fin} - {ars(s.costo)}</div>
               <button style={Object.assign({},btn(ok,wh),{width:"100%",fontSize:13})} onClick={function(){
-                // Create psico profile
-                const newId="px"+Date.now();
-                const newP={id:newId,nombre:s.nombre,wa:s.tel||"",email:s.email||"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"Creada automaticamente desde solicitud invitada",email2:"",pass:"psico123"};
-                saveDoc("psicos",newId,newP);
-                // Create fixed horarios from slots
-                (s.slots||[]).forEach(function(sl){
-                  const c=CONS.find(function(x){return x.id===sl.cons;});
-                  const hId="h"+Date.now()+Math.random().toString(36).substr(2,5);
-                  saveDoc("horarios",hId,{id:hId,psico:s.nombre,consultorio:sl.cons,diaSemana:Number(sl.dia),inicio:sl.ini,fin:sl.fin,sede:c?c.sede:"VL"});
-                });
-                // Send welcome WA
-                const flyerUrl=(config&&config.flyer)||"";
-                const resumen2=(s.slots||[]).map(function(sl){return DIAS[sl.dia]+" "+sl.cons+" "+sl.ini+"-"+sl.fin;}).join("\n");
-                const msg="Bienvenida "+s.nombre+" al Consultorio Gloria Videla!\n\nHorarios fijos aprobados:\n"+resumen2+"\n\nTu acceso a la app:\nUsuario: "+s.nombre+"\nContrasena: psico123\n\nTe pedimos que la cambies en tu primer ingreso."+(flyerUrl?"\n\nReglas de convivencia:\n"+flyerUrl:"");
-                const a=document.createElement("a");
-                a.href="https://wa.me/"+(s.tel||"")+"?text="+encodeURIComponent(msg);
-                a.target="_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                // Mark as complete
-                saveDoc("solHor",s.id,Object.assign({},s,{estado:"completada",fechaRes:new Date().toISOString()}));
-                notify("Perfil creado y bienvenida enviada!");
-              }}>
-                Confirmar pago y crear perfil + enviar bienvenida
+                  confirmarPago(s);
+                  var flyerUrl = (config&&config.flyer)||"";
+                  var slots2 = (s.slots||[]);
+                  var res = slots2.map(function(sl){ return DIAS[sl.dia]+" "+sl.cons+" "+sl.ini+"-"+sl.fin; }).join(", ");
+                  var line1 = "Bienvenida "+s.nombre+" al Consultorio Gloria Videla!";
+                  var line2 = "Horarios: "+res;
+                  var line3 = "Usuario: "+s.nombre+" / Contrasena: psico123";
+                  var line4 = flyerUrl ? "Reglas: "+flyerUrl : "";
+                  var msg = [line1, line2, line3, line4].filter(Boolean).join("%0A%0A");
+                  var a = document.createElement("a");
+                  a.href = "https://wa.me/"+(s.tel||"")+"?text="+msg;
+                  a.target = "_blank";
+                  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                  window.location.reload();
+                }}>
+                Confirmar pago y crear perfil
               </button>
             </div>
           );})}
