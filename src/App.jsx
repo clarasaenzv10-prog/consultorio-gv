@@ -108,49 +108,26 @@ function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currenc
 function calcPrecio(ini,fin,P) {
   const p = P || PD;
   const s = toMin(ini), e = toMin(fin);
-  // M1=480-840(08-14), M2=840-1080(14-18), M3=1080-1260(18-21)
-  const hasM1 = s<=480 && e>=840;   // 08-14 fully covered
-  const hasM2 = s<=840 && e>=1080;  // 14-18 fully covered
-  const hasM3 = s<=1080 && e>=1260; // 18-21 fully covered
+  // Franjas: Manana 08-14 (480-840), Tarde 14-18 (840-1080), Noche 18-21 (1080-1260)
+  const M1s=480,M1e=840,M2s=840,M2e=1080,M3s=1080,M3e=1260;
+  const coversM1=s<=M1s&&e>=M1e, coversM2=s<=M2s&&e>=M2e, coversM3=s<=M3s&&e>=M3e;
 
-  // Exact combinations first
-  if(hasM1&&hasM2&&hasM3) return {sub:p.dia, ley:"Dia completo (08-21hs)", tipo:"mod"};
-  if(hasM1&&hasM2) return {sub:p.m1+p.m2, ley:"Mod. Manana + Tarde (08-18hs)", tipo:"mod"};
-  if(hasM2&&hasM3) return {sub:p.m2+p.m3, ley:"Mod. Tarde + Noche (14-21hs)", tipo:"mod"};
-  if(hasM1&&!hasM2&&e===840) return {sub:p.m1, ley:"Mod. Manana (08-14hs)", tipo:"mod"};
-  if(hasM2&&!hasM1&&!hasM3&&s===840) return {sub:p.m2, ley:"Mod. Tarde (14-18hs)", tipo:"mod"};
-  if(hasM3&&!hasM2&&s===1080) return {sub:p.m3, ley:"Mod. Noche (18-21hs)", tipo:"mod"};
+  // Exact module / combination matches (ordered most specific to least)
+  if(coversM1&&coversM2&&coversM3) return {sub:p.dia, ley:"Dia completo (08-21hs)", tipo:"mod"};
+  if(coversM1&&coversM2) return {sub:p.m1+p.m2, ley:"Mod. Manana + Tarde (08-18hs)", tipo:"mod"};
+  if(coversM2&&coversM3) return {sub:p.m2+p.m3, ley:"Mod. Tarde + Noche (14-21hs)", tipo:"mod"};
+  if(coversM1&&e<=M1e) return {sub:p.m1, ley:"Mod. Manana (08-14hs)", tipo:"mod"};
+  if(coversM2&&s>=M2s&&e<=M2e) return {sub:p.m2, ley:"Mod. Tarde (14-18hs)", tipo:"mod"};
+  if(coversM3&&s>=M3s) return {sub:p.m3, ley:"Mod. Noche (18-21hs)", tipo:"mod"};
 
-  // Mixed: use module price for fully-covered modules + hourly for the rest
+  // Hourly: calculate overlap with each franja independently
   let tot=0; const pts=[];
-  let pos=s; // current position in minutes
-
-  // Mañana partial (before M1 start or M1 not full)
-  if(pos<480&&e>480) { const hs=(Math.min(e,480)-pos)/60; if(hs>0){tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");} pos=480; }
-
-  if(hasM1) {
-    tot+=p.m1; pts.push("Mod. Manana 08-14hs ("+ars(p.m1)+")"); pos=840;
-  } else if(pos<840&&e>pos) {
-    const hs=(Math.min(e,840)-Math.max(pos,480))/60;
-    if(hs>0){tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}
-    pos=840;
-  }
-
-  if(hasM2) {
-    tot+=p.m2; pts.push("Mod. Tarde 14-18hs ("+ars(p.m2)+")"); pos=1080;
-  } else if(pos<=840&&e>840) {
-    const hs=(Math.min(e,1080)-840)/60;
-    if(hs>0){tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}
-    pos=1080;
-  }
-
-  if(hasM3) {
-    tot+=p.m3; pts.push("Mod. Noche 18-21hs ("+ars(p.m3)+")"); pos=1260;
-  } else if(pos<=1080&&e>1080) {
-    const hs=(Math.min(e,1260)-1080)/60;
-    if(hs>0){tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}
-  }
-
+  const man_ini=Math.max(s,M1s),man_fin=Math.min(e,M1e);
+  if(man_fin>man_ini){const hs=(man_fin-man_ini)/60;tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}
+  const tar_ini=Math.max(s,M2s),tar_fin=Math.min(e,M2e);
+  if(tar_fin>tar_ini){const hs=(tar_fin-tar_ini)/60;tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}
+  const noc_ini=Math.max(s,M3s),noc_fin=Math.min(e,M3e);
+  if(noc_fin>noc_ini){const hs=(noc_fin-noc_ini)/60;tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}
   return {sub:tot, ley:null, tipo:"hora", des:pts.join(" + ")};
 }
 
@@ -419,6 +396,7 @@ export default function App() {
               <div style={{color:tx,fontWeight:700,fontSize:14}}>{user}</div>
               <div style={{color:mu,fontSize:12}}>{role==="admin"?"Administradora":"Psicologa"}</div>
             </div>
+            {role==="psico" && <EditarPerfilBtn user={user} psicos={psicos} setPsicos={setPsicos} notify={notify}/>}
             {role==="psico" && <CambiarPassBtn user={user} setPsicos={setPsicos} notify={notify}/>}
             <button onClick={function(){setView("login");setRole(null);setUser(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:er,fontSize:15,fontWeight:600}}>
               <span style={{fontSize:20}}>&#x23FB;</span>
@@ -706,10 +684,14 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     }
     return null;
   }
-  // Skip conflict check if coming from alternatives AND user hasn't changed time
-  const userChangedTime = !(ini===(slot.preIni||ini) && fin===(slot.preFin||fin));
-  const skipCheck = slot.confirmedFree && !userChangedTime;
-  const conflicto = (!skipCheck && (tipo==="fijo"||tipo==="reservar")) ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
+  // When coming from alternatives: trust the window. Only warn if user goes OUTSIDE it.
+  const fromAlternative = slot.confirmedFree === true;
+  const outOfWindow = fromAlternative && (
+    toMin(ini) < toMin(slot.preIni||"08:00") || toMin(fin) > toMin(slot.preFin||"21:00")
+  );
+  const conflicto = outOfWindow
+    ? "El horario elegido supera la ventana disponible ("+slot.preIni+"-"+slot.preFin+"). Si lo ampliás podria haber conflictos."
+    : (!fromAlternative && (tipo==="fijo"||tipo==="reservar")) ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
 
   if(ev) {
     const consNombre = (CONS.find(function(c){return c.id===ev.consultorio;})||{sn:""}).sn;
@@ -850,7 +832,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
           )}
           {!conflicto&&(tipo==="fijo"||tipo==="reservar")&&ini&&fin&&toMin(fin)>toMin(ini)&&(
             <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>
-              {skipCheck?"Horario verificado disponible":"Horario disponible"} - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
+              {fromAlternative?"Horario verificado disponible":"Horario disponible"} - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
             </div>
           )}
           <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){
@@ -2018,6 +2000,62 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
+  const [open,setOpen] = useState(false);
+  const p = psicos.find(function(x){return x.nombre===user;});
+  const [wa,setWa] = useState(p?p.wa||"":"");
+  const [email,setEmail] = useState(p?p.email||"":"");
+  const [analisis,setAnalisis] = useState(p?p.analisis||[]:[]);
+  const [disponible,setDisponible] = useState(p?p.disponible!==false:true);
+
+  function save() {
+    if(!p) return;
+    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,analisis:analisis,disponible:disponible}));
+    notify("Perfil actualizado");
+    setOpen(false);
+  }
+
+  const ANALS=["Cognitivo Conductual","Psicoanalitico","Sistemico / Familiar","Humanista / Gestalt","EMDR","Mindfulness / ACT","Integrativo","Otro"];
+
+  return (
+    <div>
+      <button onClick={function(){setOpen(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",borderBottom:"1px solid #C9E4EF",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:"#1C3A4A",fontSize:15}}>
+        <span style={{fontSize:20}}>&#9998;</span>
+        <span>Editar mi perfil</span>
+      </button>
+      {open && (
+        <div style={{padding:"12px 20px",borderBottom:"1px solid #C9E4EF",background:"#F0F8FB",display:"flex",flexDirection:"column",gap:10}}>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>WhatsApp (549...)</label>
+            <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={wa} onChange={function(e){setWa(e.target.value);}} placeholder="Ej: 5491161572283"/>
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Email</label>
+            <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="tu@email.com"/>
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Tipo de analisis</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {ANALS.map(function(a){
+                const sel=analisis.includes(a);
+                return <button key={a} onClick={function(){setAnalisis(function(prev){return sel?prev.filter(function(x){return x!==a;}):[...prev,a];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{a}</button>;
+              })}
+            </div>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:8,color:"#1C3A4A",fontSize:14,cursor:"pointer"}}>
+            <input type="checkbox" checked={disponible} onChange={function(e){setDisponible(e.target.checked);}}/>
+            Disponible para derivaciones
+          </label>
+          <div style={{display:"flex",gap:8}}>
+            <button style={{flex:1,background:"#4BA3C3",color:"#fff",border:"none",borderRadius:10,padding:"10px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={save}>Guardar</button>
+            <button style={{flex:1,background:"#fff",color:"#1C3A4A",border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setOpen(false);}}>Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
