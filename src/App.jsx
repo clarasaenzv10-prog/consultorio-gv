@@ -1243,6 +1243,12 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
                 const newId="px"+Date.now();
                 const newP={id:newId,nombre:s.nombre,wa:s.tel||"",email:s.email||"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"Creada automaticamente desde solicitud invitada",email2:"",pass:"psico123"};
                 saveDoc("psicos",newId,newP);
+                // Create fixed horarios from slots
+                (s.slots||[]).forEach(function(sl){
+                  const c=CONS.find(function(x){return x.id===sl.cons;});
+                  const hId="h"+Date.now()+Math.random().toString(36).substr(2,5);
+                  saveDoc("horarios",hId,{id:hId,psico:s.nombre,consultorio:sl.cons,diaSemana:Number(sl.dia),inicio:sl.ini,fin:sl.fin,sede:c?c.sede:"VL"});
+                });
                 // Send welcome WA
                 const flyerUrl=(config&&config.flyer)||"";
                 const msg="Bienvenida "+s.nombre+" al Consultorio Gloria Videla!
@@ -1286,14 +1292,18 @@ Aqui encontras las reglas de convivencia:
                 <div style={{color:mu,fontSize:11}}>{parseLocalDate(s.fechaSol.split("T")[0]).toLocaleDateString("es-AR")}</div>
               </div>
               <div style={{background:bg,borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid #C9E4EF"}}>
-                <div style={{color:tx,fontWeight:600}}>{s.consultorio} - {parseLocalDate(s.fecha).toLocaleDateString("es-AR")}</div>
-                <div style={{color:mu,fontSize:13}}>{s.inicio}-{s.fin} ({s.horas}hs)</div>
-                <div style={{color:ok,fontWeight:700}}>{ars(s.costo)}</div>
+                {(s.slots||[{consultorio:s.consultorio,dia:"-",ini:s.inicio,fin:s.fin}]).map(function(sl,si){return(
+                  <div key={si} style={{color:tx,fontSize:13,padding:"3px 0"}}>
+                    {DIAS[sl.dia]||sl.dia} - {sl.cons||sl.consultorio} - {sl.ini||sl.inicio}-{sl.fin} ({Math.max((toMin(sl.fin||sl.fin)-toMin(sl.ini||sl.inicio))/60,0).toFixed(1)}hs)
+                  </div>
+                );})}
+                <div style={{color:ok,fontWeight:700,marginTop:4}}>{ars(s.costoSemanal||s.costo||0)}/sem - {(s.totalHoras||s.horas||0).toFixed(1)}hs totales</div>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button style={Object.assign({},btn(br,wh),{flex:1,fontSize:13})} onClick={function(){
                   const tr=config&&config.transferencia?config.transferencia:{};
-                  const msg="Hola "+s.nombre+"! Tu solicitud para el "+parseLocalDate(s.fecha).toLocaleDateString("es-AR")+" en "+s.consultorio+" ("+s.inicio+"-"+s.fin+") fue aprobada.\n\nPara confirmar, realizá la transferencia de "+ars(s.costo)+" a:\nTitular: "+(tr.titular||"")+"\nCBU: "+(tr.cbu||"")+"\nAlias: "+(tr.alias||"")+"\nBanco: "+(tr.banco||"")+"\n\nUna vez realizada, subi el comprobante en la app.";
+                  const resumen=(s.slots||[]).map(function(sl){return DIAS[sl.dia]+" "+sl.cons+" "+sl.ini+"-"+sl.fin;}).join("\n");
+                  const msg="Hola "+s.nombre+"! Tu solicitud de horarios fijos fue aprobada.\n\nHorarios:\n"+resumen+"\n\nTotal semanal: "+((s.totalHoras||0).toFixed(1))+"hs - "+ars(s.costoSemanal||0)+"/semana\n\nPara confirmar, realizá la transferencia a:\nTitular: "+(tr.titular||"")+"\nCBU: "+(tr.cbu||"")+"\nAlias: "+(tr.alias||"")+"\nBanco: "+(tr.banco||"")+"\n\nEsperamos tu comprobante por WhatsApp.";
                   const a=document.createElement("a"); a.href="https://wa.me/"+s.tel+"?text="+encodeURIComponent(msg); a.target="_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
                   saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada-pago",fechaRes:new Date().toISOString()}));
                   notify("Solicitud aprobada - datos enviados por WA");
@@ -2208,46 +2218,59 @@ function ConsultoriosView({config,horarios}) {
 
 // ─── Solicitud Invitada ────────────────────────────────────────
 function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
-  const [fecha,setFecha] = useState("");
-  const [ini,setIni] = useState("09:00");
-  const [fin,setFin] = useState("12:00");
-  const [cons,setCons] = useState("C1");
   const [nombre,setNombre] = useState("");
   const [tel,setTel] = useState("");
   const [email,setEmail] = useState("");
   const [enviado,setEnviado] = useState(false);
+  const [slots,setSlots] = useState([]);
+  const [addDia,setAddDia] = useState(1);
+  const [addCons,setAddCons] = useState("C1");
+  const [addIni,setAddIni] = useState("09:00");
+  const [addFin,setAddFin] = useState("12:00");
 
+  const totalHoras = slots.reduce(function(acc,s){return acc+Math.max((toMin(s.fin)-toMin(s.ini))/60,0);},0);
   const minHoras = 3;
-  const horas = Math.max((toMin(fin)-toMin(ini))/60,0);
 
-  function checkConflicto() {
-    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return null;
-    const sMin=toMin(ini),eMin=toMin(fin);
-    const ds=parseLocalDate(fecha).getDay(), jd=ds===0?7:ds;
-    const fijos=(horarios||[]).filter(function(x){return x.consultorio===cons&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-    const extras=(reservas||[]).filter(function(x){return x.fecha===fecha&&x.consultorio===cons&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-    return fijos.concat(extras).length>0?"Ese horario no esta disponible en "+cons:null;
+  function conflictoSlot(s) {
+    const sMin=toMin(s.ini), eMin=toMin(s.fin);
+    if(eMin<=sMin) return "Fin debe ser mayor al inicio";
+    const ocu=(horarios||[]).filter(function(x){
+      return x.consultorio===s.cons&&Number(x.diaSemana)===Number(s.dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+    });
+    return ocu.length?"Ese horario esta ocupado en "+s.cons:null;
   }
-  const conflicto = checkConflicto();
 
-  function getLibresInvitada() {
-    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return [];
+  function libresParaSlot(dia,ini,fin) {
     const sMin=toMin(ini),eMin=toMin(fin);
-    const ds=parseLocalDate(fecha).getDay(),jd=ds===0?7:ds;
+    if(eMin<=sMin) return [];
     return CONS.filter(function(c){
-      if(c.id===cons) return false;
-      const ocu=(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
-      return !ocu;
+      return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
     });
   }
 
+  function addSlot() {
+    if(toMin(addFin)<=toMin(addIni)){notify("Fin debe ser mayor al inicio","err");return;}
+    const nuevo={dia:Number(addDia),cons:addCons,ini:addIni,fin:addFin};
+    const conf=conflictoSlot(nuevo);
+    if(conf){notify(conf,"err");return;}
+    if(slots.some(function(s){return Number(s.dia)===Number(addDia);})){
+      notify("Ya hay un horario ese dia. Eliminalos primero.","err"); return;
+    }
+    setSlots(function(p){return p.concat([nuevo]);});
+  }
+  function removeSlot(i){setSlots(function(p){return p.filter(function(_,idx){return idx!==i;});});}
+
+  function calcCostoSemanal() {
+    return slots.reduce(function(acc,s){return acc+calcPrecio(s.ini,s.fin).sub;},0);
+  }
+
   function enviar() {
-    if(!nombre.trim()||!tel.trim()||!fecha) { notify("Completa todos los campos","err"); return; }
-    if(horas<minHoras) { notify("Minimo "+minHoras+" horas","err"); return; }
-    if(conflicto) { notify(conflicto,"err"); return; }
-    const s={id:Date.now(),tipo:"invitada",nombre:nombre,tel:tel,email:email,fecha:fecha,inicio:ini,fin:fin,consultorio:cons,horas:horas,estado:"pendiente",fechaSol:new Date().toISOString(),costo:calcPrecio(ini,fin).sub};
+    if(!nombre.trim()||!tel.trim()){notify("Completa tu nombre y WhatsApp","err");return;}
+    if(slots.length===0){notify("Agrega al menos un horario","err");return;}
+    if(totalHoras<minHoras){notify("Minimo "+minHoras+"hs semanales en total","err");return;}
+    const s={id:Date.now(),tipo:"invitada",nombre:nombre,tel:tel,email:email,slots:slots,totalHoras:totalHoras,costoSemanal:calcCostoSemanal(),estado:"pendiente",fechaSol:new Date().toISOString()};
     saveDoc("solHor",s.id,s);
-    notify("Solicitud enviada! Te contactaremos pronto.");
+    notify("Solicitud enviada!");
     setEnviado(true);
   }
 
@@ -2255,13 +2278,18 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
     <div style={Object.assign({},sPanel,{textAlign:"center",padding:40})}>
       <div style={{fontSize:48,marginBottom:16}}>✓</div>
       <div style={{color:ok,fontWeight:700,fontSize:18,marginBottom:8}}>Solicitud enviada!</div>
-      <div style={{color:mu,fontSize:14}}>Te contactaremos a la brevedad para confirmar tu reserva.</div>
+      <div style={{color:mu,fontSize:14,lineHeight:1.6}}>Te contactaremos a la brevedad para confirmar tu reserva.</div>
     </div>
   );
 
+  const addConflicto = (toMin(addFin)>toMin(addIni)) ? conflictoSlot({dia:addDia,cons:addCons,ini:addIni,fin:addFin}) : null;
+  const addLibres = libresParaSlot(addDia,addIni,addFin);
+
   return (
     <div>
-      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitar reserva</h2>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:4}}>Solicitar horario fijo</h2>
+      <div style={{color:mu,fontSize:13,marginBottom:16}}>Minimo {minHoras}hs semanales en total. Podes agregar varios dias.</div>
+
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Tus datos</div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2270,51 +2298,88 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
           <div><label style={sLbl}>Email</label><input style={sInp} value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="tu@email.com"/></div>
         </div>
       </div>
+
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Reserva</div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          <div><label style={sLbl}>Fecha</label><input style={sInp} type="date" value={fecha} onChange={function(e){setFecha(e.target.value);}}/></div>
-          <div><label style={sLbl}>Consultorio</label>
-            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
-              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
-            </select>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Horarios fijos semanales</div>
+        {slots.length===0 && <div style={{color:mu,fontSize:13,textAlign:"center",padding:"10px 0",marginBottom:10}}>Todavia no agregaste horarios</div>}
+        {slots.map(function(s,i){
+          return (
+            <div key={i} style={{background:ob,border:"1px solid #A7E3C0",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1}}>
+                <div style={{color:tx,fontWeight:700,fontSize:13}}>{DIAS[s.dia]} - {s.cons} {CONS.find(function(c){return c.id===s.cons;})?("("+(CONS.find(function(c){return c.id===s.cons;}).sede==="VL"?"Vic. Lopez":"Uruguay")+")"):"" }</div>
+                <div style={{color:mu,fontSize:12}}>{s.ini}-{s.fin} - {Math.max((toMin(s.fin)-toMin(s.ini))/60,0).toFixed(1)}hs - {ars(calcPrecio(s.ini,s.fin).sub)}/sem</div>
+              </div>
+              <button style={{background:"transparent",border:"none",color:er,fontSize:18,cursor:"pointer",padding:"0 4px",fontFamily:"inherit"}} onClick={function(){removeSlot(i);}}>X</button>
+            </div>
+          );
+        })}
+        <div style={{background:bg,borderRadius:10,padding:14,border:"1.5px dashed #4BA3C3",marginTop:8}}>
+          <div style={{color:br,fontSize:12,fontWeight:700,marginBottom:10}}>+ Agregar dia</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div>
+              <label style={sLbl}>Dia</label>
+              <select style={sInp} value={addDia} onChange={function(e){setAddDia(Number(e.target.value));}}>
+                {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
+              </select>
+            </div>
+            <div>
+              <label style={sLbl}>Consultorio</label>
+              <select style={sInp} value={addCons} onChange={function(e){setAddCons(e.target.value);}}>
+                {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sede==="VL"?"VL":"UY"}</option>;})}
+              </select>
+            </div>
+            <div>
+              <label style={sLbl}>Desde</label>
+              <input style={sInp} type="time" value={addIni} onChange={function(e){setAddIni(e.target.value);}}/>
+            </div>
+            <div>
+              <label style={sLbl}>Hasta</label>
+              <input style={sInp} type="time" value={addFin} onChange={function(e){setAddFin(e.target.value);}}/>
+            </div>
           </div>
-          <div style={{display:"flex",gap:10}}>
-            <div style={{flex:1}}><label style={sLbl}>Desde</label><input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/></div>
-            <div style={{flex:1}}><label style={sLbl}>Hasta</label><input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/></div>
-          </div>
-        </div>
-        {conflicto && (
-          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",marginTop:10,color:er,fontSize:13}}>
-            <b>{conflicto}</b>
-            {getLibresInvitada().length>0 && (
-              <div style={{marginTop:8}}>
-                <div style={{fontSize:12,marginBottom:6}}>Consultorios disponibles:</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {getLibresInvitada().map(function(c){return(
-                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setCons(c.id);}}>
-                      {c.id} - {c.sede==="VL"?"Vicente Lopez":"Uruguay"}
+          {addConflicto && (
+            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"8px 12px",marginBottom:8,color:er,fontSize:12}}>
+              {addConflicto}
+              {addLibres.length>0 && (
+                <div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {addLibres.map(function(c){return(
+                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:6,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setAddCons(c.id);}}>
+                      {c.id} - {c.sede==="VL"?"Vic. Lopez":"Uruguay"}
                     </button>
                   );})}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-        {!conflicto && horas>0 && (
-          <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",marginTop:10}}>
-            <div style={{color:ok,fontWeight:700}}>{horas.toFixed(1)}hs - {ars(calcPrecio(ini,fin).sub)}</div>
-            {horas<minHoras && <div style={{color:er,fontSize:12,marginTop:4}}>Minimo {minHoras} horas por reserva</div>}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+          {!addConflicto && toMin(addFin)>toMin(addIni) && (
+            <div style={{color:ok,fontSize:12,marginBottom:8}}>Disponible - {ars(calcPrecio(addIni,addFin).sub)}/sem</div>
+          )}
+          <button style={Object.assign({},btnO(wh,br,"1.5px solid #4BA3C3"),{width:"100%",padding:"8px",fontSize:13})} onClick={addSlot}>
+            + Agregar este dia
+          </button>
+        </div>
       </div>
-      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"12px 16px",fontSize:15,opacity:(conflicto||horas<minHoras)?0.4:1})} disabled={!!(conflicto||horas<minHoras||!nombre||!tel||!fecha)} onClick={enviar}>
-        Enviar solicitud
+
+      <div style={Object.assign({},sPanel,{marginBottom:16,background:totalHoras>=minHoras?ob:eb,border:totalHoras>=minHoras?"1px solid #A7E3C0":"1px solid #F5B8B3"})}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{color:tx,fontWeight:700,fontSize:15}}>Total: {totalHoras.toFixed(1)}hs semanales</div>
+            {slots.length>0&&<div style={{color:mu,fontSize:12}}>Costo: {ars(calcCostoSemanal())}/semana</div>}
+          </div>
+          <div style={{color:totalHoras>=minHoras?ok:er,fontWeight:700,fontSize:13}}>
+            {totalHoras>=minHoras?"Minimo cumplido":"Faltan "+(minHoras-totalHoras).toFixed(1)+"hs"}
+          </div>
+        </div>
+      </div>
+
+      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"13px 16px",fontSize:15,opacity:(totalHoras<minHoras||!nombre||!tel||slots.length===0)?0.4:1})} disabled={!!(totalHoras<minHoras||!nombre||!tel||slots.length===0)} onClick={enviar}>
+        Enviar solicitud ({totalHoras.toFixed(1)}hs semanales)
       </button>
-      <div style={{color:mu,fontSize:12,textAlign:"center",marginTop:10}}>Minimo {minHoras}hs - Sujeto a aprobacion</div>
+      <div style={{color:mu,fontSize:12,textAlign:"center",marginTop:8}}>Minimo {minHoras}hs semanales - Sujeto a aprobacion</div>
     </div>
   );
 }
+
 
 // ─── Estadisticas ─────────────────────────────────────────────
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
