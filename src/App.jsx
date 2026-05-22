@@ -232,6 +232,12 @@ export default function App() {
   const [anuncios,setAnunciosLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
+  const [config,setConfigLocal] = useState({
+    invPass:"invitada123",
+    transferencia:{alias:"",cbu:"",banco:"",titular:""},
+    flyer:"",
+    fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}
+  });
   const [dbReady,setDbReady] = useState(false);
 
   useEffect(function() {
@@ -261,6 +267,7 @@ export default function App() {
   function setAnuncios(u2) { const n=typeof u2==="function"?u2(anuncios):u2; n.forEach(function(a){saveDoc("anuncios",a.id,a);}); anuncios.forEach(function(a){if(!n.find(function(x){return x.id===a.id;}))delDoc("anuncios",a.id);}); }
   function setSolHor(u2) { const n=typeof u2==="function"?u2(solHor):u2; n.forEach(function(s){saveDoc("solHor",s.id,s);}); solHor.forEach(function(s){if(!n.find(function(x){return x.id===s.id;}))delDoc("solHor",s.id);}); }
   function setTabP(u2) { const n=typeof u2==="function"?u2(tabP):u2; n.forEach(function(t){saveDoc("tabP",t.id,t);}); tabP.forEach(function(t){if(!n.find(function(x){return x.id===t.id;}))delDoc("tabP",t.id);}); }
+  function setConfig(u2) { const n=typeof u2==="function"?u2(config):u2; saveDoc("config","main",n); }
 
   const cmap = {};
   psicos.forEach(function(p,i){ cmap[p.nombre.toLowerCase()] = PCOLS[i%PCOLS.length]; });
@@ -337,7 +344,7 @@ export default function App() {
       </div>
     </div>
   );
-  if(view==="login") return <AppRoot><LoginView onLogin={login} psicos={psicos}/></AppRoot>;
+  if(view==="login") return <AppRoot><LoginView onLogin={login} psicos={psicos} config={config}/></AppRoot>;
 
   const nav = [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
@@ -440,15 +447,18 @@ export default function App() {
           </div>
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
-          {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
+          {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
           {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
-          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify}/>}
+          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
+          {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
+          {tab==="consultorios" && role==="invitada" && <ConsultoriosView config={config} horarios={horarios}/>}
+          {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
           {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
         </main>
@@ -500,7 +510,7 @@ export default function App() {
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
-          <NuevaModal user={user} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
+          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
         )}
       </div>
     </AppRoot>
@@ -508,12 +518,13 @@ export default function App() {
 }
 
 // ─── Login ────────────────────────────────────────────────────
-function LoginView({onLogin,psicos}) {
+function LoginView({onLogin,psicos,config}) {
   const [u,setU] = useState("");
   const [p,setP] = useState("");
   const [err,setErr] = useState("");
   function go() {
     if(u==="admin" && p==="admin123") { onLogin("admin","Admin"); return; }
+    if(u.toLowerCase()==="invitada" && p===((config&&config.invPass)||"invitada123")) { onLogin("invitada","Invitada"); return; }
     const f = psicos.find(function(x){return x.nombre.toLowerCase()===u.toLowerCase();});
     if(f && p===(f.pass||"psico123")) { onLogin("psico",f.nombre); return; }
     setErr("Usuario o contrasena incorrectos");
@@ -670,28 +681,21 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     const fijos=(horarios||[]).filter(function(x){
       if(x.consultorio!==consCheck) return false;
       if(Number(x.diaSemana)!==jd) return false;
-      const xIni=toMin(x.inicio), xFin=toMin(x.fin);
-      // Adjacent slots are NOT conflicts (e.g. booking 08-09 when Agus has 09-12 is fine)
-      return sMin < xFin && eMin > xIni;
+      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
     });
-    if(fijos.length) return "Conflicto con "+fijos.map(function(x){return x.psico;}).join(", ")+" en "+consCheck;
+    if(fijos.length) return "Ese horario esta ocupado en "+consCheck;
     if(tipoCheck==="reservar") {
       // Also check extras on the same specific date
       const extras=(reservas||[]).filter(function(x){
         return x.fecha===slot.date && x.consultorio===consCheck && x.estado==="aprobada" && sMin<toMin(x.fin) && eMin>toMin(x.inicio);
       });
-      if(extras.length) return "Conflicto con "+extras.map(function(x){return x.psico;}).join(", ")+" en "+consCheck;
+      if(extras.length) return "Ese horario esta ocupado en "+consCheck;
     }
     return null;
   }
-  // When coming from alternatives: trust the window. Only warn if user goes OUTSIDE it.
+  // Always run full conflict check - no minimum hours restriction
   const fromAlternative = slot.confirmedFree === true;
-  const outOfWindow = fromAlternative && (
-    toMin(ini) < toMin(slot.preIni||"08:00") || toMin(fin) > toMin(slot.preFin||"21:00")
-  );
-  const conflicto = outOfWindow
-    ? "El horario elegido supera la ventana disponible ("+slot.preIni+"-"+slot.preFin+"). Si lo ampliás podria haber conflictos."
-    : (!fromAlternative && (tipo==="fijo"||tipo==="reservar")) ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
+  const conflicto = (tipo==="fijo"||tipo==="reservar") ? checkConflicto(tipo,cons,ini,fin,diaSemana) : null;
 
   if(ev) {
     const consNombre = (CONS.find(function(c){return c.id===ev.consultorio;})||{sn:""}).sn;
@@ -832,7 +836,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
           )}
           {!conflicto&&(tipo==="fijo"||tipo==="reservar")&&ini&&fin&&toMin(fin)>toMin(ini)&&(
             <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>
-              {fromAlternative?"Horario verificado disponible":"Horario disponible"} - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
+              "Horario disponible" - <b>{ars(pr.sub)}</b>{tipo==="fijo"?"/sem":""}
             </div>
           )}
           <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){
@@ -848,11 +852,57 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
   );
 }
 
-function NuevaModal({user,onReservar,onClose}) {
+function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
   const [fecha,setFecha] = useState("");
   const [ini,setIni] = useState("09:00");
   const [fin,setFin] = useState("12:00");
   const [cons,setCons] = useState("C1");
+
+  function getDiaSemana() {
+    // JS: 0=Dom,1=Lun...6=Sab -> our system: 1=Lun...6=Sab,7=Dom
+    if(!fecha) return 0;
+    const d = parseLocalDate(fecha);
+    const jsDay = d.getDay();
+    return jsDay===0 ? 7 : jsDay;
+  }
+
+  function checkConflicto() {
+    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return null;
+    const sMin=toMin(ini), eMin=toMin(fin);
+    const jd=getDiaSemana();
+    const fijos=(horarios||[]).filter(function(x){
+      if(x.consultorio!==cons) return false;
+      if(Number(x.diaSemana)!==jd) return false;
+      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+    });
+    const extras=(reservas||[]).filter(function(x){
+      if(x.fecha!==fecha||x.consultorio!==cons) return false;
+      if(x.estado!=="aprobada"&&x.estado!=="pendiente") return false;
+      return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+    });
+    return fijos.concat(extras).length>0?"Ese horario esta ocupado en "+cons:null;
+  }
+
+  function getLibres() {
+    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return [];
+    const sMin=toMin(ini), eMin=toMin(fin);
+    const jd=getDiaSemana();
+    return CONS.filter(function(c){
+      if(c.id===cons) return false;
+      const ocupFijo=(horarios||[]).some(function(x){
+        return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      });
+      const ocupExtra=(reservas||[]).some(function(x){
+        return x.fecha===fecha&&x.consultorio===c.id&&(x.estado==="aprobada"||x.estado==="pendiente")&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      });
+      return !ocupFijo&&!ocupExtra;
+    });
+  }
+
+  const conflicto = checkConflicto();
+  const libres = conflicto ? getLibres() : [];
+  const horas = Math.max((toMin(fin)-toMin(ini))/60,0);
+
   return (
     <div style={sOverlay} onClick={onClose}>
       <div style={sModal} onClick={function(e){e.stopPropagation();}}>
@@ -866,11 +916,40 @@ function NuevaModal({user,onReservar,onClose}) {
             <div style={{flex:1}}><label style={sLbl}>Desde</label><input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/></div>
             <div style={{flex:1}}><label style={sLbl}>Hasta</label><input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/></div>
           </div>
-          <div><label style={sLbl}>Consultorio</label><select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>{CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}</select></div>
-          <div style={{background:bg,borderRadius:8,padding:10,color:mu,fontSize:12,border:"1px solid #C9E4EF"}}>
-            Minimo 3hs - Requiere aprobacion - <b style={{color:ok}}>{ars(calcPrecio(ini,fin).sub)}</b>
+          <div><label style={sLbl}>Consultorio</label>
+            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
+              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
+            </select>
           </div>
-          <button style={btn(br,wh)} onClick={function(){if(!fecha)return;if(calcHrs(ini,fin)<3){alert("Minimo 3 horas");return;}onReservar({fecha:fecha,inicio:ini,fin:fin,consultorio:cons,psico:user});}}>Enviar solicitud</button>
+          {conflicto && (
+            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
+              <b>{conflicto}</b>
+              {libres.length>0 && (
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:12,marginBottom:6,color:tx}}>Consultorios disponibles:</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {libres.map(function(c){return(
+                      <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setCons(c.id);}}>
+                        {c.id} - {c.sede==="VL"?"Vic. Lopez":"Uruguay"}
+                      </button>
+                    );})}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {!conflicto && horas>0 && (
+            <div style={{background:bg,borderRadius:8,padding:10,color:mu,fontSize:12,border:"1px solid #C9E4EF"}}>
+              {horas.toFixed(1)}hs - Requiere aprobacion - <b style={{color:ok}}>{ars(calcPrecio(ini,fin).sub)}</b>
+
+            </div>
+          )}
+          <button
+            style={Object.assign({},btn(br,wh),{opacity:(conflicto||!fecha)?0.4:1})}
+            disabled={!!(conflicto||!fecha)}
+            onClick={function(){onReservar({fecha:fecha,inicio:ini,fin:fin,consultorio:cons,psico:user});}}>
+            Enviar solicitud
+          </button>
         </div>
       </div>
     </div>
@@ -1113,9 +1192,10 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
 }
 
 // ─── Cambios Horario ──────────────────────────────────────────
-function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify}) {
+function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos}) {
   const [notas,setNotas] = useState({});
-  const pend = solicitudes.filter(function(s){return s.estado==="pendiente";});
+  const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";});
+  const pendInv = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo==="invitada";});
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";});
 
   function aprobar(s) {
@@ -1142,8 +1222,39 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
   return (
     <div>
-      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Cambios de Horario</h2>
-      {!pend.length && <div style={{color:mu,textAlign:"center",padding:40}}>Sin cambios pendientes</div>}
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitudes de Horario</h2>
+      {pendInv.length>0 && (
+        <div style={{marginBottom:20}}>
+          <div style={{color:er,fontWeight:700,fontSize:13,marginBottom:10}}>Solicitudes de nuevas psicologas ({pendInv.length})</div>
+          {pendInv.map(function(s){return(
+            <div key={s.id} style={Object.assign({},sPanel,{marginBottom:10,border:"1.5px solid #F5B8B3"})}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div>
+                  <div style={{color:tx,fontWeight:700,fontSize:15}}>{s.nombre}</div>
+                  <div style={{color:mu,fontSize:12}}>WA: {s.tel}{s.email?" | "+s.email:""}</div>
+                </div>
+                <div style={{color:mu,fontSize:11}}>{parseLocalDate(s.fechaSol.split("T")[0]).toLocaleDateString("es-AR")}</div>
+              </div>
+              <div style={{background:bg,borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid #C9E4EF"}}>
+                <div style={{color:tx,fontWeight:600}}>{s.consultorio} - {parseLocalDate(s.fecha).toLocaleDateString("es-AR")}</div>
+                <div style={{color:mu,fontSize:13}}>{s.inicio}-{s.fin} ({s.horas}hs)</div>
+                <div style={{color:ok,fontWeight:700}}>{ars(s.costo)}</div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={Object.assign({},btn(br,wh),{flex:1,fontSize:13})} onClick={function(){
+                  const tr=config&&config.transferencia?config.transferencia:{};
+                  const msg="Hola "+s.nombre+"! Tu solicitud para el "+parseLocalDate(s.fecha).toLocaleDateString("es-AR")+" en "+s.consultorio+" ("+s.inicio+"-"+s.fin+") fue aprobada.\n\nPara confirmar, realizá la transferencia de "+ars(s.costo)+" a:\nTitular: "+(tr.titular||"")+"\nCBU: "+(tr.cbu||"")+"\nAlias: "+(tr.alias||"")+"\nBanco: "+(tr.banco||"")+"\n\nUna vez realizada, subi el comprobante en la app.";
+                  const a=document.createElement("a"); a.href="https://wa.me/"+s.tel+"?text="+encodeURIComponent(msg); a.target="_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                  saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada-pago",fechaRes:new Date().toISOString()}));
+                  notify("Solicitud aprobada - datos enviados por WA");
+                }}>Aprobar y enviar datos</button>
+                <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1,fontSize:13})} onClick={function(){saveDoc("solHor",s.id,Object.assign({},s,{estado:"rechazada",fechaRes:new Date().toISOString()}));notify("Rechazada");}}>Rechazar</button>
+              </div>
+            </div>
+          );})}
+        </div>
+      )}
+      {!pend.length && !pendInv.length && <div style={{color:mu,textAlign:"center",padding:40}}>Sin cambios pendientes</div>}
       {pend.map(function(s) {
         return (
           <div key={s.id} style={Object.assign({},sPanel,{marginBottom:12})}>
@@ -1861,6 +1972,245 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   );
 }
 
+
+// ─── Configuracion (Admin) ────────────────────────────────────
+function ConfigView({config,setConfig,notify}) {
+  const [invPass,setInvPass] = useState(config.invPass||"invitada123");
+  const [alias,setAlias] = useState((config.transferencia&&config.transferencia.alias)||"");
+  const [cbu,setCbu] = useState((config.transferencia&&config.transferencia.cbu)||"");
+  const [banco,setBanco] = useState((config.transferencia&&config.transferencia.banco)||"");
+  const [titular,setTitular] = useState((config.transferencia&&config.transferencia.titular)||"");
+  const [flyer,setFlyer] = useState(config.flyer||"");
+  const [fotos,setFotos] = useState(config.fotos||{C1:[],C2:[],C3:[],C4:[],C5:[]});
+  const [selCons,setSelCons] = useState("C1");
+  const [newFoto,setNewFoto] = useState("");
+
+  function save() {
+    setConfig({invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,id:"main"});
+    notify("Configuracion guardada");
+  }
+  function addFoto() {
+    if(!newFoto.trim()) return;
+    const updated = Object.assign({},fotos,{[selCons]:(fotos[selCons]||[]).concat([newFoto.trim()])});
+    setFotos(updated);
+    setNewFoto("");
+  }
+  function delFoto(cons,idx) {
+    const updated = Object.assign({},fotos,{[cons]:fotos[cons].filter(function(_,i){return i!==idx;})});
+    setFotos(updated);
+  }
+  function gdLink(url) {
+    if(!url) return url;
+    const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    return m?"https://drive.google.com/uc?export=view&id="+m[1]:url;
+  }
+
+  return (
+    <div>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
+      <div style={Object.assign({},sPanel,{marginBottom:16})}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
+        <label style={sLbl}>Contrasena para invitadas</label>
+        <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
+        <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
+      </div>
+      <div style={Object.assign({},sPanel,{marginBottom:16})}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Datos de transferencia</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div><label style={sLbl}>Titular</label><input style={sInp} value={titular} onChange={function(e){setTitular(e.target.value);}} placeholder="Nombre completo"/></div>
+          <div><label style={sLbl}>CBU</label><input style={sInp} value={cbu} onChange={function(e){setCbu(e.target.value);}} placeholder="0000000000000000000000"/></div>
+          <div><label style={sLbl}>Alias</label><input style={sInp} value={alias} onChange={function(e){setAlias(e.target.value);}} placeholder="alias.mercadopago"/></div>
+          <div><label style={sLbl}>Banco</label><input style={sInp} value={banco} onChange={function(e){setBanco(e.target.value);}} placeholder="Ej: Brubank, Galicia..."/></div>
+        </div>
+      </div>
+      <div style={Object.assign({},sPanel,{marginBottom:16})}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Flyer de convivencia (link imagen)</div>
+        <input style={sInp} value={flyer} onChange={function(e){setFlyer(e.target.value);}} placeholder="Link de Google Drive o imagen"/>
+        {flyer && <img src={gdLink(flyer)} alt="flyer" style={{width:"100%",borderRadius:8,marginTop:8,maxHeight:300,objectFit:"contain"}}/>}
+      </div>
+      <div style={Object.assign({},sPanel,{marginBottom:16})}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Fotos de consultorios</div>
+        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+          {["C1","C2","C3","C4","C5"].map(function(c){return(
+            <button key={c} onClick={function(){setSelCons(c);}} style={{padding:"6px 14px",borderRadius:8,border:"none",background:selCons===c?br:bg,color:selCons===c?wh:mu,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13}}>{c}</button>
+          );})}
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <input style={Object.assign({},sInp,{flex:1})} value={newFoto} onChange={function(e){setNewFoto(e.target.value);}} placeholder="Link de Google Drive o imagen"/>
+          <button style={btn(br,wh)} onClick={addFoto}>+</button>
+        </div>
+        {(fotos[selCons]||[]).map(function(url,i){return(
+          <div key={i} style={{position:"relative",marginBottom:8}}>
+            <img src={gdLink(url)} alt={"foto "+i} style={{width:"100%",borderRadius:8,maxHeight:200,objectFit:"cover"}}/>
+            <button onClick={function(){delFoto(selCons,i);}} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.5)",color:wh,border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>X</button>
+          </div>
+        );})}
+        {!(fotos[selCons]||[]).length && <div style={{color:mu,fontSize:13}}>Sin fotos para {selCons}. Pega links de Google Drive.</div>}
+      </div>
+      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"12px 16px",fontSize:15})} onClick={save}>Guardar configuracion</button>
+    </div>
+  );
+}
+
+// ─── Consultorios View (Invitada) ─────────────────────────────
+function ConsultoriosView({config,horarios}) {
+  const [selC,setSelC] = useState("C1");
+  const fotos = (config.fotos&&config.fotos[selC])||[];
+  function gdLink(url) {
+    if(!url) return url;
+    const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    return m?"https://drive.google.com/uc?export=view&id="+m[1]:url;
+  }
+  const hs = horarios.filter(function(h){return h.consultorio===selC;});
+  const ocupados = [1,2,3,4,5,6].reduce(function(acc,d){
+    acc[d]=hs.filter(function(h){return Number(h.diaSemana)===d;}).map(function(h){return h.inicio+"-"+h.fin;}).join(", ");
+    return acc;
+  },{});
+  const cons = CONS.find(function(c){return c.id===selC;});
+  return (
+    <div>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Consultorios</h2>
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {CONS.map(function(c){return(
+          <button key={c.id} onClick={function(){setSelC(c.id);}} style={{padding:"8px 16px",borderRadius:10,border:"none",background:selC===c.id?br:wh,color:selC===c.id?wh:tx,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13,boxShadow:"0 1px 4px rgba(75,163,195,.1)"}}>
+            {c.id}
+          </button>
+        );})}
+      </div>
+      <div style={sPanel}>
+        <div style={{color:tx,fontWeight:700,fontSize:16,marginBottom:4}}>{selC}</div>
+        <div style={{color:mu,fontSize:13,marginBottom:14}}>{cons?cons.sn:""}</div>
+        {fotos.length>0?(
+          <div style={{marginBottom:16}}>
+            {fotos.map(function(url,i){return <img key={i} src={gdLink(url)} alt={"foto "+i} style={{width:"100%",borderRadius:10,marginBottom:8,maxHeight:220,objectFit:"cover"}}/> ;})}
+          </div>
+        ):(
+          <div style={{background:bg,borderRadius:8,padding:20,textAlign:"center",color:mu,marginBottom:14}}>Sin fotos aun</div>
+        )}
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Disponibilidad semanal</div>
+        {[1,2,3,4,5,6].map(function(d){return(
+          <div key={d} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #EBF6FA"}}>
+            <div style={{color:tx,fontWeight:600,fontSize:13}}>{DIAS[d]}</div>
+            <div style={{color:ocupados[d]?er:ok,fontSize:12}}>
+              {ocupados[d]?"Ocupado "+ocupados[d]:"Disponible todo el dia"}
+            </div>
+          </div>
+        );})}
+      </div>
+    </div>
+  );
+}
+
+// ─── Solicitud Invitada ────────────────────────────────────────
+function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
+  const [fecha,setFecha] = useState("");
+  const [ini,setIni] = useState("09:00");
+  const [fin,setFin] = useState("12:00");
+  const [cons,setCons] = useState("C1");
+  const [nombre,setNombre] = useState("");
+  const [tel,setTel] = useState("");
+  const [email,setEmail] = useState("");
+  const [enviado,setEnviado] = useState(false);
+
+  const minHoras = 3;
+  const horas = Math.max((toMin(fin)-toMin(ini))/60,0);
+
+  function checkConflicto() {
+    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return null;
+    const sMin=toMin(ini),eMin=toMin(fin);
+    const ds=parseLocalDate(fecha).getDay(), jd=ds===0?7:ds;
+    const fijos=(horarios||[]).filter(function(x){return x.consultorio===cons&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+    const extras=(reservas||[]).filter(function(x){return x.fecha===fecha&&x.consultorio===cons&&x.estado==="aprobada"&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+    return fijos.concat(extras).length>0?"Ese horario no esta disponible en "+cons:null;
+  }
+  const conflicto = checkConflicto();
+
+  function getLibresInvitada() {
+    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return [];
+    const sMin=toMin(ini),eMin=toMin(fin);
+    const ds=parseLocalDate(fecha).getDay(),jd=ds===0?7:ds;
+    return CONS.filter(function(c){
+      if(c.id===cons) return false;
+      const ocu=(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+      return !ocu;
+    });
+  }
+
+  function enviar() {
+    if(!nombre.trim()||!tel.trim()||!fecha) { notify("Completa todos los campos","err"); return; }
+    if(horas<minHoras) { notify("Minimo "+minHoras+" horas","err"); return; }
+    if(conflicto) { notify(conflicto,"err"); return; }
+    const s={id:Date.now(),tipo:"invitada",nombre:nombre,tel:tel,email:email,fecha:fecha,inicio:ini,fin:fin,consultorio:cons,horas:horas,estado:"pendiente",fechaSol:new Date().toISOString(),costo:calcPrecio(ini,fin).sub};
+    saveDoc("solHor",s.id,s);
+    notify("Solicitud enviada! Te contactaremos pronto.");
+    setEnviado(true);
+  }
+
+  if(enviado) return (
+    <div style={Object.assign({},sPanel,{textAlign:"center",padding:40})}>
+      <div style={{fontSize:48,marginBottom:16}}>✓</div>
+      <div style={{color:ok,fontWeight:700,fontSize:18,marginBottom:8}}>Solicitud enviada!</div>
+      <div style={{color:mu,fontSize:14}}>Te contactaremos a la brevedad para confirmar tu reserva.</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitar reserva</h2>
+      <div style={Object.assign({},sPanel,{marginBottom:16})}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Tus datos</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={nombre} onChange={function(e){setNombre(e.target.value);}} placeholder="Tu nombre"/></div>
+          <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={tel} onChange={function(e){setTel(e.target.value);}} placeholder="549..."/></div>
+          <div><label style={sLbl}>Email</label><input style={sInp} value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="tu@email.com"/></div>
+        </div>
+      </div>
+      <div style={Object.assign({},sPanel,{marginBottom:16})}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Reserva</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div><label style={sLbl}>Fecha</label><input style={sInp} type="date" value={fecha} onChange={function(e){setFecha(e.target.value);}}/></div>
+          <div><label style={sLbl}>Consultorio</label>
+            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
+              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
+            </select>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:1}}><label style={sLbl}>Desde</label><input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/></div>
+            <div style={{flex:1}}><label style={sLbl}>Hasta</label><input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/></div>
+          </div>
+        </div>
+        {conflicto && (
+          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",marginTop:10,color:er,fontSize:13}}>
+            <b>{conflicto}</b>
+            {getLibresInvitada().length>0 && (
+              <div style={{marginTop:8}}>
+                <div style={{fontSize:12,marginBottom:6}}>Consultorios disponibles:</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {getLibresInvitada().map(function(c){return(
+                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setCons(c.id);}}>
+                      {c.id} - {c.sede==="VL"?"Vicente Lopez":"Uruguay"}
+                    </button>
+                  );})}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {!conflicto && horas>0 && (
+          <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"10px 12px",marginTop:10}}>
+            <div style={{color:ok,fontWeight:700}}>{horas.toFixed(1)}hs - {ars(calcPrecio(ini,fin).sub)}</div>
+            {horas<minHoras && <div style={{color:er,fontSize:12,marginTop:4}}>Minimo {minHoras} horas por reserva</div>}
+          </div>
+        )}
+      </div>
+      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"12px 16px",fontSize:15,opacity:(conflicto||horas<minHoras)?0.4:1})} disabled={!!(conflicto||horas<minHoras||!nombre||!tel||!fecha)} onClick={enviar}>
+        Enviar solicitud
+      </button>
+      <div style={{color:mu,fontSize:12,textAlign:"center",marginTop:10}}>Minimo {minHoras}hs - Sujeto a aprobacion</div>
+    </div>
+  );
+}
+
 // ─── Estadisticas ─────────────────────────────────────────────
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
@@ -2110,7 +2460,7 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
       if(h && x.id===h.id) return false; // exclude own horario when editing
       return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
     });
-    return c.length ? "Conflicto con "+c.map(function(x){return x.psico;}).join(", ")+" en "+cons : null;
+    return c.length ? "Ese horario esta ocupado en "+cons : null;
   }
   const conflicto = checkConflicto();
 
@@ -2127,6 +2477,7 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
     });
   }
   const libres = conflicto ? getLibres() : [];
+  const sedeNombre = function(sede){ return sede==="VL"?"Vicente Lopez":"Uruguay"; };
 
   return (
     <div>
@@ -2165,8 +2516,9 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
                 <div style={{color:tx,fontSize:12,fontWeight:600,marginBottom:4}}>Consultorios disponibles en ese horario:</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {libres.map(function(c){return(
-                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"4px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setCons(c.id);}}>
-                      {c.id}
+                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}} onClick={function(){setCons(c.id);}}>
+                      <div>{c.id}</div>
+                      <div style={{fontWeight:400,fontSize:11,color:"#2D8A5E"}}>{sedeNombre(c.sede)}</div>
                     </button>
                   );})}
                 </div>
