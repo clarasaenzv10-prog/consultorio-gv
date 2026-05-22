@@ -1209,7 +1209,7 @@ function confirmarPago(s) {
   saveDoc("psicos", newId, newP);
   (s.slots||[]).forEach(function(sl) {
     var c = CONS.find(function(x){ return x.id===sl.cons; });
-    var hId = "h" + Date.now() + String(Math.random()).slice(2,7);
+    var hId = "h" + Date.now() + Math.floor(Math.random()*99999);
     saveDoc("horarios", hId, {id:hId, psico:s.nombre, consultorio:sl.cons, diaSemana:Number(sl.dia), inicio:sl.ini, fin:sl.fin, sede:c?c.sede:"VL"});
   });
   saveDoc("solHor", s.id, Object.assign({}, s, {estado:"completada", fechaRes:new Date().toISOString()}));
