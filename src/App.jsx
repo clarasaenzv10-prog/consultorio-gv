@@ -1251,20 +1251,8 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
                 });
                 // Send welcome WA
                 const flyerUrl=(config&&config.flyer)||"";
-                const msg="Bienvenida "+s.nombre+" al Consultorio Gloria Videla!
-
-Tu reserva fue confirmada:
-"+s.consultorio+" - "+parseLocalDate(s.fecha).toLocaleDateString("es-AR")+"
-"+s.inicio+"-"+s.fin+"
-
-Tu acceso a la app:
-Usuario: "+s.nombre+"
-Contrasena: psico123
-
-Te pedimos que la cambies en tu primer ingreso."+(flyerUrl?"
-
-Aqui encontras las reglas de convivencia:
-"+flyerUrl:"");
+                const resumen2=(s.slots||[]).map(function(sl){return DIAS[sl.dia]+" "+sl.cons+" "+sl.ini+"-"+sl.fin;}).join("\n");
+                const msg="Bienvenida "+s.nombre+" al Consultorio Gloria Videla!\n\nHorarios fijos aprobados:\n"+resumen2+"\n\nTu acceso a la app:\nUsuario: "+s.nombre+"\nContrasena: psico123\n\nTe pedimos que la cambies en tu primer ingreso."+(flyerUrl?"\n\nReglas de convivencia:\n"+flyerUrl:"");
                 const a=document.createElement("a");
                 a.href="https://wa.me/"+(s.tel||"")+"?text="+encodeURIComponent(msg);
                 a.target="_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
