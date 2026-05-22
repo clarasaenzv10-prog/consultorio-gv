@@ -1,3 +1,4 @@
+// v2026-05-22 23:23
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, uploadFile, deleteFile } from "./firebase.js";
 
@@ -256,6 +257,7 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("config", function(d){ if(d&&d.length>0) setConfigLocal(Object.assign({invPass:"invitada123",transferencia:{},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}},d[0])); }),
     ];
     return function(){ unsubs.forEach(function(u){u();}); };
   }, []);
@@ -2034,8 +2036,20 @@ function ConfigView({config,setConfig,notify}) {
   const [uploading,setUploading] = useState(false);
   const [uploadingFlyer,setUploadingFlyer] = useState(false);
 
+  // Sync local state when config changes from Firebase
+  useEffect(function() {
+    setInvPass(config.invPass||"invitada123");
+    setAlias((config.transferencia&&config.transferencia.alias)||"");
+    setCbu((config.transferencia&&config.transferencia.cbu)||"");
+    setBanco((config.transferencia&&config.transferencia.banco)||"");
+    setTitular((config.transferencia&&config.transferencia.titular)||"");
+    setFlyer(config.flyer||"");
+    setFotos(config.fotos||{C1:[],C2:[],C3:[],C4:[],C5:[]});
+  }, [config]);
+
   function save() {
-    setConfig({invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,id:"main"});
+    const newConfig = {id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos};
+    setConfig(newConfig);
     notify("Configuracion guardada");
   }
 
