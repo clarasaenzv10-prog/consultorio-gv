@@ -1,4 +1,4 @@
-// v2026-05-22 23:23
+// build-fix-final
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, uploadFile, deleteFile } from "./firebase.js";
 
