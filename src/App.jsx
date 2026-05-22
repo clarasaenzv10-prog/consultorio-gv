@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
-import { listenCol, saveDoc, delDoc, seedIfEmpty } from "./firebase.js";
+import { listenCol, saveDoc, delDoc, seedIfEmpty, uploadFile, deleteFile } from "./firebase.js";
 
 // ─── Colores (hardcoded, no concatenation in JSX) ──────────────
 const br = "#4BA3C3";   // brand teal
@@ -346,11 +346,14 @@ export default function App() {
   );
   if(view==="login") return <AppRoot><LoginView onLogin={login} psicos={psicos} config={config}/></AppRoot>;
 
-  const nav = [
+  const nav = role==="invitada" ? [
+    {id:"calendario",icon:"📅",label:"Calendario",badge:0},
+    {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
+    {id:"solicitar",icon:"✉",label:"Solicitar",badge:0},
+  ] : role==="admin" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Psicologas",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
-  ].concat(role==="admin" ? [
     {id:"solicitudes",icon:"🔔",label:"Solicitudes",badge:pendR.length},
     {id:"cambios",icon:"🗓",label:"Cambios",badge:pendH.length},
     {id:"facturacion",icon:"💰",label:"Facturacion",badge:0},
@@ -359,9 +362,12 @@ export default function App() {
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
+    {id:"calendario",icon:"📅",label:"Calendario",badge:0},
+    {id:"perfiles",icon:"👩",label:"Psicologas",badge:0},
+    {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
-  ]);
+  ];
 
   const nav5 = nav.slice(0,5);
   const navX = nav.slice(5);
@@ -1224,6 +1230,49 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitudes de Horario</h2>
+      {/* Invitadas que ya pagaron - confirmar y crear perfil */}
+      {solicitudes.filter(function(s){return s.tipo==="invitada"&&s.estado==="aprobada-pago";}).length>0 && (
+        <div style={{marginBottom:20}}>
+          <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:10}}>Esperando confirmacion de pago</div>
+          {solicitudes.filter(function(s){return s.tipo==="invitada"&&s.estado==="aprobada-pago";}).map(function(s){return(
+            <div key={s.id} style={Object.assign({},sPanel,{marginBottom:10,border:"1.5px solid #A7E3C0"})}>
+              <div style={{color:tx,fontWeight:700,fontSize:15,marginBottom:4}}>{s.nombre}</div>
+              <div style={{color:mu,fontSize:13,marginBottom:10}}>{s.consultorio} - {parseLocalDate(s.fecha).toLocaleDateString("es-AR")} - {s.inicio}-{s.fin} - {ars(s.costo)}</div>
+              <button style={Object.assign({},btn(ok,wh),{width:"100%",fontSize:13})} onClick={function(){
+                // Create psico profile
+                const newId="px"+Date.now();
+                const newP={id:newId,nombre:s.nombre,wa:s.tel||"",email:s.email||"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"Creada automaticamente desde solicitud invitada",email2:"",pass:"psico123"};
+                saveDoc("psicos",newId,newP);
+                // Send welcome WA
+                const flyerUrl=(config&&config.flyer)||"";
+                const msg="Bienvenida "+s.nombre+" al Consultorio Gloria Videla!
+
+Tu reserva fue confirmada:
+"+s.consultorio+" - "+parseLocalDate(s.fecha).toLocaleDateString("es-AR")+"
+"+s.inicio+"-"+s.fin+"
+
+Tu acceso a la app:
+Usuario: "+s.nombre+"
+Contrasena: psico123
+
+Te pedimos que la cambies en tu primer ingreso."+(flyerUrl?"
+
+Aqui encontras las reglas de convivencia:
+"+flyerUrl:"");
+                const a=document.createElement("a");
+                a.href="https://wa.me/"+(s.tel||"")+"?text="+encodeURIComponent(msg);
+                a.target="_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                // Mark as complete
+                saveDoc("solHor",s.id,Object.assign({},s,{estado:"completada",fechaRes:new Date().toISOString()}));
+                notify("Perfil creado y bienvenida enviada!");
+              }}>
+                Confirmar pago y crear perfil + enviar bienvenida
+              </button>
+            </div>
+          );})}
+        </div>
+      )}
+
       {pendInv.length>0 && (
         <div style={{marginBottom:20}}>
           <div style={{color:er,fontWeight:700,fontSize:13,marginBottom:10}}>Solicitudes de nuevas psicologas ({pendInv.length})</div>
@@ -1984,37 +2033,63 @@ function ConfigView({config,setConfig,notify}) {
   const [flyer,setFlyer] = useState(config.flyer||"");
   const [fotos,setFotos] = useState(config.fotos||{C1:[],C2:[],C3:[],C4:[],C5:[]});
   const [selCons,setSelCons] = useState("C1");
-  const [newFoto,setNewFoto] = useState("");
+  const [uploading,setUploading] = useState(false);
+  const [uploadingFlyer,setUploadingFlyer] = useState(false);
 
   function save() {
     setConfig({invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,id:"main"});
     notify("Configuracion guardada");
   }
-  function addFoto() {
-    if(!newFoto.trim()) return;
-    const updated = Object.assign({},fotos,{[selCons]:(fotos[selCons]||[]).concat([newFoto.trim()])});
-    setFotos(updated);
-    setNewFoto("");
+
+  async function handleFoto(e) {
+    const file = e.target.files&&e.target.files[0];
+    if(!file) return;
+    setUploading(true);
+    try {
+      const path = "consultorios/"+selCons+"/"+Date.now()+"_"+file.name;
+      const url = await uploadFile(path, file);
+      const updated = Object.assign({},fotos,{[selCons]:(fotos[selCons]||[]).concat([url])});
+      setFotos(updated);
+      notify("Foto subida");
+    } catch(err) {
+      notify("Error al subir la foto","err");
+    }
+    setUploading(false);
   }
-  function delFoto(cons,idx) {
+
+  async function delFoto(cons,idx) {
+    const url = fotos[cons][idx];
     const updated = Object.assign({},fotos,{[cons]:fotos[cons].filter(function(_,i){return i!==idx;})});
     setFotos(updated);
+    try { await deleteFile(url); } catch(e){}
   }
-  function gdLink(url) {
-    if(!url) return url;
-    const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    return m?"https://drive.google.com/uc?export=view&id="+m[1]:url;
+
+  async function handleFlyer(e) {
+    const file = e.target.files&&e.target.files[0];
+    if(!file) return;
+    setUploadingFlyer(true);
+    try {
+      const path = "flyer/"+Date.now()+"_"+file.name;
+      const url = await uploadFile(path, file);
+      setFlyer(url);
+      notify("Flyer subido");
+    } catch(err) {
+      notify("Error al subir el flyer","err");
+    }
+    setUploadingFlyer(false);
   }
 
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
+
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
       </div>
+
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Datos de transferencia</div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2024,31 +2099,46 @@ function ConfigView({config,setConfig,notify}) {
           <div><label style={sLbl}>Banco</label><input style={sInp} value={banco} onChange={function(e){setBanco(e.target.value);}} placeholder="Ej: Brubank, Galicia..."/></div>
         </div>
       </div>
+
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Flyer de convivencia (link imagen)</div>
-        <input style={sInp} value={flyer} onChange={function(e){setFlyer(e.target.value);}} placeholder="Link de Google Drive o imagen"/>
-        {flyer && <img src={gdLink(flyer)} alt="flyer" style={{width:"100%",borderRadius:8,marginTop:8,maxHeight:300,objectFit:"contain"}}/>}
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Flyer de convivencia</div>
+        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:uploadingFlyer?bg:lt,border:"2px dashed #4BA3C3",borderRadius:12,padding:"16px",cursor:"pointer",color:br,fontWeight:700,fontSize:14}}>
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={handleFlyer}/>
+          {uploadingFlyer?"Subiendo...":"📷 Subir flyer desde el celular"}
+        </label>
+        {flyer && (
+          <div style={{position:"relative",marginTop:10}}>
+            <img src={(function(){const m=flyer.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?"https://lh3.googleusercontent.com/d/"+m[1]:flyer;})()} alt="flyer" style={{width:"100%",borderRadius:10,maxHeight:300,objectFit:"contain",border:"1px solid #C9E4EF"}}/>
+            <button onClick={function(){setFlyer("");}} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",color:wh,border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>Eliminar</button>
+          </div>
+        )}
       </div>
+
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Fotos de consultorios</div>
-        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
           {["C1","C2","C3","C4","C5"].map(function(c){return(
-            <button key={c} onClick={function(){setSelCons(c);}} style={{padding:"6px 14px",borderRadius:8,border:"none",background:selCons===c?br:bg,color:selCons===c?wh:mu,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13}}>{c}</button>
+            <button key={c} onClick={function(){setSelCons(c);}} style={{padding:"7px 16px",borderRadius:8,border:"none",background:selCons===c?br:bg,color:selCons===c?wh:mu,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13}}>
+              {c} {(fotos[c]||[]).length>0&&<span style={{fontSize:10}}>({(fotos[c]||[]).length})</span>}
+            </button>
           );})}
         </div>
-        <div style={{display:"flex",gap:8,marginBottom:10}}>
-          <input style={Object.assign({},sInp,{flex:1})} value={newFoto} onChange={function(e){setNewFoto(e.target.value);}} placeholder="Link de Google Drive o imagen"/>
-          <button style={btn(br,wh)} onClick={addFoto}>+</button>
-        </div>
+        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:uploading?bg:lt,border:"2px dashed #4BA3C3",borderRadius:12,padding:"16px",cursor:"pointer",color:br,fontWeight:700,fontSize:14,marginBottom:12}}>
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={handleFoto}/>
+          {uploading?"Subiendo...":"📷 Agregar foto de "+selCons}
+        </label>
+        {(fotos[selCons]||[]).length===0 && <div style={{color:mu,fontSize:13,textAlign:"center",padding:10}}>Sin fotos para {selCons}</div>}
         {(fotos[selCons]||[]).map(function(url,i){return(
           <div key={i} style={{position:"relative",marginBottom:8}}>
-            <img src={gdLink(url)} alt={"foto "+i} style={{width:"100%",borderRadius:8,maxHeight:200,objectFit:"cover"}}/>
-            <button onClick={function(){delFoto(selCons,i);}} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.5)",color:wh,border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>X</button>
+            <img src={(function(){const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?"https://lh3.googleusercontent.com/d/"+m[1]:url;})()} alt={"foto "+i} style={{width:"100%",borderRadius:10,maxHeight:220,objectFit:"cover"}}/>
+            <button onClick={function(){delFoto(selCons,i);}} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",color:wh,border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>X</button>
           </div>
         );})}
-        {!(fotos[selCons]||[]).length && <div style={{color:mu,fontSize:13}}>Sin fotos para {selCons}. Pega links de Google Drive.</div>}
       </div>
-      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"12px 16px",fontSize:15})} onClick={save}>Guardar configuracion</button>
+
+      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"13px 16px",fontSize:15})} onClick={save}>
+        Guardar configuracion
+      </button>
     </div>
   );
 }
@@ -2056,11 +2146,15 @@ function ConfigView({config,setConfig,notify}) {
 // ─── Consultorios View (Invitada) ─────────────────────────────
 function ConsultoriosView({config,horarios}) {
   const [selC,setSelC] = useState("C1");
+  const [fotoAbierta,setFotoAbierta] = useState(null);
   const fotos = (config.fotos&&config.fotos[selC])||[];
-  function gdLink(url) {
-    if(!url) return url;
-    const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    return m?"https://drive.google.com/uc?export=view&id="+m[1]:url;
+  function fixUrl(url) {
+    if(!url) return "";
+    const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(m2) return "https://lh3.googleusercontent.com/d/"+m2[1];
+    return url;
   }
   const hs = horarios.filter(function(h){return h.consultorio===selC;});
   const ocupados = [1,2,3,4,5,6].reduce(function(acc,d){
@@ -2083,7 +2177,11 @@ function ConsultoriosView({config,horarios}) {
         <div style={{color:mu,fontSize:13,marginBottom:14}}>{cons?cons.sn:""}</div>
         {fotos.length>0?(
           <div style={{marginBottom:16}}>
-            {fotos.map(function(url,i){return <img key={i} src={gdLink(url)} alt={"foto "+i} style={{width:"100%",borderRadius:10,marginBottom:8,maxHeight:220,objectFit:"cover"}}/> ;})}
+            {fotos.map(function(url,i){return(
+            <img key={i} src={fixUrl(url)} alt={"foto "+i}
+              style={{width:"100%",borderRadius:10,marginBottom:8,maxHeight:220,objectFit:"cover",cursor:"pointer"}}
+              onClick={function(){setFotoAbierta(fixUrl(url));}}/>
+          );})}
           </div>
         ):(
           <div style={{background:bg,borderRadius:8,padding:20,textAlign:"center",color:mu,marginBottom:14}}>Sin fotos aun</div>
@@ -2099,6 +2197,12 @@ function ConsultoriosView({config,horarios}) {
         );})}
       </div>
     </div>
+    {fotoAbierta && (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={function(){setFotoAbierta(null);}}>
+        <img src={fotoAbierta} alt="foto" style={{maxWidth:"95vw",maxHeight:"90vh",borderRadius:12,objectFit:"contain"}}/>
+        <button style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.2)",border:"none",color:wh,fontSize:24,cursor:"pointer",borderRadius:8,width:40,height:40,fontFamily:"inherit"}} onClick={function(){setFotoAbierta(null);}}>X</button>
+      </div>
+    )}
   );
 }
 
