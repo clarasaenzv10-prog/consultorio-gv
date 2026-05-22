@@ -56,7 +56,7 @@ const HBASE = [
   {psico:"Bernadette",consultorio:"C5",diaSemana:3,inicio:"18:00",fin:"20:00",sede:"UY"},
   {psico:"Magda",consultorio:"C5",diaSemana:4,inicio:"08:00",fin:"16:00",sede:"UY"},
   {psico:"Jose Cesareo",consultorio:"C2",diaSemana:4,inicio:"08:00",fin:"21:00",sede:"VL"},
-  {psico:"Caro",consultorio:"C3",diaSemana:4,inicio:"08:30",fin:"11:30",sede:"VL"},
+  {psico:"Carolina",consultorio:"C3",diaSemana:4,inicio:"08:30",fin:"11:30",sede:"VL"},
   {psico:"Bernadette",consultorio:"C4",diaSemana:4,inicio:"09:00",fin:"11:00",sede:"UY"},
   {psico:"Bernadette",consultorio:"C4",diaSemana:4,inicio:"13:00",fin:"14:00",sede:"UY"},
   {psico:"Agus Mohr",consultorio:"C1",diaSemana:4,inicio:"14:00",fin:"18:00",sede:"VL"},
@@ -84,7 +84,6 @@ const PBASE = [
   {id:"p10",nombre:"Euge",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
   {id:"p11",nombre:"Dolores Torreira",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
   {id:"p12",nombre:"Jose Cesareo",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p13",nombre:"Caro",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
   {id:"p14",nombre:"Milagros",wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"},
 ];
 
@@ -1201,6 +1200,28 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
 }
 
 // ─── Cambios Horario ──────────────────────────────────────────
+function procesarPagoConfirmado(s, cfg) {
+  confirmarPago(s);
+  var tel = s.tel || "";
+  if(!tel) return;
+  var slots2 = s.slots || [];
+  var parts = [];
+  parts.push("Bienvenida " + s.nombre + " al Consultorio Gloria Videla!");
+  if(slots2.length > 0) {
+    var hs = slots2.map(function(sl){ return DIAS[sl.dia] + " " + sl.cons + " " + sl.ini + "-" + sl.fin; });
+    parts.push("Horarios: " + hs.join(", "));
+  }
+  parts.push("Usuario: " + s.nombre + " / Contrasena: psico123");
+  if(cfg && cfg.flyer) parts.push("Reglas: " + cfg.flyer);
+  var encoded = parts.map(function(p){ return encodeURIComponent(p); }).join("%0A%0A");
+  var a = document.createElement("a");
+  a.href = "https://wa.me/" + tel + "?text=" + encoded;
+  a.target = "_blank";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); }, 500);
+}
+
 function confirmarPago(s) {
   var config2 = {};
   try { config2 = window.__gvConfig || {}; } catch(e) {}
@@ -1253,23 +1274,11 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
           {solicitudes.filter(function(s){return s.tipo==="invitada"&&s.estado==="aprobada-pago";}).map(function(s){return(
             <div key={s.id} style={Object.assign({},sPanel,{marginBottom:10,border:"1.5px solid #A7E3C0"})}>
               <div style={{color:tx,fontWeight:700,fontSize:15,marginBottom:4}}>{s.nombre}</div>
-              <div style={{color:mu,fontSize:13,marginBottom:10}}>{s.consultorio} - {parseLocalDate(s.fecha).toLocaleDateString("es-AR")} - {s.inicio}-{s.fin} - {ars(s.costo)}</div>
-              <button style={Object.assign({},btn(ok,wh),{width:"100%",fontSize:13})} onClick={function(){
-                  confirmarPago(s);
-                  var flyerUrl = (config&&config.flyer)||"";
-                  var slots2 = (s.slots||[]);
-                  var res = slots2.map(function(sl){ return DIAS[sl.dia]+" "+sl.cons+" "+sl.ini+"-"+sl.fin; }).join(", ");
-                  var line1 = "Bienvenida "+s.nombre+" al Consultorio Gloria Videla!";
-                  var line2 = "Horarios: "+res;
-                  var line3 = "Usuario: "+s.nombre+" / Contrasena: psico123";
-                  var line4 = flyerUrl ? "Reglas: "+flyerUrl : "";
-                  var msg = [line1, line2, line3, line4].filter(Boolean).join("%0A%0A");
-                  var a = document.createElement("a");
-                  a.href = "https://wa.me/"+(s.tel||"")+"?text="+msg;
-                  a.target = "_blank";
-                  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                  window.location.reload();
-                }}>
+              <div style={{color:mu,fontSize:13,marginBottom:10}}>
+                {(s.slots||[]).map(function(sl,i){return <div key={i}>{DIAS[sl.dia]} {sl.cons} {sl.ini}-{sl.fin}</div>;})}
+                <div style={{color:ok,fontWeight:600}}>{ars(s.costoSemanal||0)}/semana</div>
+              </div>
+              <button style={Object.assign({},btn(ok,wh),{width:"100%",fontSize:13})} onClick={function(){ procesarPagoConfirmado(s,config); }}>
                 Confirmar pago y crear perfil
               </button>
             </div>
