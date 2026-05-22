@@ -357,6 +357,7 @@ export default function App() {
     {id:"precios",icon:"💵",label:"Precios",badge:0},
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
+    {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
