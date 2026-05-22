@@ -2192,6 +2192,7 @@ function ConsultoriosView({config,horarios}) {
   },{});
   const cons = CONS.find(function(c){return c.id===selC;});
   return (
+    <>
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Consultorios</h2>
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
@@ -2232,6 +2233,7 @@ function ConsultoriosView({config,horarios}) {
         <button style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.2)",border:"none",color:wh,fontSize:24,cursor:"pointer",borderRadius:8,width:40,height:40,fontFamily:"inherit"}} onClick={function(){setFotoAbierta(null);}}>X</button>
       </div>
     )}
+    </>
   );
 }
 
