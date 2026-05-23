@@ -261,7 +261,12 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
-      listenCol("config", function(d){ if(d&&d.length>0) setConfigLocal(Object.assign({invPass:"invitada123",transferencia:{},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}},d[0])); }),
+      listenCol("config", function(d){
+        if(d&&d.length>0) {
+          const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}};
+          setConfigLocal(Object.assign({},def,d[0],{transferencia:Object.assign({},def.transferencia,(d[0].transferencia||{})),fotos:Object.assign({},def.fotos,(d[0].fotos||{}))}));
+        }
+      }),
     ];
     return function(){ unsubs.forEach(function(u){u();}); };
   }, []);
@@ -2073,10 +2078,12 @@ function ConfigView({config,setConfig,notify}) {
   }
   function fixUrl(url) {
     if(!url) return "";
+    // Google Drive share link: /d/FILE_ID/
     const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+    if(m) return "https://drive.google.com/thumbnail?id="+m[1]+"&sz=w800";
+    // Google Drive open link: ?id=FILE_ID
     const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if(m2) return "https://lh3.googleusercontent.com/d/"+m2[1];
+    if(m2) return "https://drive.google.com/thumbnail?id="+m2[1]+"&sz=w800";
     return url;
   }
   function addFoto() {
@@ -2148,9 +2155,9 @@ function ConsultoriosView({config,horarios}) {
   function fixUrl(url) {
     if(!url) return "";
     const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+    if(m) return "https://drive.google.com/thumbnail?id="+m[1]+"&sz=w800";
     const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if(m2) return "https://lh3.googleusercontent.com/d/"+m2[1];
+    if(m2) return "https://drive.google.com/thumbnail?id="+m2[1]+"&sz=w800";
     return url;
   }
   const hs = horarios.filter(function(h){return h.consultorio===selC;});
