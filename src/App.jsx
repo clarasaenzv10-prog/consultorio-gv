@@ -264,7 +264,7 @@ export default function App() {
       listenCol("config", function(d){
         if(d&&d.length>0) {
           const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]},descripciones:{C1:"",C2:"",C3:"",C4:"",C5:""}};
-          setConfigLocal(Object.assign({},def,d[0],{transferencia:Object.assign({},def.transferencia,(d[0].transferencia||{})),fotos:Object.assign({},def.fotos,(d[0].fotos||{}))}));
+          setConfigLocal(Object.assign({},def,d[0],{transferencia:Object.assign({},def.transferencia,(d[0].transferencia||{})),fotos:Object.assign({},def.fotos,(d[0].fotos||{})),descripciones:Object.assign({},def.descripciones,(d[0].descripciones||{}))}));
         }
       }),
     ];
@@ -1687,7 +1687,13 @@ function GestionPsicoRow({p,setPsicos,notify}) {
       </div>
       <div style={{display:"flex",gap:6,flexShrink:0}}>
         <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"4px 10px"})} onClick={function(){setEditPass(function(v){return !v;});setNewPass("");}}>Contrasena</button>
-        <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){if(!window.confirm("Eliminar a "+p.nombre+"?"))return;delDoc("psicos",p.id);notify("Eliminada");}}>X</button>
+        <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){
+              if(!window.confirm("Eliminar a "+p.nombre+"?\nTambien se eliminaran sus horarios fijos.")) return;
+              delDoc("psicos",p.id);
+              horarios.filter(function(h){return h.psico&&h.psico.toLowerCase()===p.nombre.toLowerCase();})
+                .forEach(function(h){delDoc("horarios",h.id);});
+              notify("Psicologa y horarios eliminados");
+            }}>X</button>
       </div>
     </div>
   );
