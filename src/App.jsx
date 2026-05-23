@@ -1,6 +1,6 @@
 // v2026-05-22 23:23
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
-import { listenCol, saveDoc, delDoc, seedIfEmpty, uploadFile, deleteFile } from "./firebase.js";
+import { listenCol, saveDoc, delDoc, seedIfEmpty } from "./firebase.js";
 
 // ─── Colores (hardcoded, no concatenation in JSX) ──────────────
 const br = "#4BA3C3";   // brand teal
@@ -108,26 +108,31 @@ function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currenc
 function calcPrecio(ini,fin,P) {
   const p = P || PD;
   const s = toMin(ini), e = toMin(fin);
-  // Franjas: Manana 08-14 (480-840), Tarde 14-18 (840-1080), Noche 18-21 (1080-1260)
   const M1s=480,M1e=840,M2s=840,M2e=1080,M3s=1080,M3e=1260;
-  const coversM1=s<=M1s&&e>=M1e, coversM2=s<=M2s&&e>=M2e, coversM3=s<=M3s&&e>=M3e;
-
-  // Exact module / combination matches (ordered most specific to least)
-  if(coversM1&&coversM2&&coversM3) return {sub:p.dia, ley:"Dia completo (08-21hs)", tipo:"mod"};
-  if(coversM1&&coversM2) return {sub:p.m1+p.m2, ley:"Mod. Manana + Tarde (08-18hs)", tipo:"mod"};
-  if(coversM2&&coversM3) return {sub:p.m2+p.m3, ley:"Mod. Tarde + Noche (14-21hs)", tipo:"mod"};
-  if(coversM1&&e<=M1e) return {sub:p.m1, ley:"Mod. Manana (08-14hs)", tipo:"mod"};
-  if(coversM2&&s>=M2s&&e<=M2e) return {sub:p.m2, ley:"Mod. Tarde (14-18hs)", tipo:"mod"};
-  if(coversM3&&s>=M3s) return {sub:p.m3, ley:"Mod. Noche (18-21hs)", tipo:"mod"};
-
-  // Hourly: calculate overlap with each franja independently
+  // Module is "used" only when the schedule FULLY covers it
+  const useM1 = s<=M1s && e>=M1e;
+  const useM2 = s<=M2s && e>=M2e;
+  const useM3 = s<=M3s && e>=M3e;
+  // Exact full matches
+  if(useM1&&useM2&&useM3) return {sub:p.dia, ley:"Dia completo (08-21hs)", tipo:"mod"};
+  if(useM1&&useM2) return {sub:p.m1+p.m2, ley:"Mod. Manana + Tarde (08-18hs)", tipo:"mod"};
+  if(useM2&&useM3) return {sub:p.m2+p.m3, ley:"Mod. Tarde + Noche (14-21hs)", tipo:"mod"};
+  if(useM1&&e===M1e) return {sub:p.m1, ley:"Mod. Manana (08-14hs)", tipo:"mod"};
+  if(useM2&&s===M2s&&e===M2e) return {sub:p.m2, ley:"Mod. Tarde (14-18hs)", tipo:"mod"};
+  if(useM3&&s===M3s) return {sub:p.m3, ley:"Mod. Noche (18-21hs)", tipo:"mod"};
+  // Mixed: module price where fully covered, hourly for partial
   let tot=0; const pts=[];
-  const man_ini=Math.max(s,M1s),man_fin=Math.min(e,M1e);
-  if(man_fin>man_ini){const hs=(man_fin-man_ini)/60;tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}
-  const tar_ini=Math.max(s,M2s),tar_fin=Math.min(e,M2e);
-  if(tar_fin>tar_ini){const hs=(tar_fin-tar_ini)/60;tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}
-  const noc_ini=Math.max(s,M3s),noc_fin=Math.min(e,M3e);
-  if(noc_fin>noc_ini){const hs=(noc_fin-noc_ini)/60;tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}
+  // Pre-morning
+  if(s<M1s){const hs=(Math.min(e,M1s)-s)/60;if(hs>0){tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}}
+  // Morning
+  if(useM1){tot+=p.m1;pts.push("Mod. Manana 08-14hs ("+ars(p.m1)+")");}
+  else{const i1=Math.max(s,M1s),f1=Math.min(e,M1e);if(f1>i1){const hs=(f1-i1)/60;tot+=hs*p.man;pts.push(hs.toFixed(1)+"hs manana x "+ars(p.man)+"/hs");}}
+  // Afternoon
+  if(useM2){tot+=p.m2;pts.push("Mod. Tarde 14-18hs ("+ars(p.m2)+")");}
+  else{const i2=Math.max(s,M2s),f2=Math.min(e,M2e);if(f2>i2){const hs=(f2-i2)/60;tot+=hs*p.tar;pts.push(hs.toFixed(1)+"hs tarde x "+ars(p.tar)+"/hs");}}
+  // Night
+  if(useM3){tot+=p.m3;pts.push("Mod. Noche 18-21hs ("+ars(p.m3)+")");}
+  else{const i3=Math.max(s,M3s),f3=Math.min(e,M3e);if(f3>i3){const hs=(f3-i3)/60;tot+=hs*p.noc;pts.push(hs.toFixed(1)+"hs noche x "+ars(p.noc)+"/hs");}}
   return {sub:tot, ley:null, tipo:"hora", des:pts.join(" + ")};
 }
 
@@ -308,7 +313,7 @@ export default function App() {
   function genMsg(psico,mes,anio) {
     const r = calcFact(psico,mes,anio);
     let m = "Hola "+psico.nombre+" !\n\nResumen "+MESES[mes]+" "+anio+":\n\n";
-    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley?d.ley:(d.des||calcHrs(d.ini,d.fin).toFixed(1)+"hs"))+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
+    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||calcHrs(d.ini,d.fin).toFixed(1)+"hs")+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
     if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+parseLocalDate(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
     if(!r.df.length&&!r.de.length) m+="Sin horas este mes.\n\n";
     m += "----------------\n";
@@ -1489,10 +1494,10 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div>
                           <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
-                          <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({d.horas.toFixed?d.horas.toFixed(1):d.horas}hs)</div>
+                          <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({typeof d.horas==="number"?d.horas.toFixed(1):d.horas}hs)</div>
                           {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
-                          <div style={{color:mu,fontSize:11}}>x {d.sem} semanas = {ars(d.sub)}</div>
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
@@ -2050,10 +2055,8 @@ function ConfigView({config,setConfig,notify}) {
   const [flyer,setFlyer] = useState(config.flyer||"");
   const [fotos,setFotos] = useState(config.fotos||{C1:[],C2:[],C3:[],C4:[],C5:[]});
   const [selCons,setSelCons] = useState("C1");
-  const [uploading,setUploading] = useState(false);
-  const [uploadingFlyer,setUploadingFlyer] = useState(false);
+  const [newFoto,setNewFoto] = useState("");
 
-  // Sync local state when config changes from Firebase
   useEffect(function() {
     setInvPass(config.invPass||"invitada123");
     setAlias((config.transferencia&&config.transferencia.alias)||"");
@@ -2065,60 +2068,38 @@ function ConfigView({config,setConfig,notify}) {
   }, [config]);
 
   function save() {
-    const newConfig = {id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos};
-    setConfig(newConfig);
+    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos});
     notify("Configuracion guardada");
   }
-
-  async function handleFoto(e) {
-    const file = e.target.files&&e.target.files[0];
-    if(!file) return;
-    setUploading(true);
-    try {
-      const path = "consultorios/"+selCons+"/"+Date.now()+"_"+file.name;
-      const url = await uploadFile(path, file);
-      const updated = Object.assign({},fotos,{[selCons]:(fotos[selCons]||[]).concat([url])});
-      setFotos(updated);
-      notify("Foto subida");
-    } catch(err) {
-      notify("Error al subir la foto","err");
-    }
-    setUploading(false);
+  function fixUrl(url) {
+    if(!url) return "";
+    const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(m2) return "https://lh3.googleusercontent.com/d/"+m2[1];
+    return url;
   }
-
-  async function delFoto(cons,idx) {
-    const url = fotos[cons][idx];
-    const updated = Object.assign({},fotos,{[cons]:fotos[cons].filter(function(_,i){return i!==idx;})});
+  function addFoto() {
+    if(!newFoto.trim()) return;
+    const updated = Object.assign({},fotos,{[selCons]:(fotos[selCons]||[]).concat([newFoto.trim()])});
     setFotos(updated);
-    try { await deleteFile(url); } catch(e){}
+    setNewFoto("");
+    notify("Foto agregada");
   }
-
-  async function handleFlyer(e) {
-    const file = e.target.files&&e.target.files[0];
-    if(!file) return;
-    setUploadingFlyer(true);
-    try {
-      const path = "flyer/"+Date.now()+"_"+file.name;
-      const url = await uploadFile(path, file);
-      setFlyer(url);
-      notify("Flyer subido");
-    } catch(err) {
-      notify("Error al subir el flyer","err");
-    }
-    setUploadingFlyer(false);
+  function delFoto(cons,idx) {
+    const updated = Object.assign({},fotos,{[cons]:(fotos[cons]||[]).filter(function(_,i){return i!==idx;})});
+    setFotos(updated);
   }
 
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
-
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
       </div>
-
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Datos de transferencia</div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2128,46 +2109,33 @@ function ConfigView({config,setConfig,notify}) {
           <div><label style={sLbl}>Banco</label><input style={sInp} value={banco} onChange={function(e){setBanco(e.target.value);}} placeholder="Ej: Brubank, Galicia..."/></div>
         </div>
       </div>
-
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Flyer de convivencia</div>
-        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:uploadingFlyer?bg:lt,border:"2px dashed #4BA3C3",borderRadius:12,padding:"16px",cursor:"pointer",color:br,fontWeight:700,fontSize:14}}>
-          <input type="file" accept="image/*" style={{display:"none"}} onChange={handleFlyer}/>
-          {uploadingFlyer?"Subiendo...":"📷 Subir flyer desde el celular"}
-        </label>
-        {flyer && (
-          <div style={{position:"relative",marginTop:10}}>
-            <img src={(function(){const m=flyer.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?"https://lh3.googleusercontent.com/d/"+m[1]:flyer;})()} alt="flyer" style={{width:"100%",borderRadius:10,maxHeight:300,objectFit:"contain",border:"1px solid #C9E4EF"}}/>
-            <button onClick={function(){setFlyer("");}} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",color:wh,border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>Eliminar</button>
-          </div>
-        )}
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Flyer de convivencia (link Google Drive)</div>
+        <input style={sInp} value={flyer} onChange={function(e){setFlyer(e.target.value);}} placeholder="Pega el link de Google Drive"/>
+        {flyer && <img src={fixUrl(flyer)} alt="flyer" style={{width:"100%",borderRadius:8,marginTop:8,maxHeight:300,objectFit:"contain"}}/>}
       </div>
-
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Fotos de consultorios</div>
-        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Fotos de consultorios (links Google Drive)</div>
+        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
           {["C1","C2","C3","C4","C5"].map(function(c){return(
-            <button key={c} onClick={function(){setSelCons(c);}} style={{padding:"7px 16px",borderRadius:8,border:"none",background:selCons===c?br:bg,color:selCons===c?wh:mu,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13}}>
-              {c} {(fotos[c]||[]).length>0&&<span style={{fontSize:10}}>({(fotos[c]||[]).length})</span>}
+            <button key={c} onClick={function(){setSelCons(c);}} style={{padding:"6px 14px",borderRadius:8,border:"none",background:selCons===c?br:bg,color:selCons===c?wh:mu,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13}}>
+              {c}{(fotos[c]||[]).length>0?" ("+fotos[c].length+")":""}
             </button>
           );})}
         </div>
-        <label style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:uploading?bg:lt,border:"2px dashed #4BA3C3",borderRadius:12,padding:"16px",cursor:"pointer",color:br,fontWeight:700,fontSize:14,marginBottom:12}}>
-          <input type="file" accept="image/*" style={{display:"none"}} onChange={handleFoto}/>
-          {uploading?"Subiendo...":"📷 Agregar foto de "+selCons}
-        </label>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <input style={Object.assign({},sInp,{flex:1})} value={newFoto} onChange={function(e){setNewFoto(e.target.value);}} placeholder="Link de Google Drive"/>
+          <button style={btn(br,wh)} onClick={addFoto}>+</button>
+        </div>
         {(fotos[selCons]||[]).length===0 && <div style={{color:mu,fontSize:13,textAlign:"center",padding:10}}>Sin fotos para {selCons}</div>}
         {(fotos[selCons]||[]).map(function(url,i){return(
           <div key={i} style={{position:"relative",marginBottom:8}}>
-            <img src={(function(){const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?"https://lh3.googleusercontent.com/d/"+m[1]:url;})()} alt={"foto "+i} style={{width:"100%",borderRadius:10,maxHeight:220,objectFit:"cover"}}/>
+            <img src={fixUrl(url)} alt={"foto "+i} style={{width:"100%",borderRadius:10,maxHeight:220,objectFit:"cover"}}/>
             <button onClick={function(){delFoto(selCons,i);}} style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,.55)",color:wh,border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:12}}>X</button>
           </div>
         );})}
       </div>
-
-      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"13px 16px",fontSize:15})} onClick={save}>
-        Guardar configuracion
-      </button>
+      <button style={Object.assign({},btn(br,wh),{width:"100%",padding:"13px 16px",fontSize:15})} onClick={save}>Guardar configuracion</button>
     </div>
   );
 }
