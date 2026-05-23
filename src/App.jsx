@@ -371,11 +371,13 @@ export default function App() {
     {id:"precios",icon:"💵",label:"Precios",badge:0},
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
+    {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Psicologas",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
+    {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
   ];
@@ -475,7 +477,7 @@ export default function App() {
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
-          {tab==="consultorios" && role==="invitada" && <ConsultoriosView config={config} horarios={horarios}/>}
+          {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
           {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
@@ -2155,9 +2157,9 @@ function ConsultoriosView({config,horarios}) {
   function fixUrl(url) {
     if(!url) return "";
     const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(m) return "https://drive.google.com/thumbnail?id="+m[1]+"&sz=w800";
+    if(m) return "https://drive.google.com/uc?export=view&id="+m[1];
     const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if(m2) return "https://drive.google.com/thumbnail?id="+m2[1]+"&sz=w800";
+    if(m2) return "https://drive.google.com/uc?export=view&id="+m2[1];
     return url;
   }
   const hs = horarios.filter(function(h){return h.consultorio===selC;});
