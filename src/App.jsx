@@ -1,4 +1,4 @@
-// v2026-05-23-DESCRIPCION-FIX
+// v2026-05-23-DESC-V2
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty } from "./firebase.js";
 
@@ -2140,12 +2140,12 @@ function ConfigView({config,setConfig,notify}) {
             </button>
           );})}
         </div>
-        <div style={{marginBottom:12}}>
-          <label style={sLbl}>Descripcion de {selCons}</label>
-          <textarea style={Object.assign({},sInp,{minHeight:70,resize:"vertical",fontSize:13})}
+        <div style={{marginBottom:14,background:lt,borderRadius:10,padding:12,border:"1.5px solid #4BA3C3"}}>
+          <label style={{color:br,fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6}}>Descripcion de {selCons} (visible para psicologas e invitadas)</label>
+          <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical",fontSize:13,background:wh})}
             value={descripciones[selCons]||""}
             onChange={function(e){setDescripciones(function(d){return Object.assign({},d,{[selCons]:e.target.value});});}}
-            placeholder={"Ej: Consultorio luminoso con vista al parque, capacidad para 2 personas..."}/>
+            placeholder="Ej: Consultorio luminoso, planta baja, con aire acondicionado..."/>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:10}}>
           <input style={Object.assign({},sInp,{flex:1})} value={newFoto} onChange={function(e){setNewFoto(e.target.value);}} placeholder="Link de Google Drive"/>
@@ -2221,11 +2221,12 @@ function ConsultoriosView({config,horarios}) {
         ):(
           <div style={{background:bg,borderRadius:8,padding:20,textAlign:"center",color:mu,marginBottom:14}}>Sin fotos aun</div>
         )}
-        {(config.descripciones&&config.descripciones[selC]) ? (
-          <div style={{color:tx,fontSize:14,lineHeight:1.7,marginBottom:16,padding:"12px 0",borderBottom:"1px solid #EBF6FA"}}>
-            {config.descripciones[selC]}
-          </div>
-        ) : null}
+        <div style={{color:tx,fontSize:14,lineHeight:1.7,marginBottom:16,padding:"12px 0",borderBottom:"1px solid #EBF6FA",minHeight:20}}>
+          {(config.descripciones&&config.descripciones[selC])
+            ? config.descripciones[selC]
+            : <span style={{color:mu,fontStyle:"italic"}}>Sin descripcion cargada aun.</span>
+          }
+        </div>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8,marginTop:8}}>Disponibilidad</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {[1,2,3,4,5,6].map(function(d){
