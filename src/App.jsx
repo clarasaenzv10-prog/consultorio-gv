@@ -2221,12 +2221,12 @@ function ConsultoriosView({config,horarios}) {
         ):(
           <div style={{background:bg,borderRadius:8,padding:20,textAlign:"center",color:mu,marginBottom:14}}>Sin fotos aun</div>
         )}
-        {(config.descripciones&&config.descripciones[selC]) && (
-          <div style={{color:tx,fontSize:14,lineHeight:1.6,marginBottom:12,padding:"10px 0",borderBottom:"1px solid #EBF6FA"}}>
+        {(config.descripciones&&config.descripciones[selC]) ? (
+          <div style={{color:tx,fontSize:14,lineHeight:1.7,marginBottom:16,padding:"12px 0",borderBottom:"1px solid #EBF6FA"}}>
             {config.descripciones[selC]}
           </div>
-        )}
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Disponibilidad</div>
+        ) : null}
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8,marginTop:8}}>Disponibilidad</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {[1,2,3,4,5,6].map(function(d){
             const libre=!ocupados[d];
