@@ -2189,11 +2189,7 @@ function ConsultoriosView({config,horarios}) {
     if(id) return "https://drive.google.com/thumbnail?id="+id+"&sz=w800";
     return url;
   }
-  const hs = horarios.filter(function(h){return h.consultorio===selC;});
-  const ocupados = [1,2,3,4,5,6].reduce(function(acc,d){
-    acc[d]=hs.filter(function(h){return Number(h.diaSemana)===d;}).map(function(h){return h.inicio+"-"+h.fin;}).join(", ");
-    return acc;
-  },{});
+
   const cons = CONS.find(function(c){return c.id===selC;});
   return (
     <>
@@ -2227,13 +2223,7 @@ function ConsultoriosView({config,horarios}) {
             : <span style={{color:mu,fontStyle:"italic"}}>Sin descripcion cargada aun.</span>
           }
         </div>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8,marginTop:8}}>Disponibilidad</div>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          {[1,2,3,4,5,6].map(function(d){
-            const libre=!ocupados[d];
-            return <span key={d} style={{background:libre?ob:eb,color:libre?ok:er,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600}}>{DIAS[d].substring(0,3)} {libre?"libre":"ocupado"}</span>;
-          })}
-        </div>
+
       </div>
     </div>
     {fotoAbierta && (
