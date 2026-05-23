@@ -263,7 +263,7 @@ export default function App() {
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
       listenCol("config", function(d){
         if(d&&d.length>0) {
-          const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}};
+          const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]},descripciones:{C1:"",C2:"",C3:"",C4:"",C5:""}};
           setConfigLocal(Object.assign({},def,d[0],{transferencia:Object.assign({},def.transferencia,(d[0].transferencia||{})),fotos:Object.assign({},def.fotos,(d[0].fotos||{}))}));
         }
       }),
@@ -2063,6 +2063,7 @@ function ConfigView({config,setConfig,notify}) {
   const [fotos,setFotos] = useState(config.fotos||{C1:[],C2:[],C3:[],C4:[],C5:[]});
   const [selCons,setSelCons] = useState("C1");
   const [newFoto,setNewFoto] = useState("");
+  const [descripciones,setDescripciones] = useState(config.descripciones||{C1:"",C2:"",C3:"",C4:"",C5:""});
 
   useEffect(function() {
     setInvPass(config.invPass||"invitada123");
@@ -2072,10 +2073,11 @@ function ConfigView({config,setConfig,notify}) {
     setTitular((config.transferencia&&config.transferencia.titular)||"");
     setFlyer(config.flyer||"");
     setFotos(config.fotos||{C1:[],C2:[],C3:[],C4:[],C5:[]});
+    setDescripciones(config.descripciones||{C1:"",C2:"",C3:"",C4:"",C5:""});
   }, [config]);
 
   function save() {
-    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos});
+    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
     notify("Configuracion guardada");
   }
   function fixUrl(url) {
@@ -2124,13 +2126,20 @@ function ConfigView({config,setConfig,notify}) {
         {flyer && <img src={fixUrl(flyer)} alt="flyer" style={{width:"100%",borderRadius:8,marginTop:8,maxHeight:300,objectFit:"contain"}}/>}
       </div>
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Fotos de consultorios (links Google Drive)</div>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Descripcion y fotos por consultorio</div>
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
           {["C1","C2","C3","C4","C5"].map(function(c){return(
             <button key={c} onClick={function(){setSelCons(c);}} style={{padding:"6px 14px",borderRadius:8,border:"none",background:selCons===c?br:bg,color:selCons===c?wh:mu,fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:13}}>
               {c}{(fotos[c]||[]).length>0?" ("+fotos[c].length+")":""}
             </button>
           );})}
+        </div>
+        <div style={{marginBottom:12}}>
+          <label style={sLbl}>Descripcion de {selCons}</label>
+          <textarea style={Object.assign({},sInp,{minHeight:70,resize:"vertical",fontSize:13})}
+            value={descripciones[selCons]||""}
+            onChange={function(e){setDescripciones(function(d){return Object.assign({},d,{[selCons]:e.target.value});});}}
+            placeholder={"Ej: Consultorio luminoso con vista al parque, capacidad para 2 personas..."}/>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:10}}>
           <input style={Object.assign({},sInp,{flex:1})} value={newFoto} onChange={function(e){setNewFoto(e.target.value);}} placeholder="Link de Google Drive"/>
@@ -2156,10 +2165,22 @@ function ConsultoriosView({config,horarios}) {
   const fotos = (config.fotos&&config.fotos[selC])||[];
   function fixUrl(url) {
     if(!url) return "";
-    const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(m) return "https://drive.google.com/uc?export=view&id="+m[1];
-    const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if(m2) return "https://drive.google.com/uc?export=view&id="+m2[1];
+    var id = null;
+    var m1 = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+    var m2 = url.match(/id=([a-zA-Z0-9_-]{25,})/);
+    if(m1) id = m1[1];
+    else if(m2) id = m2[1];
+    if(id) return "https://lh3.googleusercontent.com/d/"+id+"=s800";
+    return url;
+  }
+  function altUrl(url) {
+    if(!url) return "";
+    var id = null;
+    var m1 = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+    var m2 = url.match(/id=([a-zA-Z0-9_-]{25,})/);
+    if(m1) id = m1[1];
+    else if(m2) id = m2[1];
+    if(id) return "https://drive.google.com/thumbnail?id="+id+"&sz=w800";
     return url;
   }
   const hs = horarios.filter(function(h){return h.consultorio===selC;});
@@ -2187,21 +2208,25 @@ function ConsultoriosView({config,horarios}) {
             {fotos.map(function(url,i){return(
             <img key={i} src={fixUrl(url)} alt={"foto "+i}
               style={{width:"100%",borderRadius:10,marginBottom:8,maxHeight:220,objectFit:"cover",cursor:"pointer"}}
+              onError={function(e){if(e.target.src!==altUrl(url))e.target.src=altUrl(url);}}
               onClick={function(){setFotoAbierta(fixUrl(url));}}/>
           );})}
           </div>
         ):(
           <div style={{background:bg,borderRadius:8,padding:20,textAlign:"center",color:mu,marginBottom:14}}>Sin fotos aun</div>
         )}
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Disponibilidad semanal</div>
-        {[1,2,3,4,5,6].map(function(d){return(
-          <div key={d} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #EBF6FA"}}>
-            <div style={{color:tx,fontWeight:600,fontSize:13}}>{DIAS[d]}</div>
-            <div style={{color:ocupados[d]?er:ok,fontSize:12}}>
-              {ocupados[d]?"Ocupado "+ocupados[d]:"Disponible todo el dia"}
-            </div>
+        {(config.descripciones&&config.descripciones[selC]) && (
+          <div style={{color:tx,fontSize:14,lineHeight:1.6,marginBottom:12,padding:"10px 0",borderBottom:"1px solid #EBF6FA"}}>
+            {config.descripciones[selC]}
           </div>
-        );})}
+        )}
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Disponibilidad</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[1,2,3,4,5,6].map(function(d){
+            const libre=!ocupados[d];
+            return <span key={d} style={{background:libre?ob:eb,color:libre?ok:er,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600}}>{DIAS[d].substring(0,3)} {libre?"libre":"ocupado"}</span>;
+          })}
+        </div>
       </div>
     </div>
     {fotoAbierta && (
