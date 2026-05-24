@@ -203,16 +203,9 @@ const sModH = {display:"flex",justifyContent:"space-between",alignItems:"center"
 const sXBtn = {background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"};
 
 function Logo({size,col}) {
-  const s=size||36, c=col||"#fff";
+  const s=size||36;
   return (
-    <svg viewBox="0 0 100 100" width={s} height={s} fill="none">
-      <path d="M 72 80 A 37 37 0 1 1 72 20" stroke={c} strokeWidth="5.5" strokeLinecap="round" strokeDasharray="13 6" fill="none"/>
-      <path d="M 68 72 A 28 28 0 1 1 68 28" stroke={c} strokeWidth="5" strokeLinecap="round" strokeDasharray="10 5" fill="none"/>
-      <path d="M 50 22 A 28 28 0 0 0 22 50 A 28 28 0 0 0 50 78 A 20 20 0 0 0 70 58 L 52 58" stroke={c} strokeWidth="5" strokeLinecap="round" fill="none"/>
-      <path d="M 50 38 A 12 12 0 0 0 38 50 A 12 12 0 0 0 50 62 A 12 12 0 0 0 61 53" stroke={c} strokeWidth="4.5" strokeLinecap="round" fill="none"/>
-      <circle cx="50" cy="50" r="2.8" fill={c}/>
-      <circle cx="72" cy="26" r="2.5" fill={c}/>
-    </svg>
+    <img src="/icon-192.png" width={s} height={s} alt="Logo" style={{borderRadius:"50%",display:"block"}}/>
   );
 }
 
