@@ -2728,6 +2728,7 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   const p = psicos.find(function(x){return x.nombre===user;});
   const [wa,setWa] = useState(p?p.wa||"":"");
   const [email,setEmail] = useState(p?p.email||"":"");
+  const [profesion,setProfesion] = useState(p?p.profesion||"Psicologa":"Psicologa");
   const [analisis,setAnalisis] = useState(p?p.analisis||[]:[]);
   const [otroAnalisis,setOtroAnalisis] = useState(p?p.otroAnalisis||"":"");
   const [poblacion,setPoblacion] = useState(p?p.poblacion||[]:[]);
@@ -2736,7 +2737,7 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   function save() {
     if(!p) return;
     const analFinal=analisis.includes("Otro")&&otroAnalisis.trim()?analisis.filter(function(x){return x!=="Otro";}).concat([otroAnalisis.trim()]):analisis;
-    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,analisis:analFinal,otroAnalisis:otroAnalisis,poblacion:poblacion,disponible:disponible}));
+    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,profesion:profesion,analisis:analFinal,otroAnalisis:otroAnalisis,poblacion:poblacion,disponible:disponible}));
     notify("Perfil actualizado");
     setOpen(false);
   }
@@ -2759,6 +2760,17 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
           <div>
             <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Email</label>
             <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="tu@email.com"/>
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Profesion</label>
+            <select style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={profesion} onChange={function(e){setProfesion(e.target.value);}}>
+              <option>Psicologa</option>
+              <option>Psicologo</option>
+              <option>Psiquiatra</option>
+              <option>Nutricionista</option>
+              <option>Kinesiologo</option>
+              <option>Otro</option>
+            </select>
           </div>
           <div>
             <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Tipo de analisis</label>
