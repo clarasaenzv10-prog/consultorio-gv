@@ -1,22 +1,26 @@
 {
   "name": "Consultorio Gloria Videla",
   "short_name": "Consultorio GV",
-  "description": "Sistema de gestion - Psicologia Clinica",
+  "description": "Sistema de gestion interno - Psicologia Clinica",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#F0F8FB",
   "theme_color": "#4BA3C3",
-  "orientation": "portrait",
+  "categories": ["medical", "productivity"],
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
