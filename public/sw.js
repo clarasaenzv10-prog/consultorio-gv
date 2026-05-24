@@ -1,26 +1,56 @@
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+// Service Worker - Gloria Videla Consultorio
+const CACHE = 'consultorio-gv-v4';
 
-firebase.initializeApp({
-  apiKey: "AIzaSyBfF3r9X9END2GH8mFwDsXmoy7crk0LJiE",
-  authDomain: "consultorio-gv-dc2db.firebaseapp.com",
-  projectId: "consultorio-gv-dc2db",
-  storageBucket: "consultorio-gv-dc2db.firebasestorage.app",
-  messagingSenderId: "816478423904",
-  appId: "1:816478423904:web:9252d5b442048f3d882c05"
+self.addEventListener('install', function(e) {
+  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then(function(c) {
+      return c.addAll(['/', '/index.html']).catch(function(){});
+    })
+  );
 });
 
-const messaging = firebase.messaging();
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(
+        keys.filter(function(k){ return k !== CACHE; })
+            .map(function(k){ return caches.delete(k); })
+      );
+    }).then(function(){ return self.clients.claim(); })
+  );
+});
 
-messaging.onBackgroundMessage(function(payload) {
-  const { title, body } = payload.notification || {};
-  self.registration.showNotification(title || 'Consultorio GV', {
-    body: body || '',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    vibrate: [200, 100, 200],
-    data: payload.data
-  });
+self.addEventListener('fetch', function(e) {
+  if(e.request.method !== 'GET') return;
+  if(e.request.url.includes('firebase') || 
+     e.request.url.includes('googleapis') ||
+     e.request.url.includes('gstatic')) return;
+  e.respondWith(
+    fetch(e.request).catch(function() {
+      return caches.match(e.request).then(function(r){
+        return r || caches.match('/index.html');
+      });
+    })
+  );
+});
+
+// FCM Background messages
+self.addEventListener('push', function(e) {
+  if(!e.data) return;
+  try {
+    const data = e.data.json();
+    const title = (data.notification && data.notification.title) || 'Consultorio GV';
+    const body = (data.notification && data.notification.body) || '';
+    e.waitUntil(
+      self.registration.showNotification(title, {
+        body: body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        vibrate: [200, 100, 200]
+      })
+    );
+  } catch(err) {}
 });
 
 self.addEventListener('notificationclick', function(e) {
