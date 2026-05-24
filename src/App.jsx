@@ -203,16 +203,23 @@ const sModH = {display:"flex",justifyContent:"space-between",alignItems:"center"
 const sXBtn = {background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"};
 
 function Logo({size,col}) {
-  const s = size||36, c = col||"#fff";
+  const s=size||36, c=col||"#fff";
   return (
-    <svg viewBox="0 0 120 120" width={s} height={s} fill="none">
-      <circle cx="60" cy="60" r="52" stroke={c} strokeWidth="5" strokeDasharray="14 7" strokeLinecap="round"/>
-      <circle cx="60" cy="60" r="38" stroke={c} strokeWidth="4.5" strokeDasharray="10 6" strokeLinecap="round"/>
-      <path d="M60 26 A34 34 0 1 1 26 60" stroke={c} strokeWidth="4" strokeLinecap="round" fill="none" strokeDasharray="8 5"/>
-      <path d="M60 60 L78 60" stroke={c} strokeWidth="4" strokeLinecap="round"/>
-      <path d="M78 60 A20 20 0 0 0 60 40 A20 20 0 0 0 40 60 A20 20 0 0 0 60 80 A20 20 0 0 0 78 72" stroke={c} strokeWidth="4" strokeLinecap="round" fill="none"/>
-      <circle cx="78" cy="38" r="3" fill={c}/>
-      <circle cx="60" cy="60" r="3" fill={c}/>
+    <svg viewBox="0 0 100 100" width={s} height={s} fill="none">
+      {/* Outer arc - opens to right, dashed */}
+      <path d="M 71 82 A 38 38 0 1 1 71 18" stroke={c} strokeWidth="5.5" strokeLinecap="round" strokeDasharray="12 5.5" fill="none"/>
+      {/* Second arc */}
+      <path d="M 65 75 A 29 29 0 1 1 65 25" stroke={c} strokeWidth="5" strokeLinecap="round" strokeDasharray="10 5" fill="none"/>
+      {/* Third arc */}
+      <path d="M 60 69 A 21 21 0 1 1 60 31" stroke={c} strokeWidth="4.5" strokeLinecap="round" strokeDasharray="8.5 4.5" fill="none"/>
+      {/* Inner G curve */}
+      <path d="M 56 64 A 15 15 0 1 1 56 36" stroke={c} strokeWidth="4" strokeLinecap="round" strokeDasharray="7 4" fill="none"/>
+      {/* G crossbar extending right */}
+      <path d="M 50 50 L 62 50" stroke={c} strokeWidth="4" strokeLinecap="round"/>
+      {/* Center dot */}
+      <circle cx="50" cy="50" r="3" fill={c}/>
+      {/* Accent dot upper right */}
+      <circle cx="71" cy="22" r="2.5" fill={c}/>
     </svg>
   );
 }
