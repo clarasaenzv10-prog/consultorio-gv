@@ -1,6 +1,6 @@
 // v2026-05-23-DESC-V2
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
-import { listenCol, saveDoc, delDoc, seedIfEmpty } from "./firebase.js";
+import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForegroundMessages } from "./firebase.js";
 
 // ─── Colores (hardcoded, no concatenation in JSX) ──────────────
 const br = "#4BA3C3";   // brand teal
@@ -216,6 +216,7 @@ export default function App() {
   const [user,setUser] = useState(null);
   const [tab,setTab] = useState("calendario");
   const [perfilSel,setPerfilSel] = useState(null);
+  const [notifMsg,setNotifMsg] = useState(null);
   const [wk,setWk] = useState(new Date());
   const [fSede,setFSede] = useState("todas");
   const [fCons,setFCons] = useState("todos");
@@ -377,7 +378,7 @@ export default function App() {
     {id:"solicitar",icon:"✉",label:"Solicitar",badge:0},
   ] : role==="admin" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
-    {id:"perfiles",icon:"👩",label:"Psicologas",badge:0},
+    {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
     {id:"solicitudes",icon:"🔔",label:"Solicitudes",badge:pendR.length},
     {id:"cambios",icon:"🗓",label:"Cambios",badge:pendH.length},
@@ -389,7 +390,7 @@ export default function App() {
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
-    {id:"perfiles",icon:"👩",label:"Psicologas",badge:0},
+    {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
@@ -435,7 +436,7 @@ export default function App() {
           <div style={{position:"fixed",top:56,right:0,background:wh,zIndex:80,boxShadow:"0 8px 24px rgba(75,163,195,.15)",borderRadius:"0 0 0 12px",minWidth:200,border:"1px solid #C9E4EF"}}>
             <div style={{padding:"14px 20px",borderBottom:"1px solid #C9E4EF"}}>
               <div style={{color:tx,fontWeight:700,fontSize:14}}>{user}</div>
-              <div style={{color:mu,fontSize:12}}>{role==="admin"?"Administradora":"Psicologa"}</div>
+              <div style={{color:mu,fontSize:12}}>{role==="admin"?"Administradora":"Profesional"}</div>
             </div>
             {role==="psico" && <EditarPerfilBtn user={user} psicos={psicos} setPsicos={setPsicos} notify={notify}/>}
             {role==="psico" && <CambiarPassBtn user={user} setPsicos={setPsicos} notify={notify}/>}
@@ -522,7 +523,16 @@ export default function App() {
           )}
         </nav>
 
-        {mod && mod.type==="slot" && (
+        {notifMsg && (
+        <div style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",zIndex:999,background:DK_BLUE||"#2E86AB",color:"#fff",borderRadius:14,padding:"14px 20px",maxWidth:"90vw",boxShadow:"0 8px 32px rgba(46,134,171,.35)",display:"flex",gap:12,alignItems:"flex-start"}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{notifMsg.title}</div>
+            <div style={{fontSize:13,opacity:.9}}>{notifMsg.body}</div>
+          </div>
+          <button onClick={function(){setNotifMsg(null);}} style={{background:"transparent",border:"none",color:"#fff",fontSize:18,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
+        </div>
+      )}
+      {mod && mod.type==="slot" && (
           <SlotModal key={mod.slot.date+(mod.slot.preCons||"")+(mod.slot.evento?mod.slot.evento.id:"")} slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
             onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
@@ -856,7 +866,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
           </div>
           {(tipo==="reservar"||tipo==="fijo")&&(
             <div>
-              <label style={sLbl}>Psicologa</label>
+              <label style={sLbl}>Profesional</label>
               {role==="admin"
                 ?<select style={sInp} value={psico} onChange={function(e){setPsico(e.target.value);}}>{psicos.map(function(p){return <option key={p.id}>{p.nombre}</option>;})}</select>
                 :<input style={sInp} value={user} disabled/>
@@ -998,7 +1008,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
   return (
     <>
     <div>
-      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Psicologas</h2>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Profesionales</h2>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
         {psicos.map(function(p) {
           return (
@@ -1017,7 +1027,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                   </div>
                   <div>
                     <label style={sLbl}>Nota privada (solo vos la ves)</label>
-                    <textarea style={Object.assign({},sInp,{minHeight:60,resize:"vertical",fontSize:13})} value={form.nota||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nota:e.target.value});});}} placeholder="Anotaciones internas sobre esta psicologa..."/>
+                    <textarea style={Object.assign({},sInp,{minHeight:60,resize:"vertical",fontSize:13})} value={form.nota||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nota:e.target.value});});}} placeholder="Anotaciones internas sobre esta profesional..."/>
                   </div>
                   <label style={{display:"flex",alignItems:"center",gap:6,color:tx,fontSize:13}}>
                     <input type="checkbox" checked={form.disponible||false} onChange={function(e){setForm(function(f){return Object.assign({},f,{disponible:e.target.checked});});}}/>
@@ -1031,6 +1041,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
               ) : (
                 <div style={{width:"100%"}}>
                   <div style={{color:tx,fontWeight:700,fontSize:14}}>{p.nombre}</div>
+                  {p.profesion && p.profesion!=="Psicologa" && <div style={{color:br,fontSize:11,fontWeight:600}}>{p.profesion}</div>}
                   {role==="admin" && p.wa && <div style={{color:mu,fontSize:12}}>WA: {p.wa}</div>}
                   {role==="admin" && p.email && <div style={{color:mu,fontSize:12}}>Mail: {p.email}</div>}
                   {(p.analisis||[]).length>0 && (
@@ -1140,6 +1151,13 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
     if(!txt.trim()) return;
     const a={id:Date.now(),texto:txt.trim(),fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
+    // Save pending notification to Firestore for cloud function to send
+    saveDoc("pendingNotifs","notif_"+a.id,{
+      title:"Consultorio Gloria Videla",
+      body:txt.trim().substring(0,100),
+      created:new Date().toISOString(),
+      sent:false
+    });
     setTxt(""); notify("Anuncio publicado");
   }
   function sWA(p,t) {
@@ -1319,7 +1337,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
       {pendInv.length>0 && (
         <div style={{marginBottom:20}}>
-          <div style={{color:er,fontWeight:700,fontSize:13,marginBottom:10}}>Solicitudes de nuevas psicologas ({pendInv.length})</div>
+          <div style={{color:er,fontWeight:700,fontSize:13,marginBottom:10}}>Solicitudes de nuevos profesionales ({pendInv.length})</div>
           {pendInv.map(function(s){return(
             <div key={s.id} style={Object.assign({},sPanel,{marginBottom:10,border:"1.5px solid #F5B8B3"})}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
@@ -1425,7 +1443,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
     const sinWA = psicos.filter(function(p){return !p.wa;});
     if(sinWA.length) notify(sinWA.map(function(p){return p.nombre;}).join(", ")+" sin WA","err");
     cWA.forEach(function(p,i){setTimeout(function(){const m=genMsg(p,mes,anio);openLink("https://wa.me/"+p.wa+"?text="+encodeURIComponent(m),"_blank");},i*800);});
-    if(cWA.length) notify("Enviando a "+cWA.length+" psicologas");
+    if(cWA.length) notify("Enviando a "+cWA.length+" profesionals");
   }
 
   return (
@@ -1463,11 +1481,11 @@ function FactView({psicos,calcFact,genMsg,notify}) {
               </div>
             );
           })}
-          {!ps && <div style={{color:mu,textAlign:"center",padding:40}}>Selecciona una psicologa de la lista</div>}
+          {!ps && <div style={{color:mu,textAlign:"center",padding:40}}>Selecciona una profesional de la lista</div>}
         </div>
       )}
       {vista==="historial" && !ps && (
-        <div style={{color:mu,textAlign:"center",padding:40}}>Selecciona una psicologa de la lista para ver su historial</div>
+        <div style={{color:mu,textAlign:"center",padding:40}}>Selecciona una profesional de la lista para ver su historial</div>
       )}
 
       {vista==="mes" && (
@@ -1479,7 +1497,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
         </div>
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div style={sPanel}>
-          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Psicologas</div>
+          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Profesionales</div>
           {psicos.map(function(p) {
             const r = calcFact(p,mes,anio);
             const act = sel===p.nombre;
@@ -1654,7 +1672,7 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
                 <div style={{color:tx,fontSize:18,fontWeight:700}}>{sel.label}</div>
                 <div style={{color:mu,fontSize:13}}>Vigente desde {new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")}</div>
               </div>
-              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12})} onClick={function(){if(!window.confirm("Eliminar?"))return;setTabP(function(p){return p.filter(function(t){return t.id!==selId;});});setSelId(null);notify("Eliminada");}}>Eliminar</button>
+              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12})} onClick={function(){if(!window.confirm("Eliminar?"))return;setTabP(function(p){return p.filter(function(t){return t.id!==selId;});});setSelId(null);notify("Eliminado");}}>Eliminar</button>
             </div>
             {CAMPOS.map(function(c) {
               return (
@@ -1665,7 +1683,7 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
               );
             })}
             <div style={{marginTop:20}}>
-              <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Enviar a psicologas</div>
+              <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>Enviar a profesionals</div>
               {psicos.map(function(p) {
                 return (
                   <div key={p.id} style={Object.assign({},sCard,{padding:"10px 14px",marginBottom:8})}>
@@ -1741,7 +1759,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,notify}) {
               delDoc("psicos",p.id);
               horarios.filter(function(h){return h.psico&&h.psico.toLowerCase()===p.nombre.toLowerCase();})
                 .forEach(function(h){delDoc("horarios",h.id);});
-              notify("Psicologa y horarios eliminados");
+              notify("Profesional y horarios eliminados");
             }}>X</button>
       </div>
     </div>
@@ -1807,16 +1825,16 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
     saveDoc("horarios",eid,Object.assign({},ef,{sede:c?c.sede:ef.sede,diaSemana:Number(ef.diaSemana)}));
     setEid(null); notify("Actualizado");
   }
-  const [newP,setNewP] = useState({nombre:"",wa:"",email:"",fijas:false,descuento:0,nota:"",pass:"psico123"});
+  const [newP,setNewP] = useState({nombre:"",profesion:"Psicologa",wa:"",email:"",fijas:false,descuento:0,nota:"",pass:"psico123"});
   const [showNewP,setShowNewP] = useState(false);
 
   function addPsico() {
     if(!newP.nombre.trim()) return;
     const newId = "px"+Date.now();
-    saveDoc("psicos",newId,{id:newId,nombre:newP.nombre.trim(),wa:newP.wa||"",email:newP.email||"",analisis:[],poblacion:[],disponible:true,fijas:newP.fijas,descuento:Number(newP.descuento)||0,nota:newP.nota||"",pass:newP.pass||"psico123"});
+    saveDoc("psicos",newId,{id:newId,nombre:newP.nombre.trim(),profesion:newP.profesion||"Psicologa",wa:newP.wa||"",email:newP.email||"",analisis:[],poblacion:[],disponible:true,fijas:newP.fijas,descuento:Number(newP.descuento)||0,nota:newP.nota||"",pass:newP.pass||"psico123"});
     setNewP({nombre:"",wa:"",email:"",fijas:false,descuento:0,nota:"",pass:"psico123"});
     setShowNewP(false);
-    notify("Psicologa agregada");
+    notify("Profesional agregado");
   }
 
   const tabBtn = function(active) {
@@ -1828,14 +1846,14 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Gestion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
-        <button style={tabBtn(gt==="psicologas")} onClick={function(){setGt("psicologas");}}>Psicologas</button>
+        <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
         <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
       </div>
       {gt==="horarios" && (
         <div>
           {!selP && (
             <div>
-              <div style={{color:mu,fontSize:12,marginBottom:12}}>Selecciona una psicologa</div>
+              <div style={{color:mu,fontSize:12,marginBottom:12}}>Selecciona una profesional</div>
               {psicos.map(function(p) {
                 return (
                   <div key={p.id} style={Object.assign({},sCard,{cursor:"pointer"})} onClick={function(){setSelP(p.nombre);setEid(null);setShowAdd(false);}}>
@@ -1884,15 +1902,26 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
           )}
         </div>
       )}
-      {gt==="psicologas" && (
+      {gt==="profesionals" && (
         <div style={sPanel}>
           <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
-            {showNewP?"Cancelar":"+ Agregar nueva psicóloga"}
+            {showNewP?"Cancelar":"+ Agregar nuevo profesional"}
           </button>
           {showNewP && (
             <div style={{background:lt,borderRadius:12,padding:16,marginBottom:16,border:"1.5px solid #4BA3C3",display:"flex",flexDirection:"column",gap:10}}>
               <div style={{color:br,fontWeight:700,fontSize:13,marginBottom:4}}>Nueva psicóloga</div>
               <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={newP.nombre} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nombre:e.target.value});});}} placeholder="Nombre y apellido"/></div>
+              <div>
+                <label style={sLbl}>Profesion</label>
+                <select style={sInp} value={newP.profesion} onChange={function(e){setNewP(function(p){return Object.assign({},p,{profesion:e.target.value});});}}>
+                  <option>Psicologa</option>
+                  <option>Psicologo</option>
+                  <option>Psiquiatra</option>
+                  <option>Nutricionista</option>
+                  <option>Kinesiologo</option>
+                  <option>Otro</option>
+                </select>
+              </div>
               <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={newP.wa} onChange={function(e){setNewP(function(p){return Object.assign({},p,{wa:e.target.value});});}} placeholder="549..."/></div>
               <div><label style={sLbl}>Email</label><input style={sInp} value={newP.email} onChange={function(e){setNewP(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="email@ejemplo.com"/></div>
               <div><label style={sLbl}>Contrasena inicial</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
@@ -2219,7 +2248,7 @@ function ConfigView({config,setConfig,notify}) {
           );})}
         </div>
         <div style={{marginBottom:14,background:lt,borderRadius:10,padding:12,border:"1.5px solid #4BA3C3"}}>
-          <label style={{color:br,fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6}}>Descripcion de {selCons} (visible para psicologas e invitadas)</label>
+          <label style={{color:br,fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6}}>Descripcion de {selCons} (visible para profesionals e invitadas)</label>
           <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical",fontSize:13,background:wh})}
             value={descripciones[selCons]||""}
             onChange={function(e){setDescripciones(function(d){return Object.assign({},d,{[selCons]:e.target.value});});}}
@@ -2485,7 +2514,7 @@ function exportarExcel(psicos,mes,anio) {
   var mNombre = MESES[mes]+" "+anio;
 
   // Header
-  lines.push(["Psicologa","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]);
+  lines.push(["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]);
 
   psicos.forEach(function(p){
     var r = calcFact(p,mes,anio);
@@ -2587,7 +2616,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
           {totalDesc()>0 && <div style={{color:er,fontSize:12,marginTop:4}}>Desc. aplicados: {ars(totalDesc())}</div>}
         </div>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
-          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Psicologas activas</div>
+          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Profesionals activas</div>
           <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,mes,anio).total>0;}).length}</div>
           <div style={{color:mu,fontSize:12}}>de {psicos.length} total</div>
         </div>
@@ -2679,7 +2708,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
-        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las psicologas del mes en formato Excel.</div>
+        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del mes en formato Excel.</div>
         <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel(psicos,mes,anio);}}>
           Descargar Excel - Facturacion {MESES[mes]} {anio}
         </button>
