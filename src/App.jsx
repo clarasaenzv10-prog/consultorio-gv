@@ -302,7 +302,7 @@ export default function App() {
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
-      if(!r.estado==="aprobada") return false;
+      if(r.estado!=="aprobada") return false;
       if(!(r.psico&&r.psico.trim().toLowerCase()===pn)) return false;
       if(r.tipo!=="extra") return false;
       if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
