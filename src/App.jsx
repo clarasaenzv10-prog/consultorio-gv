@@ -572,8 +572,8 @@ function LoginView({onLogin,psicos,config}) {
 function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fSede,setFSede,fCons,setFCons}) {
   const hrs = Array.from({length:15},function(_,i){return i+7;});
   const vis = wkD.slice(0,6);
-  function prev() { const d=new Date(wk); d.setDate(d.getDate()-6); setWk(d); }
-  function next() { const d=new Date(wk); d.setDate(d.getDate()+6); setWk(d); }
+  function prev() { const d=new Date(wk.getFullYear(),wk.getMonth(),wk.getDate()-7); setWk(d); }
+  function next() { const d=new Date(wk.getFullYear(),wk.getMonth(),wk.getDate()+7); setWk(d); }
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",gap:12}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
