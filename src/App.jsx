@@ -292,7 +292,12 @@ export default function App() {
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
     const pn=psico.nombre.trim().toLowerCase();
-    const fp = horarios.filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===pn;});
+    const pnFirst=pn.split(" ")[0]; // first name only for fallback
+    const fp = horarios.filter(function(h){
+      if(!h.psico) return false;
+      const hn=h.psico.trim().toLowerCase();
+      return hn===pn || hn===pnFirst; // match full name OR just first name
+    });
     let tf=0; const df=[];
     fp.forEach(function(h) {
       const sem = mesFechas(mes,anio,Number(h.diaSemana)).length;
@@ -303,7 +308,8 @@ export default function App() {
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
-      if(!(r.psico&&r.psico.trim().toLowerCase()===pn)) return false;
+      const rn=r.psico?r.psico.trim().toLowerCase():"";
+      if(!(rn===pn||rn===pnFirst)) return false;
       if(r.tipo!=="extra") return false;
       if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
       if(parseLocalDate(r.fecha).getFullYear()!==anio) return false;
@@ -1793,11 +1799,16 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
     saveDoc("horarios",eid,Object.assign({},ef,{sede:c?c.sede:ef.sede,diaSemana:Number(ef.diaSemana)}));
     setEid(null); notify("Actualizado");
   }
+  const [newP,setNewP] = useState({nombre:"",wa:"",email:"",fijas:false,descuento:0,nota:"",pass:"psico123"});
+  const [showNewP,setShowNewP] = useState(false);
+
   function addPsico() {
-    if(!nn.trim()) return;
+    if(!newP.nombre.trim()) return;
     const newId = "px"+Date.now();
-    setPsicos(function(p){return p.concat([{id:newId,nombre:nn,wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"}]);});
-    setNn(""); notify("Agregada");
+    saveDoc("psicos",newId,{id:newId,nombre:newP.nombre.trim(),wa:newP.wa||"",email:newP.email||"",analisis:[],poblacion:[],disponible:true,fijas:newP.fijas,descuento:Number(newP.descuento)||0,nota:newP.nota||"",pass:newP.pass||"psico123"});
+    setNewP({nombre:"",wa:"",email:"",fijas:false,descuento:0,nota:"",pass:"psico123"});
+    setShowNewP(false);
+    notify("Psicologa agregada");
   }
 
   const tabBtn = function(active) {
@@ -1867,10 +1878,31 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       )}
       {gt==="psicologas" && (
         <div style={sPanel}>
-          <div style={{display:"flex",gap:10,marginBottom:20}}>
-            <input style={Object.assign({},sInp,{flex:1})} value={nn} onChange={function(e){setNn(e.target.value);}} placeholder="Nombre de la psicologa" onKeyDown={function(e){if(e.key==="Enter")addPsico();}}/>
-            <button style={btn(br,wh)} onClick={addPsico}>Agregar</button>
-          </div>
+          <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
+            {showNewP?"Cancelar":"+ Agregar nueva psicóloga"}
+          </button>
+          {showNewP && (
+            <div style={{background:lt,borderRadius:12,padding:16,marginBottom:16,border:"1.5px solid #4BA3C3",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{color:br,fontWeight:700,fontSize:13,marginBottom:4}}>Nueva psicóloga</div>
+              <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={newP.nombre} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nombre:e.target.value});});}} placeholder="Nombre y apellido"/></div>
+              <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={newP.wa} onChange={function(e){setNewP(function(p){return Object.assign({},p,{wa:e.target.value});});}} placeholder="549..."/></div>
+              <div><label style={sLbl}>Email</label><input style={sInp} value={newP.email} onChange={function(e){setNewP(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="email@ejemplo.com"/></div>
+              <div><label style={sLbl}>Contrasena inicial</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
+              <div><label style={sLbl}>Descuento (%)</label><input style={sInp} type="number" min="0" max="100" value={newP.descuento} onChange={function(e){setNewP(function(p){return Object.assign({},p,{descuento:e.target.value});});}}/></div>
+              <div><label style={sLbl}>Nota interna</label><input style={sInp} value={newP.nota} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nota:e.target.value});});}} placeholder="Nota privada (solo admin)"/></div>
+              <div style={{background:wh,borderRadius:10,padding:12,border:"1px solid #C9E4EF"}}>
+                <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de horario</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:false});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:!newP.fijas?br:bg,color:!newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:!newP.fijas?700:400,fontSize:13}}>Solo extras</button>
+                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:true});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:newP.fijas?br:bg,color:newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:newP.fijas?700:400,fontSize:13}}>Tiene fijos</button>
+                </div>
+                <div style={{color:mu,fontSize:11,marginTop:6}}>{newP.fijas?"Tendra horarios fijos semanales — se cargan desde Gestion → Horarios":"Solo horas extras — no aparece en facturacion fija"}</div>
+              </div>
+              <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={addPsico} disabled={!newP.nombre.trim()}>
+                Crear psicóloga
+              </button>
+            </div>
+          )}
           {psicos.map(function(p) {
             return (
               <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} notify={notify}/>
@@ -2440,6 +2472,65 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 
 
 // ─── Estadisticas ─────────────────────────────────────────────
+function exportarExcel(psicos,mes,anio) {
+  var lines = [];
+  var mNombre = MESES[mes]+" "+anio;
+
+  // Header
+  lines.push(["Psicologa","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]);
+
+  psicos.forEach(function(p){
+    var r = calcFact(p,mes,anio);
+    // Fijos
+    r.df.forEach(function(d){
+      lines.push([
+        p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
+        d.horas.toFixed?d.horas.toFixed(1):d.horas,
+        d.ley||d.des||"",d.sem,d.sub,
+        (p.descuento||0)+"%",
+        ""
+      ]);
+    });
+    // Extras
+    r.de.forEach(function(d){
+      lines.push([
+        p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,
+        d.horas.toFixed?d.horas.toFixed(1):d.horas,
+        d.ley||d.des||"","1",d.sub,
+        (p.descuento||0)+"%",
+        ""
+      ]);
+    });
+    // Totals row per psico
+    lines.push([
+      p.nombre,"TOTAL","","","","","","",
+      "",r.bruto,
+      (p.descuento||0)+"%",
+      r.total
+    ]);
+    lines.push([]); // empty row between psicos
+  });
+
+  // Convert to CSV with semicolons (Excel-friendly for Argentina)
+  var csv = lines.map(function(row){
+    return row.map(function(cell){
+      return String(cell==null?"":cell).replace(/;/g," ");
+    }).join(";");
+  }).join("\n");
+
+  // Add BOM for Excel UTF-8
+  var bom = "\uFEFF";
+  var blob = new Blob([bom+csv],{type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "Facturacion_"+mNombre.replace(" ","_")+".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
@@ -2577,6 +2668,13 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
             </div>
           );
         })}
+      </div>
+      <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
+        <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
+        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las psicologas del mes en formato Excel.</div>
+        <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel(psicos,mes,anio);}}>
+          Descargar Excel - Facturacion {MESES[mes]} {anio}
+        </button>
       </div>
     </div>
   );
