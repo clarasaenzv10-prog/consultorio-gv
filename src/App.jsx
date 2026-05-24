@@ -206,20 +206,12 @@ function Logo({size,col}) {
   const s=size||36, c=col||"#fff";
   return (
     <svg viewBox="0 0 100 100" width={s} height={s} fill="none">
-      {/* Outer arc - opens to right, dashed */}
-      <path d="M 71 82 A 38 38 0 1 1 71 18" stroke={c} strokeWidth="5.5" strokeLinecap="round" strokeDasharray="12 5.5" fill="none"/>
-      {/* Second arc */}
-      <path d="M 65 75 A 29 29 0 1 1 65 25" stroke={c} strokeWidth="5" strokeLinecap="round" strokeDasharray="10 5" fill="none"/>
-      {/* Third arc */}
-      <path d="M 60 69 A 21 21 0 1 1 60 31" stroke={c} strokeWidth="4.5" strokeLinecap="round" strokeDasharray="8.5 4.5" fill="none"/>
-      {/* Inner G curve */}
-      <path d="M 56 64 A 15 15 0 1 1 56 36" stroke={c} strokeWidth="4" strokeLinecap="round" strokeDasharray="7 4" fill="none"/>
-      {/* G crossbar extending right */}
-      <path d="M 50 50 L 62 50" stroke={c} strokeWidth="4" strokeLinecap="round"/>
-      {/* Center dot */}
-      <circle cx="50" cy="50" r="3" fill={c}/>
-      {/* Accent dot upper right */}
-      <circle cx="71" cy="22" r="2.5" fill={c}/>
+      <path d="M 72 80 A 37 37 0 1 1 72 20" stroke={c} strokeWidth="5.5" strokeLinecap="round" strokeDasharray="13 6" fill="none"/>
+      <path d="M 68 72 A 28 28 0 1 1 68 28" stroke={c} strokeWidth="5" strokeLinecap="round" strokeDasharray="10 5" fill="none"/>
+      <path d="M 50 22 A 28 28 0 0 0 22 50 A 28 28 0 0 0 50 78 A 20 20 0 0 0 70 58 L 52 58" stroke={c} strokeWidth="5" strokeLinecap="round" fill="none"/>
+      <path d="M 50 38 A 12 12 0 0 0 38 50 A 12 12 0 0 0 50 62 A 12 12 0 0 0 61 53" stroke={c} strokeWidth="4.5" strokeLinecap="round" fill="none"/>
+      <circle cx="50" cy="50" r="2.8" fill={c}/>
+      <circle cx="72" cy="26" r="2.5" fill={c}/>
     </svg>
   );
 }
