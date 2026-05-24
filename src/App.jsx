@@ -291,7 +291,8 @@ export default function App() {
 
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
-    const fp = horarios.filter(function(h){return h.psico.toLowerCase()===psico.nombre.toLowerCase();});
+    const pn=psico.nombre.trim().toLowerCase();
+    const fp = horarios.filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===pn;});
     let tf=0; const df=[];
     fp.forEach(function(h) {
       const sem = mesFechas(mes,anio,Number(h.diaSemana)).length;
@@ -300,7 +301,7 @@ export default function App() {
       df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
-    const ep = reservas.filter(function(r){return r.estado==="aprobada"&&r.psico===psico.nombre&&r.tipo==="extra"&&new Date(r.fecha).getMonth()===mes&&new Date(r.fecha).getFullYear()===anio;});
+    const ep = reservas.filter(function(r){return r.estado==="aprobada"&&r.psico&&r.psico.trim().toLowerCase()===pn&&r.tipo==="extra"&&parseLocalDate(r.fecha).getMonth()===mes&&parseLocalDate(r.fecha).getFullYear()===anio;});
     let te=0; const de=[];
     ep.forEach(function(r){const p=calcPrecio(r.inicio,r.fin,getP(r.fecha));te+=p.sub;de.push({fecha:r.fecha,cons:r.consultorio,ini:r.inicio,fin:r.fin,horas:calcHrs(r.inicio,r.fin),sub:p.sub,ley:p.ley,tipo:p.tipo,des:p.des});});
     const bruto=tf+te, desc=psico.descuento||0, montoDesc=Math.round(bruto*desc/100);
