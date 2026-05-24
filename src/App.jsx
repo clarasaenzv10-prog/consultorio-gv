@@ -1717,7 +1717,15 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,notify}) {
             <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditNombre(true);setNewNombre(p.nombre);}}>editar nombre</button>
           </div>
         )}
-        <span style={Object.assign({},bge(p.fijas?lt:bg,p.fijas?dk:mu),{marginLeft:0})}>{p.fijas?"Fijos":"Solo extras"}</span>
+        <button
+          style={{background:p.fijas?lt:bg,color:p.fijas?dk:mu,border:"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}
+          onClick={function(){
+            const updated=Object.assign({},p,{fijas:!p.fijas});
+            saveDoc("psicos",p.id,updated);
+            notify((!p.fijas?"Cambiada a Fijos":"Cambiada a Solo extras"));
+          }}>
+          {p.fijas?"Fijos (tocar para cambiar a extras)":"Solo extras (tocar para cambiar a fijos)"}
+        </button>
         {editPass && (
           <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
             <input style={Object.assign({},sInp,{flex:1,fontSize:12})} type="password" value={newPass} onChange={function(e){setNewPass(e.target.value);}} placeholder="Nueva contrasena..." onKeyDown={function(e){if(e.key==="Enter")savePass();}}/>
