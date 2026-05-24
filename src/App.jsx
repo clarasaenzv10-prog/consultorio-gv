@@ -301,7 +301,22 @@ export default function App() {
       df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
-    const ep = reservas.filter(function(r){return r.estado==="aprobada"&&r.psico&&r.psico.trim().toLowerCase()===pn&&r.tipo==="extra"&&parseLocalDate(r.fecha).getMonth()===mes&&parseLocalDate(r.fecha).getFullYear()===anio;});
+    const ep = reservas.filter(function(r){
+      if(!r.estado==="aprobada") return false;
+      if(!(r.psico&&r.psico.trim().toLowerCase()===pn)) return false;
+      if(r.tipo!=="extra") return false;
+      if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
+      if(parseLocalDate(r.fecha).getFullYear()!==anio) return false;
+      // Excluir si hay un fijo que cubre el mismo dia y horario
+      const ds = parseLocalDate(r.fecha).getDay();
+      const jd = ds===0?7:ds;
+      const overlap = fp.some(function(h){
+        return Number(h.diaSemana)===jd &&
+               toMin(r.inicio)<toMin(h.fin) &&
+               toMin(r.fin)>toMin(h.inicio);
+      });
+      return !overlap;
+    });
     let te=0; const de=[];
     ep.forEach(function(r){const p=calcPrecio(r.inicio,r.fin,getP(r.fecha));te+=p.sub;de.push({fecha:r.fecha,cons:r.consultorio,ini:r.inicio,fin:r.fin,horas:calcHrs(r.inicio,r.fin),sub:p.sub,ley:p.ley,tipo:p.tipo,des:p.des});});
     const bruto=tf+te, desc=psico.descuento||0, montoDesc=Math.round(bruto*desc/100);
@@ -2573,16 +2588,20 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   const [wa,setWa] = useState(p?p.wa||"":"");
   const [email,setEmail] = useState(p?p.email||"":"");
   const [analisis,setAnalisis] = useState(p?p.analisis||[]:[]);
+  const [otroAnalisis,setOtroAnalisis] = useState(p?p.otroAnalisis||"":"");
+  const [poblacion,setPoblacion] = useState(p?p.poblacion||[]:[]);
   const [disponible,setDisponible] = useState(p?p.disponible!==false:true);
 
   function save() {
     if(!p) return;
-    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,analisis:analisis,disponible:disponible}));
+    const analFinal=analisis.includes("Otro")&&otroAnalisis.trim()?analisis.filter(function(x){return x!=="Otro";}).concat([otroAnalisis.trim()]):analisis;
+    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,analisis:analFinal,otroAnalisis:otroAnalisis,poblacion:poblacion,disponible:disponible}));
     notify("Perfil actualizado");
     setOpen(false);
   }
 
   const ANALS=["Cognitivo Conductual","Psicoanalitico","Sistemico / Familiar","Humanista / Gestalt","EMDR","Mindfulness / ACT","Integrativo","Otro"];
+  const POBS=["Ninos","Adolescentes","Adultos","Adultos mayores","Parejas","Familias"];
 
   return (
     <div>
@@ -2606,6 +2625,25 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
               {ANALS.map(function(a){
                 const sel=analisis.includes(a);
                 return <button key={a} onClick={function(){setAnalisis(function(prev){return sel?prev.filter(function(x){return x!==a;}):[...prev,a];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{a}</button>;
+              })}
+            </div>
+            {analisis.includes("Otro") && (
+              <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:13,width:"100%",fontFamily:"inherit",marginTop:6}} value={otroAnalisis} onChange={function(e){setOtroAnalisis(e.target.value);}} placeholder="Especifica tu tipo de analisis..."/>
+            )}
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Poblacion que atendes</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+              {POBS.map(function(pb){
+                const sel=poblacion.includes(pb);
+                return <button key={pb} onClick={function(){setPoblacion(function(prev){return sel?prev.filter(function(x){return x!==pb;}):[...prev,pb];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{pb}</button>;
+              })}
+            </div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6,marginTop:8}}>Trabaja con</label>
+            <div style={{display:"flex",gap:8}}>
+              {["Ninos y/o Adolescentes","Adultos"].map(function(g){
+                const sel=poblacion.includes(g);
+                return <button key={g} onClick={function(){setPoblacion(function(prev){return sel?prev.filter(function(x){return x!==g;}):[...prev,g];});}} style={{flex:1,background:sel?"#2E86AB":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #2E86AB":"1.5px solid #C9E4EF",borderRadius:10,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{g}</button>;
               })}
             </div>
           </div>
