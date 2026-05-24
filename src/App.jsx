@@ -1669,9 +1669,20 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
 }
 
 // ─── Gestion ──────────────────────────────────────────────────
-function GestionPsicoRow({p,setPsicos,notify}) {
+function GestionPsicoRow({p,setPsicos,horarios,setHorarios,notify}) {
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
+  const [editNombre,setEditNombre] = useState(false);
+  const [newNombre,setNewNombre] = useState(p.nombre);
+  function saveNombre() {
+    if(!newNombre.trim()||newNombre.trim()===p.nombre){setEditNombre(false);return;}
+    const oldNombre=p.nombre; const nn=newNombre.trim();
+    saveDoc("psicos",p.id,Object.assign({},p,{nombre:nn}));
+    // Update all horarios with old name
+    (horarios||[]).filter(function(h){return h.psico&&h.psico.toLowerCase()===oldNombre.toLowerCase();})
+      .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:nn}));});
+    setEditNombre(false); notify("Nombre actualizado en perfil y horarios");
+  }
   function savePass() {
     if(newPass.length < 4) { notify("Minimo 4 caracteres","err"); return; }
     setPsicos(function(ps){return ps.map(function(x){return x.id===p.id?Object.assign({},x,{pass:newPass}):x;});});
@@ -1680,8 +1691,19 @@ function GestionPsicoRow({p,setPsicos,notify}) {
   return (
     <div style={sCard}>
       <div style={{flex:1}}>
-        <b style={{color:tx}}>{p.nombre}</b>
-        <span style={Object.assign({},bge(p.fijas?lt:bg,p.fijas?dk:mu),{marginLeft:8})}>{p.fijas?"Fijos":"Solo extras"}</span>
+        {editNombre?(
+          <div style={{display:"flex",gap:6,marginBottom:6}}>
+            <input style={Object.assign({},sInp,{flex:1,padding:"4px 8px",fontSize:13})} value={newNombre} onChange={function(e){setNewNombre(e.target.value);}} autoFocus/>
+            <button style={Object.assign({},btn(ok,wh),{padding:"4px 12px",fontSize:13})} onClick={saveNombre}>OK</button>
+            <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"4px 10px",fontSize:13})} onClick={function(){setEditNombre(false);setNewNombre(p.nombre);}}>X</button>
+          </div>
+        ):(
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <b style={{color:tx}}>{p.nombre}</b>
+            <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditNombre(true);setNewNombre(p.nombre);}}>editar nombre</button>
+          </div>
+        )}
+        <span style={Object.assign({},bge(p.fijas?lt:bg,p.fijas?dk:mu),{marginLeft:0})}>{p.fijas?"Fijos":"Solo extras"}</span>
         {editPass && (
           <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
             <input style={Object.assign({},sInp,{flex:1,fontSize:12})} type="password" value={newPass} onChange={function(e){setNewPass(e.target.value);}} placeholder="Nueva contrasena..." onKeyDown={function(e){if(e.key==="Enter")savePass();}}/>
@@ -1843,7 +1865,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
           </div>
           {psicos.map(function(p) {
             return (
-              <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} notify={notify}/>
+              <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} notify={notify}/>
             );
           })}
         </div>
@@ -1985,7 +2007,10 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
               <div style={{marginBottom:8}}>
                 <div style={{color:tx,fontWeight:700,fontSize:14}}>{DIAS[h.diaSemana]}</div>
                 <div style={{color:tx,fontSize:13}}>{h.inicio} - {h.fin} ({calcHrs(h.inicio,h.fin).toFixed(1)}hs)</div>
-                <div style={{color:mu,fontSize:12}}>{h.consultorio} - {ars(calcPrecio(h.inicio,h.fin).sub)}/semana</div>
+                {(function(){
+                  const pr=calcPrecio(h.inicio,h.fin);
+                  return <div style={{color:mu,fontSize:12}}>{h.consultorio} - {pr.ley?<span style={{color:dk,fontWeight:600}}>{pr.ley} = {ars(pr.sub)}/sem</span>:<span>{pr.des||ars(pr.sub)}/sem</span>}</div>;
+                })()}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{flex:1,fontSize:13,padding:"8px 10px"})} onClick={function(){setMH({type:"edit",h:h});}}>Modificar</button>
