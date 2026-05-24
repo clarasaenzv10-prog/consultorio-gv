@@ -615,6 +615,12 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={function(){setWk(new Date());}}>Hoy</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={next}>Sig.</button>
         </div>
+        <div style={{textAlign:"center",color:mu,fontSize:13,fontWeight:600,paddingBottom:6,letterSpacing:0.3}}>
+          {MESES[wkD[0].getMonth()]} {wkD[0].getFullYear()}
+          {wkD[0].getMonth()!==wkD[wkD.length-1].getMonth()?" — "+MESES[wkD[wkD.length-1].getMonth()]+" "+wkD[wkD.length-1].getFullYear():""}
+        </div>
+        <div style={{display:"none"}}>
+        </div>
       </div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
         <div style={{display:"flex",gap:6,background:wh,borderRadius:10,padding:"4px",border:"1px solid #C9E4EF"}}>
