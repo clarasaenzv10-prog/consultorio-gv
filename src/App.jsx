@@ -1087,11 +1087,21 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                   <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase"}}>Contacto</div>
                   {perfilSel.wa && (
                     <button style={{background:"#25D366",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={function(){
-                      const msg="Hola "+perfilSel.nombre+"! Te contacto desde el consultorio.";
-                      if(navigator.share){navigator.share({text:msg}).catch(function(){});}
-                      else{const a=document.createElement("a");a.href="https://wa.me/"+perfilSel.wa+"?text="+encodeURIComponent(msg);a.target="_blank";document.body.appendChild(a);a.click();document.body.removeChild(a);}
+                      const wa = perfilSel.wa||"";
+                      const tel = wa.startsWith("+") ? wa : (wa ? "+"+wa : "");
+                      const vcf = ["BEGIN:VCARD","VERSION:3.0","FN:"+perfilSel.nombre,"TEL:"+tel,(perfilSel.email?"EMAIL:"+perfilSel.email:""),"ORG:Consultorio Gloria Videla","END:VCARD"].filter(Boolean).join("\n");
+                      const blob = new Blob([vcf],{type:"text/vcard"});
+                      const url = URL.createObjectURL(blob);
+                      if(navigator.share){
+                        const file = new File([blob],perfilSel.nombre+".vcf",{type:"text/vcard"});
+                        navigator.share({files:[file],title:perfilSel.nombre}).catch(function(){
+                          const a=document.createElement("a");a.href=url;a.download=perfilSel.nombre+".vcf";document.body.appendChild(a);a.click();document.body.removeChild(a);
+                        });
+                      } else {
+                        const a=document.createElement("a");a.href=url;a.download=perfilSel.nombre+".vcf";document.body.appendChild(a);a.click();document.body.removeChild(a);
+                      }
                     }}>
-                      Compartir por WhatsApp
+                      Compartir contacto
                     </button>
                   )}
                   {perfilSel.email && (
