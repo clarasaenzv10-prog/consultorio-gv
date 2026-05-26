@@ -1,6 +1,6 @@
 // v2026-05-23-DESC-V2
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
-import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForegroundMessages } from "./firebase.js";
+import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
 // ─── Colores (hardcoded, no concatenation in JSX) ──────────────
 const br = "#4BA3C3";   // brand teal
@@ -230,6 +230,7 @@ export default function App() {
   const [anuncios,setAnunciosLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
+  const [adminNotifs,setAdminNotifsLocal] = useState([]);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -254,6 +255,9 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("adminNotifs", function(d){
+        setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
+      }),
       listenCol("config", function(d){
         if(d&&d.length>0) {
           const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]},descripciones:{C1:"",C2:"",C3:"",C4:"",C5:""}};
@@ -468,6 +472,18 @@ export default function App() {
               <span style={{fontSize:22}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
             </button>
+            {role==="admin" && adminNotifs.length>0 && (
+              <div style={{borderTop:"1px solid #EBF6FA",padding:"12px 16px",background:eb}}>
+                <div style={{color:er,fontWeight:700,fontSize:12,marginBottom:8}}>Notificaciones pendientes ({adminNotifs.length})</div>
+                {adminNotifs.slice(0,5).map(function(n){return(
+                  <div key={n.id} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:8,background:wh,borderRadius:8,padding:"8px 10px",border:"1px solid #F5B8B3"}}>
+                    <div style={{flex:1,color:tx,fontSize:12,lineHeight:1.5}}>{n.texto}</div>
+                    <button style={{background:"transparent",border:"none",color:mu,cursor:"pointer",fontSize:16,padding:"0 2px",flexShrink:0,lineHeight:1}} onClick={function(){saveDoc("adminNotifs",n.id,Object.assign({},n,{leido:true}));}}>×</button>
+                  </div>
+                );})}
+                {adminNotifs.length>5&&<div style={{color:mu,fontSize:11,textAlign:"center"}}>{adminNotifs.length-5} mas...</div>}
+              </div>
+            )}
           </div>
         )}
 
@@ -516,15 +532,16 @@ export default function App() {
             );
           })}
           {navX.length > 0 && (
-            <button onClick={function(){setTab(tab==="more"?"calendario":"more");}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"6px 2px",border:"none",background:isX?lt:"transparent",cursor:"pointer",fontFamily:"inherit",color:isX?br:mu,borderTop:isX?"2.5px solid #4BA3C3":"2.5px solid transparent"}}>
+            <button onClick={function(){setTab(tab==="more"?"calendario":"more");}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"6px 2px",border:"none",background:isX?lt:"transparent",cursor:"pointer",fontFamily:"inherit",color:isX?br:mu,borderTop:isX?"2.5px solid #4BA3C3":"2.5px solid transparent",position:"relative"}}>
               <span style={{fontSize:20,marginBottom:1}}>&#9776;</span>
               <span style={{fontSize:9}}>Mas</span>
+              {role==="admin"&&adminNotifs.length>0&&<span style={{position:"absolute",top:4,right:"calc(50% - 14px)",background:er,color:wh,borderRadius:"50%",width:16,height:16,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{adminNotifs.length}</span>}
             </button>
           )}
         </nav>
 
         {notifMsg && (
-        <div style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",zIndex:999,background:DK_BLUE||"#2E86AB",color:"#fff",borderRadius:14,padding:"14px 20px",maxWidth:"90vw",boxShadow:"0 8px 32px rgba(46,134,171,.35)",display:"flex",gap:12,alignItems:"flex-start"}}>
+        <div style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",zIndex:999,background:dk,color:"#fff",borderRadius:14,padding:"14px 20px",maxWidth:"90vw",boxShadow:"0 8px 32px rgba(46,134,171,.35)",display:"flex",gap:12,alignItems:"flex-start"}}>
           <div style={{flex:1}}>
             <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{notifMsg.title}</div>
             <div style={{fontSize:13,opacity:.9}}>{notifMsg.body}</div>
@@ -554,7 +571,7 @@ export default function App() {
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
-          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
+          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
         )}
       </div>
     </AppRoot>
@@ -1707,7 +1724,7 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
 }
 
 // ─── Gestion ──────────────────────────────────────────────────
-function GestionPsicoRow({p,setPsicos,horarios,setHorarios,notify}) {
+function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
   const [editNombre,setEditNombre] = useState(false);
@@ -1719,7 +1736,10 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,notify}) {
     // Update all horarios with old name
     (horarios||[]).filter(function(h){return h.psico&&h.psico.toLowerCase()===oldNombre.toLowerCase();})
       .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:nn}));});
-    setEditNombre(false); notify("Nombre actualizado en perfil y horarios");
+    // Also update reservas
+    (reservas||[]).filter(function(r){return r.psico&&r.psico.toLowerCase()===oldNombre.toLowerCase();})
+      .forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:nn}));});
+    setEditNombre(false); notify("Nombre actualizado en perfil, horarios y reservas");
   }
   function savePass() {
     if(newPass.length < 4) { notify("Minimo 4 caracteres","err"); return; }
@@ -1948,7 +1968,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
           )}
           {psicos.map(function(p) {
             return (
-              <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} notify={notify}/>
+              <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>
             );
           })}
         </div>
@@ -2013,6 +2033,15 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   function sol(tipo,accion,datos,hId,rId) {
     const s={id:Date.now(),psico:user,tipo:tipo,accion:accion,datos:datos,horarioId:hId||null,reservaId:rId||null,estado:"pendiente",fechaSol:new Date().toISOString()};
     saveDoc("solHor",s.id,s);
+    // Notify admin via Firebase
+    const diaStr=datos&&datos.diaSemana?DIAS[datos.diaSemana]:"";
+    const horStr=datos&&datos.inicio?datos.inicio+"-"+datos.fin:"";
+    saveDoc("adminNotifs","n"+Date.now(),{
+      tipo:"solicitud_horario",
+      texto:user+" solicito "+(accion==="agregar"?"agregar":accion==="modificar"?"modificar":"liberar")+" horario"+(diaStr?" "+diaStr:"")+(horStr?" "+horStr:""),
+      fecha:new Date().toISOString(),
+      leido:false
+    });
     notify("Solicitud enviada"); setMH(null);
   }
 

@@ -11,13 +11,8 @@ const firebaseConfig = {
   appId: "1:816478423904:web:9252d5b442048f3d882c05"
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-export const db = getFirestore(firebaseApp);
-
-let messaging = null;
-try { messaging = getMessaging(firebaseApp); } catch(e) {}
-
-export const VAPID_KEY = "BEOUqU1iowa8d-fZZkmIn44GmXyp6e4EMAfflzia-w_RqQw-E_QJJDdWHjRliXmWDktJb9PvPLHbqT27kNX2SMc";
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 
 export function listenCol(name, cb) {
   return onSnapshot(collection(db, name), function(snap) {
@@ -34,20 +29,34 @@ export async function seedIfEmpty(col, items) {
   await batch.commit();
 }
 
-export async function requestNotifPermission(userName) {
-  if(!messaging) return null;
-  try {
-    const permission = await Notification.requestPermission();
-    if(permission !== "granted") return null;
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-    if(token && userName) {
-      await setDoc(doc(db, "fcmTokens", token), { token, user: userName, updated: new Date().toISOString() }, { merge: true });
-    }
-    return token;
-  } catch(e) { console.log("FCM error:", e); return null; }
+let _messaging = null;
+function getMsg() {
+  if (!_messaging) {
+    try { _messaging = getMessaging(app); } catch(e) { return null; }
+  }
+  return _messaging;
 }
 
-export function listenForegroundMessages(cb) {
-  if(!messaging) return function(){};
-  return onMessage(messaging, cb);
+export async function requestNotifPermission(userName) {
+  try {
+    if (typeof Notification === "undefined") return null;
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return null;
+    const msg = getMsg();
+    if (!msg) return null;
+    const token = await getToken(msg, { vapidKey: "BEOUqU1iowa8d-fZZkmIn44GmXyp6e4EMAfflzia-w_RqQw-E_QJJDdWHjRliXmWDktJb9PvPLHbqT27kNX2SMc", serviceWorkerRegistration: await navigator.serviceWorker.ready });
+    if (token && userName) {
+      await setDoc(doc(db, "fcmTokens", token.substring(0, 100)), { token, user: userName, ts: new Date().toISOString() }, { merge: true });
+    }
+    return token;
+  } catch(e) {
+    console.log("FCM permission error:", e);
+    return null;
+  }
+}
+
+export function listenForeground(cb) {
+  const msg = getMsg();
+  if (!msg) return function() {};
+  try { return onMessage(msg, cb); } catch(e) { return function() {}; }
 }
