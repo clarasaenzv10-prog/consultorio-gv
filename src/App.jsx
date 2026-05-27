@@ -310,7 +310,15 @@ export default function App() {
       tf += p.sub*sem;
       df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
-    df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
+    // Deduplicate: if same day + consultorio has multiple entries, keep the longest
+    var dfDedup = [];
+    df.forEach(function(d){
+      var existing = dfDedup.find(function(x){return x.diaSemana===d.diaSemana&&x.cons===d.cons;});
+      if(!existing){dfDedup.push(d);}
+      else if(d.horas>existing.horas){dfDedup.splice(dfDedup.indexOf(existing),1,d);}
+    });
+    dfDedup.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
+    var dfFinal = dfDedup;
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
       const rn=r.psico?r.psico.trim().toLowerCase():"";
@@ -331,13 +339,13 @@ export default function App() {
     let te=0; const de=[];
     ep.forEach(function(r){const p=calcPrecio(r.inicio,r.fin,getP(r.fecha));te+=p.sub;de.push({fecha:r.fecha,cons:r.consultorio,ini:r.inicio,fin:r.fin,horas:calcHrs(r.inicio,r.fin),sub:p.sub,ley:p.ley,tipo:p.tipo,des:p.des});});
     const bruto=tf+te, desc=psico.descuento||0, montoDesc=Math.round(bruto*desc/100);
-    return {total:bruto-montoDesc,tf:tf,te:te,df:df,de:de,bruto:bruto,desc:desc,montoDesc:montoDesc};
+    return {total:bruto-montoDesc,tf:tf,te:te,df:dfFinal,de:de,bruto:bruto,desc:desc,montoDesc:montoDesc};
   }
 
   function genMsg(psico,mes,anio) {
     const r = calcFact(psico,mes,anio);
     let m = "Hola "+psico.nombre+" !\n\nResumen "+MESES[mes]+" "+anio+":\n\n";
-    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||calcHrs(d.ini,d.fin).toFixed(1)+"hs")+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
+    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+": "+d.ini+" a "+d.fin+" ("+calcHrs(d.ini,d.fin).toFixed(1)+"hs)"+"\n  "+(d.ley||d.des||"")+(d.ley||d.des?" - ":"")+ars(d.sub/d.sem)+"/sem x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
     if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+parseLocalDate(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
     if(!r.df.length&&!r.de.length) m+="Sin horas este mes.\n\n";
     m += "----------------\n";
@@ -1562,9 +1570,9 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                         <div>
                           <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
                           <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({typeof d.horas==="number"?d.horas.toFixed(1):d.horas}hs)</div>
-                          {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
+                          {d.ley && <div style={{color:mu,fontSize:12}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
-                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]} en {MESES[mes]} = {ars(d.sub)}</div>
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
