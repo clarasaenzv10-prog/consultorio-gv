@@ -231,7 +231,6 @@ export default function App() {
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
-  const [adminNotifs,setAdminNotifsLocal] = useState([]);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -259,7 +258,6 @@ export default function App() {
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
-      listenCol("adminNotifs", function(d){ setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("config", function(d){
         if(d&&d.length>0) {
           const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]},descripciones:{C1:"",C2:"",C3:"",C4:"",C5:""}};
