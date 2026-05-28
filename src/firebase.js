@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot, writeBatch } from "firebase/firestore";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBfF3r9X9END2GH8mFwDsXmoy7crk0LJiE",
@@ -29,34 +28,31 @@ export async function seedIfEmpty(col, items) {
   await batch.commit();
 }
 
-let _messaging = null;
-function getMsg() {
-  if (!_messaging) {
-    try { _messaging = getMessaging(app); } catch(e) { return null; }
-  }
-  return _messaging;
-}
-
 export async function requestNotifPermission(userName) {
   try {
     if (typeof Notification === "undefined") return null;
     const perm = await Notification.requestPermission();
     if (perm !== "granted") return null;
-    const msg = getMsg();
-    if (!msg) return null;
-    const token = await getToken(msg, { vapidKey: "BEOUqU1iowa8d-fZZkmIn44GmXyp6e4EMAfflzia-w_RqQw-E_QJJDdWHjRliXmWDktJb9PvPLHbqT27kNX2SMc", serviceWorkerRegistration: await navigator.serviceWorker.ready });
+    const { getMessaging, getToken } = await import("firebase/messaging");
+    const messaging = getMessaging(app);
+    const reg = await navigator.serviceWorker.ready;
+    const token = await getToken(messaging, {
+      vapidKey: "BEOUqU1iowa8d-fZZkmIn44GmXyp6e4EMAfflzia-w_RqQw-E_QJJDdWHjRliXmWDktJb9PvPLHbqT27kNX2SMc",
+      serviceWorkerRegistration: reg
+    });
     if (token && userName) {
       await setDoc(doc(db, "fcmTokens", token.substring(0, 100)), { token, user: userName, ts: new Date().toISOString() }, { merge: true });
     }
     return token;
-  } catch(e) {
-    console.log("FCM permission error:", e);
-    return null;
-  }
+  } catch(e) { console.log("FCM error:", e); return null; }
 }
 
 export function listenForeground(cb) {
-  const msg = getMsg();
-  if (!msg) return function() {};
-  try { return onMessage(msg, cb); } catch(e) { return function() {}; }
+  try {
+    import("firebase/messaging").then(function(m) {
+      const messaging = m.getMessaging(app);
+      m.onMessage(messaging, cb);
+    }).catch(function(){});
+  } catch(e) {}
+  return function() {};
 }
