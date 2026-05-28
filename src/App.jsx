@@ -505,7 +505,7 @@ export default function App() {
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
-          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
+          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
@@ -1829,7 +1829,7 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
   );
 }
 
-function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,notify}) {
+function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,reservas,notify}) {
   const [gt,setGt] = useState("horarios");
   const [selP,setSelP] = useState(null);
   const [eid,setEid] = useState(null);
