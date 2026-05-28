@@ -231,6 +231,7 @@ export default function App() {
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
+  const [adminNotifs,setAdminNotifsLocal] = useState([]);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -255,6 +256,9 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("adminNotifs", function(d){
+        setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
+      }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
@@ -310,11 +314,7 @@ export default function App() {
       tf += p.sub*sem;
       df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
-    // Deduplicate same day+cons keep longest
-    var dfDedup=[];
-    df.forEach(function(d){var ex=dfDedup.find(function(x){return x.diaSemana===d.diaSemana&&x.cons===d.cons;});if(!ex)dfDedup.push(d);else if(d.horas>ex.horas)dfDedup.splice(dfDedup.indexOf(ex),1,d);});
-    dfDedup.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
-    var dfFinal=dfDedup;
+    df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
       const rn=r.psico?r.psico.trim().toLowerCase():"";
@@ -335,13 +335,13 @@ export default function App() {
     let te=0; const de=[];
     ep.forEach(function(r){const p=calcPrecio(r.inicio,r.fin,getP(r.fecha));te+=p.sub;de.push({fecha:r.fecha,cons:r.consultorio,ini:r.inicio,fin:r.fin,horas:calcHrs(r.inicio,r.fin),sub:p.sub,ley:p.ley,tipo:p.tipo,des:p.des});});
     const bruto=tf+te, desc=psico.descuento||0, montoDesc=Math.round(bruto*desc/100);
-    return {total:bruto-montoDesc,tf:tf,te:te,df:dfFinal,de:de,bruto:bruto,desc:desc,montoDesc:montoDesc};
+    return {total:bruto-montoDesc,tf:tf,te:te,df:df,de:de,bruto:bruto,desc:desc,montoDesc:montoDesc};
   }
 
   function genMsg(psico,mes,anio) {
     const r = calcFact(psico,mes,anio);
     let m = "Hola "+psico.nombre+" !\n\nResumen "+MESES[mes]+" "+anio+":\n\n";
-    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+": "+d.ini+" a "+d.fin+" ("+calcHrs(d.ini,d.fin).toFixed(1)+"hs)\n  "+(d.ley||d.des||"")+(d.ley||d.des?" - ":"")+ars(d.sub/d.sem)+"/sem x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
+    if(r.df.length) { m+="HORARIOS FIJOS\n"; r.df.forEach(function(d){m+="- "+DIAS[d.diaSemana]+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||calcHrs(d.ini,d.fin).toFixed(1)+"hs")+" x "+d.sem+" sem = "+ars(d.sub)+"\n";}); m+="Subtotal fijos: "+ars(r.tf)+"\n\n"; }
     if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+parseLocalDate(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
     if(!r.df.length&&!r.de.length) m+="Sin horas este mes.\n\n";
     m += "----------------\n";
@@ -476,6 +476,17 @@ export default function App() {
               <span style={{fontSize:22}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
             </button>
+            {role==="admin"&&adminNotifs.length>0&&(
+              <div style={{borderTop:"1px solid #EBF6FA",padding:"12px 16px",background:eb}}>
+                <div style={{color:er,fontWeight:700,fontSize:12,marginBottom:8}}>Notificaciones ({adminNotifs.length})</div>
+                {adminNotifs.slice(0,5).map(function(n){return(
+                  <div key={n.id} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:8,background:wh,borderRadius:8,padding:"8px 10px",border:"1px solid #F5B8B3"}}>
+                    <div style={{flex:1,color:tx,fontSize:12,lineHeight:1.5}}>{n.texto}</div>
+                    <button style={{background:"transparent",border:"none",color:mu,cursor:"pointer",fontSize:16,padding:"0 2px",flexShrink:0}} onClick={function(){saveDoc("adminNotifs",n.id,Object.assign({},n,{leido:true}));}}>x</button>
+                  </div>
+                );})}
+              </div>
+            )}
             {role==="admin" && adminNotifs.length>0 && (
               <div style={{borderTop:"1px solid #EBF6FA",padding:"12px 16px",background:eb}}>
                 <div style={{color:er,fontWeight:700,fontSize:12,marginBottom:8}}>Notificaciones pendientes ({adminNotifs.length})</div>
@@ -635,6 +646,12 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={prev}>Ant.</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={function(){setWk(new Date());}}>Hoy</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={next}>Sig.</button>
+        </div>
+        <div style={{textAlign:"center",color:mu,fontSize:13,fontWeight:600,paddingBottom:6}}>
+          {MESES[wkD[0].getMonth()]} {wkD[0].getFullYear()}
+          {wkD[0].getMonth()!==wkD[wkD.length-1].getMonth()?" — "+MESES[wkD[wkD.length-1].getMonth()]+" "+wkD[wkD.length-1].getFullYear():""}
+        </div>
+        <div style={{display:"none"}}>
         </div>
         <div style={{textAlign:"center",color:mu,fontSize:13,fontWeight:600,paddingBottom:6,letterSpacing:0.3}}>
           {MESES[wkD[0].getMonth()]} {wkD[0].getFullYear()}
@@ -1029,26 +1046,21 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
 
 // ─── Perfiles ─────────────────────────────────────────────────
 function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
-  const [eid,setEid] = React.useState(null);
-  const [form,setForm] = React.useState({});
-  function save() {
-    if(!eid) return;
-    saveDoc("psicos",eid,Object.assign({},form));
-    setEid(null);
-    notify("Perfil actualizado");
-  }
-  const safe = psicos.filter(function(p){return p&&p.id;});
+  const [eid,setEid] = useState(null);
+  const [form,setForm] = useState({});
+  function save() { saveDoc("psicos",eid,Object.assign({},form)); setEid(null); notify("Perfil actualizado"); }
   return (
+    <>
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Profesionales</h2>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
-        {safe.map(function(p) {
-          const inicial = (p.nombre||"?")[0].toUpperCase();
-          const isEdit = eid===p.id;
+        {psicos.map(function(p) {
           return (
-            <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&!isEdit)setPerfilSel(p);}}>
-              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>{inicial}</div>
-              {isEdit ? (
+            <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
+              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
+                {p.nombre[0].toUpperCase()}
+              </div>
+              {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
                   <input style={sInp} value={form.nombre||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nombre:e.target.value});});}} placeholder="Nombre"/>
                   <input style={sInp} value={form.wa||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{wa:e.target.value});});}} placeholder="WhatsApp (549...)"/>
@@ -1058,8 +1070,8 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                     <input style={sInp} type="number" min="0" max="100" value={form.descuento||0} onChange={function(e){setForm(function(f){return Object.assign({},f,{descuento:Number(e.target.value)});});}}/>
                   </div>
                   <div>
-                    <label style={sLbl}>Nota privada</label>
-                    <textarea style={Object.assign({},sInp,{minHeight:60,resize:"vertical",fontSize:13})} value={form.nota||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nota:e.target.value});});}} placeholder="Anotaciones internas..."/>
+                    <label style={sLbl}>Nota privada (solo vos la ves)</label>
+                    <textarea style={Object.assign({},sInp,{minHeight:60,resize:"vertical",fontSize:13})} value={form.nota||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nota:e.target.value});});}} placeholder="Anotaciones internas sobre esta profesional..."/>
                   </div>
                   <label style={{display:"flex",alignItems:"center",gap:6,color:tx,fontSize:13}}>
                     <input type="checkbox" checked={form.disponible||false} onChange={function(e){setForm(function(f){return Object.assign({},f,{disponible:e.target.checked});});}}/>
@@ -1072,7 +1084,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                 </div>
               ) : (
                 <div style={{width:"100%"}}>
-                  <div style={{color:tx,fontWeight:700,fontSize:14}}>{p.nombre||"Sin nombre"}</div>
+                  <div style={{color:tx,fontWeight:700,fontSize:14}}>{p.nombre}</div>
                   {p.profesion && p.profesion!=="Psicologa" && <div style={{color:br,fontSize:11,fontWeight:600}}>{p.profesion}</div>}
                   {role==="admin" && p.wa && <div style={{color:mu,fontSize:12}}>WA: {p.wa}</div>}
                   {role==="admin" && p.email && <div style={{color:mu,fontSize:12}}>Mail: {p.email}</div>}
@@ -1081,9 +1093,11 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                       {(p.analisis||[]).map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
                     </div>
                   )}
-                  {(p.poblacion||[]).length>0 && <div style={{color:mu,fontSize:11,marginTop:4}}>{(p.poblacion||[]).join(" · ")}</div>}
+                  {(p.poblacion||[]).length>0 && (
+                    <div style={{color:mu,fontSize:11,marginTop:4}}>{(p.poblacion||[]).join(" · ")}</div>
+                  )}
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:6}}>
-                    <span style={bge(p.disponible?ob:eb,p.disponible?ok:er)}>{p.disponible?"Disponible":"No disponible"}</span>
+                    <span style={bge(p.disponible?ob:eb,p.disponible?ok:er)}>{p.disponible?"Disponible para derivar":"No disponible"}</span>
                   </div>
                   {role==="admin" && (
                     <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:4}}>
@@ -1092,7 +1106,9 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                     </div>
                   )}
                   {role==="admin" && p.nota && (
-                    <div style={{background:bg,borderRadius:8,padding:"8px 10px",fontSize:12,color:mu,textAlign:"left",width:"100%",marginTop:4,border:"1px solid #C9E4EF"}}>{p.nota}</div>
+                    <div style={{background:bg,borderRadius:8,padding:"8px 10px",fontSize:12,color:mu,textAlign:"left",width:"100%",marginTop:4,border:"1px solid #C9E4EF"}}>
+                      {p.nota}
+                    </div>
                   )}
                   {role==="admin" && (
                     <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,marginTop:8})} onClick={function(){setEid(p.id);setForm(Object.assign({},p));}}>Editar</button>
@@ -1103,6 +1119,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
           );
         })}
       </div>
+    </div>
       {perfilSel && (
         <div style={{position:"fixed",inset:0,background:"rgba(28,58,74,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}} onClick={function(){setPerfilSel(null);}}>
           <div style={{background:wh,borderRadius:18,width:"min(420px,95vw)",border:"1.5px solid #C9E4EF",boxShadow:"0 24px 60px rgba(75,163,195,.18)",maxHeight:"90vh",overflowY:"auto"}} onClick={function(e){e.stopPropagation();}}>
@@ -1111,8 +1128,8 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
               <button style={{background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,fontFamily:"inherit"}} onClick={function(){setPerfilSel(null);}}>X</button>
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
-              <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {(perfilSel.nombre||"?")[0].toUpperCase()}
+              <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
+                {perfilSel.nombre[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1122,7 +1139,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                 <div style={{width:"100%"}}>
                   <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de analisis</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {(perfilSel.analisis||[]).map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:12,padding:"4px 12px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
+                    {perfilSel.analisis.map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:12,padding:"4px 12px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
                   </div>
                 </div>
               )}
@@ -1130,32 +1147,46 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                 <div style={{width:"100%"}}>
                   <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Poblacion</div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {(perfilSel.poblacion||[]).map(function(pb){return <span key={pb} style={{background:bg,color:tx,fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #C9E4EF"}}>{pb}</span>;})}
+                    {perfilSel.poblacion.map(function(p){return <span key={p} style={{background:bg,color:tx,fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #C9E4EF"}}>{p}</span>;})}
                   </div>
                 </div>
               )}
-              {perfilSel.wa && (
-                <button style={{background:"#25D366",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",width:"100%"}} onClick={function(){
-                  const wa=perfilSel.wa||"";
-                  const tel=wa.startsWith("+")? wa:(wa?"+"+wa:"");
-                  const msg=perfilSel.nombre+" - Consultorio Gloria Videla"+(tel?"\nTel: "+tel:"")+(perfilSel.email?"\nEmail: "+perfilSel.email:"");
-                  const a=document.createElement("a");a.href="https://wa.me/?text="+encodeURIComponent(msg);a.target="_blank";document.body.appendChild(a);a.click();document.body.removeChild(a);
-                }}>Compartir por WhatsApp</button>
+              {(perfilSel.wa||perfilSel.email) && (
+                <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase"}}>Contacto</div>
+                  {perfilSel.wa && (
+                    <button style={{background:"#25D366",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={function(){
+                      const wa = perfilSel.wa||"";
+                      const tel = wa.startsWith("+") ? wa : (wa ? "+"+wa : "");
+                      const msg = perfilSel.nombre+" - Consultorio Gloria Videla"+(tel?"\nTel: "+tel:"")+(perfilSel.email?"\nEmail: "+perfilSel.email:"");
+                      const a = document.createElement("a");
+                      a.href = "https://wa.me/?text="+encodeURIComponent(msg);
+                      a.target = "_blank";
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    }}>
+                      Compartir por WhatsApp
+                    </button>
+                  )}
+                  {perfilSel.email && (
+                    <button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
+                      const a=document.createElement("a");a.href="mailto:"+perfilSel.email;document.body.appendChild(a);a.click();document.body.removeChild(a);
+                    }}>
+                      Enviar email
+                    </button>
+                  )}
+                  {!perfilSel.wa && !perfilSel.email && <div style={{color:mu,fontSize:13}}>Sin datos de contacto cargados.</div>}
+                </div>
               )}
-              {perfilSel.email && (
-                <button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",width:"100%"}} onClick={function(){
-                  const a=document.createElement("a");a.href="mailto:"+perfilSel.email;document.body.appendChild(a);a.click();document.body.removeChild(a);
-                }}>Enviar email</button>
+              {!perfilSel.wa && !perfilSel.email && (
+                <div style={{color:mu,fontSize:13,textAlign:"center"}}>Sin datos de contacto cargados aun.</div>
               )}
-              {!perfilSel.wa && !perfilSel.email && <div style={{color:mu,fontSize:13,textAlign:"center"}}>Sin datos de contacto cargados aun.</div>}
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
-
 
 // ─── Anuncios ─────────────────────────────────────────────────
 function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
@@ -1456,7 +1487,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
     const sinWA = psicos.filter(function(p){return !p.wa;});
     if(sinWA.length) notify(sinWA.map(function(p){return p.nombre;}).join(", ")+" sin WA","err");
     cWA.forEach(function(p,i){setTimeout(function(){const m=genMsg(p,mes,anio);openLink("https://wa.me/"+p.wa+"?text="+encodeURIComponent(m),"_blank");},i*800);});
-    if(cWA.length) notify("Enviando a "+cWA.length+" profesionales");
+    if(cWA.length) notify("Enviando a "+cWA.length+" profesionals");
   }
 
   return (
@@ -1862,7 +1893,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Gestion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
-        <button style={tabBtn(gt==="psicologas")} onClick={function(){setGt("psicologas");}}>Profesionales</button>
+        <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
         
       </div>
       {gt==="horarios" && (
@@ -1963,54 +1994,6 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
           })}
         </div>
       )}
-      {gt==="psicologas" && (
-        <div>
-          <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
-            {showNewP?"Cancelar":"+ Agregar nuevo profesional"}
-          </button>
-          {showNewP && (
-            <div style={{background:lt,borderRadius:12,padding:16,marginBottom:16,border:"1.5px solid #4BA3C3",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{color:br,fontWeight:700,fontSize:13,marginBottom:4}}>Nuevo profesional</div>
-              <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={newP.nombre} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nombre:e.target.value});});}} placeholder="Nombre y apellido"/></div>
-              <div>
-                <label style={sLbl}>Profesion</label>
-                <select style={sInp} value={newP.profesion} onChange={function(e){setNewP(function(p){return Object.assign({},p,{profesion:e.target.value});});}}>
-                  <option>Psicologa</option>
-                  <option>Psicologo</option>
-                  <option>Psiquiatra</option>
-                  <option>Nutricionista</option>
-                  <option>Kinesiologo</option>
-                  <option>Otro</option>
-                </select>
-              </div>
-              <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={newP.wa} onChange={function(e){setNewP(function(p){return Object.assign({},p,{wa:e.target.value});});}} placeholder="549..."/></div>
-              <div><label style={sLbl}>Email</label><input style={sInp} value={newP.email} onChange={function(e){setNewP(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="email@ejemplo.com"/></div>
-              <div><label style={sLbl}>Contrasena inicial</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
-              <div><label style={sLbl}>Descuento (%)</label><input style={sInp} type="number" min="0" max="100" value={newP.descuento} onChange={function(e){setNewP(function(p){return Object.assign({},p,{descuento:e.target.value});});}}/></div>
-              <div><label style={sLbl}>Nota interna</label><input style={sInp} value={newP.nota} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nota:e.target.value});});}} placeholder="Nota privada (solo admin)"/></div>
-              <div style={{background:wh,borderRadius:10,padding:12,border:"1px solid #C9E4EF"}}>
-                <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de horario</div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:false});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:!newP.fijas?br:bg,color:!newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:!newP.fijas?700:400,fontSize:13}}>Solo extras</button>
-                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:true});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:newP.fijas?br:bg,color:newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:newP.fijas?700:400,fontSize:13}}>Tiene fijos</button>
-                </div>
-                <div style={{color:mu,fontSize:11,marginTop:6}}>{newP.fijas?"Tendra horarios fijos semanales":"Solo horas extras"}</div>
-              </div>
-              <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={addPsico} disabled={!newP.nombre.trim()}>
-                Crear profesional
-              </button>
-            </div>
-          )}
-          <div style={{display:"flex",flexDirection:"column",gap:2}}>
-            {psicos.map(function(p) {
-              return (
-                <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {gt==="bloques" && (
         <div style={sPanel}>
           {!bloques.length
