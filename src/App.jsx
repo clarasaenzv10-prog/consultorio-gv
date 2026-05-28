@@ -1037,7 +1037,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
               <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {p.nombre[0].toUpperCase()}
+                {(p.nombre||"?")[0].toUpperCase()}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
@@ -1108,7 +1108,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {perfilSel.nombre[0].toUpperCase()}
+                {(perfilSel.nombre||"?")[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1562,9 +1562,9 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                         <div>
                           <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
                           <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({typeof d.horas==="number"?d.horas.toFixed(1):d.horas}hs)</div>
-                          {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
+                          {d.ley && <div style={{color:mu,fontSize:12}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
-                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]} en {MESES[mes]} = {ars(d.sub)}</div>
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
@@ -1873,7 +1873,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
         <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
-        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
+        
       </div>
       {gt==="horarios" && (
         <div>
