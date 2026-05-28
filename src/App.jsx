@@ -472,17 +472,7 @@ export default function App() {
               <span style={{fontSize:22}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
             </button>
-            {role==="admin"&&adminNotifs.length>0&&(
-              <div style={{borderTop:"1px solid #EBF6FA",padding:"12px 16px",background:eb}}>
-                <div style={{color:er,fontWeight:700,fontSize:12,marginBottom:8}}>Notificaciones ({adminNotifs.length})</div>
-                {adminNotifs.slice(0,5).map(function(n){return(
-                  <div key={n.id} style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:8,background:wh,borderRadius:8,padding:"8px 10px",border:"1px solid #F5B8B3"}}>
-                    <div style={{flex:1,color:tx,fontSize:12,lineHeight:1.5}}>{n.texto}</div>
-                    <button style={{background:"transparent",border:"none",color:mu,cursor:"pointer",fontSize:16,padding:"0 2px",flexShrink:0}} onClick={function(){saveDoc("adminNotifs",n.id,Object.assign({},n,{leido:true}));}}>x</button>
-                  </div>
-                );})}
-              </div>
-            )}
+            
             {role==="admin" && adminNotifs.length>0 && (
               <div style={{borderTop:"1px solid #EBF6FA",padding:"12px 16px",background:eb}}>
                 <div style={{color:er,fontWeight:700,fontSize:12,marginBottom:8}}>Notificaciones pendientes ({adminNotifs.length})</div>
