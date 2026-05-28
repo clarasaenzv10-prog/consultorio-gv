@@ -231,7 +231,8 @@ export default function App() {
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
-    const [config,setConfigLocal] = useState({
+  const [adminNotifs,setAdminNotifsLocal] = useState([]);
+  const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
     flyer:"",
@@ -258,7 +259,8 @@ export default function App() {
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
-            listenCol("config", function(d){
+      listenCol("adminNotifs", function(d){ setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
+      listenCol("config", function(d){
         if(d&&d.length>0) {
           const def={invPass:"invitada123",transferencia:{alias:"",cbu:"",banco:"",titular:""},flyer:"",fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]},descripciones:{C1:"",C2:"",C3:"",C4:"",C5:""}};
           setConfigLocal(Object.assign({},def,d[0],{transferencia:Object.assign({},def.transferencia,(d[0].transferencia||{})),fotos:Object.assign({},def.fotos,(d[0].fotos||{})),descripciones:Object.assign({},def.descripciones,(d[0].descripciones||{}))}));
@@ -472,7 +474,6 @@ export default function App() {
               <span style={{fontSize:22}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
             </button>
-            
             {role==="admin" && adminNotifs.length>0 && (
               <div style={{borderTop:"1px solid #EBF6FA",padding:"12px 16px",background:eb}}>
                 <div style={{color:er,fontWeight:700,fontSize:12,marginBottom:8}}>Notificaciones pendientes ({adminNotifs.length})</div>
@@ -632,12 +633,6 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={prev}>Ant.</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={function(){setWk(new Date());}}>Hoy</button>
           <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={next}>Sig.</button>
-        </div>
-        <div style={{textAlign:"center",color:mu,fontSize:13,fontWeight:600,paddingBottom:6}}>
-          {MESES[wkD[0].getMonth()]} {wkD[0].getFullYear()}
-          {wkD[0].getMonth()!==wkD[wkD.length-1].getMonth()?" — "+MESES[wkD[wkD.length-1].getMonth()]+" "+wkD[wkD.length-1].getFullYear():""}
-        </div>
-        <div style={{display:"none"}}>
         </div>
         <div style={{textAlign:"center",color:mu,fontSize:13,fontWeight:600,paddingBottom:6,letterSpacing:0.3}}>
           {MESES[wkD[0].getMonth()]} {wkD[0].getFullYear()}
@@ -1880,7 +1875,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
         <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
-        
+        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
       </div>
       {gt==="horarios" && (
         <div>
