@@ -18,8 +18,15 @@ export function listenCol(name, cb) {
     cb(snap.docs.map(function(d) { return Object.assign({}, d.data(), { id: d.id }); }));
   });
 }
-export function saveDoc(col, id, data) { return setDoc(doc(db, col, String(id)), data, { merge: true }); }
-export function delDoc(col, id) { return deleteDoc(doc(db, col, String(id))); }
+
+export function saveDoc(col, id, data) {
+  return setDoc(doc(db, col, String(id)), data, { merge: true });
+}
+
+export function delDoc(col, id) {
+  return deleteDoc(doc(db, col, String(id)));
+}
+
 export async function seedIfEmpty(col, items) {
   const snap = await getDocs(collection(db, col));
   if (!snap.empty) return;
@@ -44,15 +51,18 @@ export async function requestNotifPermission(userName) {
       await setDoc(doc(db, "fcmTokens", token.substring(0, 100)), { token, user: userName, ts: new Date().toISOString() }, { merge: true });
     }
     return token;
-  } catch(e) { console.log("FCM error:", e); return null; }
+  } catch(e) {
+    console.log("FCM error:", e);
+    return null;
+  }
 }
 
 export function listenForeground(cb) {
-  try {
-    import("firebase/messaging").then(function(m) {
+  import("firebase/messaging").then(function(m) {
+    try {
       const messaging = m.getMessaging(app);
       m.onMessage(messaging, cb);
-    }).catch(function(){});
-  } catch(e) {}
+    } catch(e) {}
+  }).catch(function(){});
   return function() {};
 }
