@@ -1,4 +1,4 @@
-// v2026-05-23-DESC-V2
+// v20260602-0131
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
@@ -2554,6 +2554,10 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 // ─── Estadisticas ─────────────────────────────────────────────
 
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
+  const now = new Date();
+  const [mes,setMes] = useState(now.getMonth());
+  const [anio,setAnio] = useState(now.getFullYear());
+
   function exportarExcel() {
     var mNombre = MESES[mes]+" "+anio;
     var lines = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]];
@@ -2578,10 +2582,6 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
-  const now = new Date();
-  const [mes,setMes] = useState(now.getMonth());
-  const [anio,setAnio] = useState(now.getFullYear());
-
   // Hours per consultorio per week
   function hrsConsultorio(consId) {
     return horarios.filter(function(h){return h.consultorio===consId;}).reduce(function(acc,h){return acc+(toMin(h.fin)-toMin(h.inicio))/60;},0);
