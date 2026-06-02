@@ -506,7 +506,7 @@ export default function App() {
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
-          {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact} mes={mes} anio={anio}/>}
+          {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
@@ -2553,7 +2553,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 
 // ─── Estadisticas ─────────────────────────────────────────────
 
-function EstadisticasView({psicos,horarios,reservas,calcFact,mes,anio}) {
+function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   function exportarExcel() {
     var mNombre = MESES[mes]+" "+anio;
     var lines = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]];
