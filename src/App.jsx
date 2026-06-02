@@ -2552,14 +2552,22 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 
   function exportarExcel() {
     var mn = MESES[xMes]+" "+xAnio;
-    var rows = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento","Total"]];
+    var totalGeneral = 0;
+    var rows = [
+      ["Facturacion "+mn],
+      [],
+      ["Profesional","Monto a pagar"]
+    ];
     psicos.forEach(function(p){
       var r = calcFact(p,xMes,xAnio);
-      (r.df||[]).forEach(function(d){rows.push([p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"",d.sem,d.sub,(p.descuento||0)+"%",""]);});
-      (r.de||[]).forEach(function(d){rows.push([p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"","1",d.sub,(p.descuento||0)+"%",""]);});
-      rows.push([p.nombre,"TOTAL","","","","","","","",r.bruto||0,(p.descuento||0)+"%",r.total||0]);
-      rows.push([]);
+      var total = r.total||0;
+      if(total>0){
+        rows.push([p.nombre, total]);
+        totalGeneral += total;
+      }
     });
+    rows.push([]);
+    rows.push(["TOTAL GENERAL", totalGeneral]);
     var csv = rows.map(function(row){return row.map(function(c){return String(c==null?"":c).replace(/;/g," ");}).join(";");}).join("\n");
     var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     var url = URL.createObjectURL(blob);
