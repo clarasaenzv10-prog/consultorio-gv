@@ -2555,14 +2555,14 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
-  const [mes,setMes] = useState(now.getMonth());
-  const [anio,setAnio] = useState(now.getFullYear());
+  const [estMes,setEstMes] = useState(now.getMonth());
+  const [estAnio,setEstAnio] = useState(now.getFullYear());
 
   function exportarExcel() {
-    var mNombre = MESES[mes]+" "+anio;
+    var mNombre = MESES[estMes]+" "+estAnio;
     var lines = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]];
     psicos.forEach(function(p){
-      var r = calcFact(p,mes,anio);
+      var r = calcFact(p,estMes,estAnio);
       r.df.forEach(function(d){
         lines.push([p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
           typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"",d.sem,d.sub,(p.descuento||0)+"%",""]);
@@ -2591,17 +2591,17 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 
   // Global monthly total
   function totalMes() {
-    return psicos.reduce(function(acc,p){return acc+calcFact(p,mes,anio).total;},0);
+    return psicos.reduce(function(acc,p){return acc+calcFact(p,estMes,estAnio).total;},0);
   }
   function totalBruto() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.bruto;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,estMes,estAnio);return acc+r.bruto;},0);
   }
   function totalDesc() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.montoDesc;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,estMes,estAnio);return acc+r.montoDesc;},0);
   }
 
   // Psico ranking by billing
-  const ranking = psicos.map(function(p){return {nombre:p.nombre,total:calcFact(p,mes,anio).total};}).sort(function(a,b){return b.total-a.total;});
+  const ranking = psicos.map(function(p){return {nombre:p.nombre,total:calcFact(p,estMes,estAnio).total};}).sort(function(a,b){return b.total-a.total;});
 
   // Occupancy by sede
   function hrsSede(sede) {
@@ -2614,19 +2614,19 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Estadisticas</h2>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
-        <select style={Object.assign({},sInp,{width:"auto"})} value={mes} onChange={function(e){setMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
-        <select style={Object.assign({},sInp,{width:"auto"})} value={anio} onChange={function(e){setAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
+        <select style={Object.assign({},sInp,{width:"auto"})} value={estMes} onChange={function(e){setEstMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
+        <select style={Object.assign({},sInp,{width:"auto"})} value={estAnio} onChange={function(e){setEstAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
-          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Total del mes</div>
+          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Total del estMes</div>
           <div style={{color:ok,fontSize:24,fontWeight:800}}>{ars(totalMes())}</div>
           {totalDesc()>0 && <div style={{color:er,fontSize:12,marginTop:4}}>Desc. aplicados: {ars(totalDesc())}</div>}
         </div>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Profesionals activas</div>
-          <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,mes,anio).total>0;}).length}</div>
+          <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,estMes,estAnio).total>0;}).length}</div>
           <div style={{color:mu,fontSize:12}}>de {psicos.length} total</div>
         </div>
       </div>
@@ -2664,7 +2664,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
 
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:14}}>Ranking facturacion {MESES[mes]}</div>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:14}}>Ranking facturacion {MESES[estMes]}</div>
         {ranking.filter(function(r){return r.total>0;}).map(function(r,i) {
           const maxT = ranking[0].total || 1;
           const pct = Math.round((r.total/maxT)*100);
@@ -2681,7 +2681,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
           );
         })}
         {ranking.filter(function(r){return r.total>0;}).length===0 && (
-          <div style={{color:mu,textAlign:"center",padding:20}}>Sin datos para este mes</div>
+          <div style={{color:mu,textAlign:"center",padding:20}}>Sin datos para este estMes</div>
         )}
       </div>
 
@@ -2717,9 +2717,9 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
-        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del mes en formato Excel.</div>
+        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del estMes en formato Excel.</div>
         <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel();}}>
-          Descargar Excel - Facturacion {MESES[mes]} {anio}
+          Descargar Excel - Facturacion {MESES[estMes]} {estAnio}
         </button>
       </div>
     </div>
