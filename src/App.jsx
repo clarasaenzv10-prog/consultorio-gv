@@ -261,7 +261,7 @@ export default function App() {
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
       listenCol("mensajes", function(d){
-        setMensajesLocal(d.sort(function(a,b){return a.fecha.localeCompare(b.fecha);}));
+        setMensajesLocal(d.sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'');}));
       }),
       listenCol("config", function(d){
         if(d&&d.length>0) {
@@ -2780,63 +2780,51 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
   const [texto,setTexto] = React.useState("");
   const bottomRef = React.useRef(null);
 
-  // For admin: list of psicos to chat with
-  // For psico: direct chat with admin
-
-  const chats = role==="admin" ? psicos : [{nombre:"Admin",id:"admin"}];
-
-  const activeName = role==="admin" ? chatOpen : "admin";
-  const convKey = role==="admin"
-    ? (chatOpen ? [chatOpen,"admin"].sort().join("_") : null)
-    : [user,"admin"].sort().join("_");
-
+  function convKey2(name) { return [name,"admin"].sort().join("_"); }
+  const convKey = role==="admin" ? (chatOpen ? convKey2(chatOpen) : null) : convKey2(user);
   const msgs = convKey ? mensajes.filter(function(m){return m.conv===convKey;}) : [];
 
-  // Unread count per psico (for admin list)
-  function unread(pName) {
-    var key = [pName,"admin"].sort().join("_");
-    return mensajes.filter(function(m){return m.conv===key&&!m.leido&&m.de!==user;}).length;
+  function unreadFor(pName) {
+    return mensajes.filter(function(m){return m.conv===convKey2(pName)&&!m.leido&&m.de!==user;}).length;
   }
-  var totalUnread = role==="psico" ? unread(user) : 0;
 
   React.useEffect(function(){
     if(bottomRef.current) bottomRef.current.scrollIntoView({behavior:"smooth"});
   },[msgs.length]);
 
-  function send() {
-    if(!texto.trim()) return;
-    if(!convKey) return;
-    var msg = {id:Date.now(),conv:convKey,de:user,para:role==="admin"?chatOpen:"admin",texto:texto.trim(),fecha:new Date().toISOString(),leido:false};
-    saveDoc("mensajes",msg.id,msg);
-    // Notify recipient
-    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
-    setTexto("");
-  }
-
-  function markRead() {
+  React.useEffect(function(){
     if(!convKey) return;
     msgs.filter(function(m){return !m.leido&&m.de!==user;}).forEach(function(m){
       saveDoc("mensajes",m.id,Object.assign({},m,{leido:true}));
     });
+  },[convKey,msgs.length]);
+
+  function send() {
+    if(!texto.trim()||!convKey) return;
+    var para = role==="admin" ? chatOpen : "admin";
+    var msg = {id:Date.now(),conv:convKey,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false};
+    saveDoc("mensajes",msg.id,msg);
+    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    setTexto("");
   }
 
-  React.useEffect(function(){markRead();},[convKey,msgs.length]);
-
+  // Admin: show list of psicos
   if(role==="admin" && !chatOpen) {
     return (
       <div>
         <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {psicos.map(function(p){
-            var u = unread(p.nombre);
+            var u = unreadFor(p.nombre);
+            var lastMsg = mensajes.filter(function(m){return m.conv===convKey2(p.nombre);}).slice(-1)[0];
             return (
-              <button key={p.id} onClick={function(){setChatOpen(p.nombre);}} style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
-                <div style={{width:42,height:42,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:18,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
-                <div style={{flex:1}}>
+              <button key={p.id} onClick={function(){setChatOpen(p.nombre);}} style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",textAlign:"left",width:"100%"}}>
+                <div style={{width:42,height:42,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:18,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
+                <div style={{flex:1,minWidth:0}}>
                   <div style={{color:tx,fontWeight:600,fontSize:14}}>{p.nombre}</div>
-                  {(function(){var last=mensajes.filter(function(m){return m.conv===[p.nombre,"admin"].sort().join("_");}).slice(-1)[0];return last?<div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:200}}>{last.texto}</div>:null;})()}
+                  {lastMsg && <div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lastMsg.texto}</div>}
                 </div>
-                {u>0&&<span style={{background:er,color:wh,borderRadius:"50%",width:22,height:22,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{u}</span>}
+                {u>0 && <span style={{background:er,color:wh,borderRadius:"50%",width:22,height:22,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
               </button>
             );
           })}
@@ -2845,21 +2833,24 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
     );
   }
 
+  // Chat view
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 140px)"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-        {role==="admin" && <button style={{background:"transparent",border:"none",color:br,fontSize:20,cursor:"pointer",padding:0}} onClick={function(){setChatOpen(null);}}>{"<"}</button>}
+        {role==="admin" && (
+          <button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",padding:"0 8px 0 0",fontWeight:700}} onClick={function(){setChatOpen(null);}}>{"<"}</button>
+        )}
         <h2 style={{color:tx,fontSize:18,fontWeight:800,margin:0}}>{role==="admin"?chatOpen:"Admin"}</h2>
       </div>
       <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
-        {msgs.length===0&&<div style={{color:mu,textAlign:"center",marginTop:40,fontSize:14}}>No hay mensajes aun. Empieza la conversacion!</div>}
+        {msgs.length===0 && <div style={{color:mu,textAlign:"center",marginTop:40,fontSize:14}}>Sin mensajes aun.</div>}
         {msgs.map(function(m){
           var isMe = m.de===user;
           return (
             <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
-              <div style={{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF",boxShadow:"0 2px 8px rgba(75,163,195,.08)"}}>
+              <div style={{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
                 <div>{m.texto}</div>
-                <div style={{fontSize:10,opacity:.6,marginTop:4,textAlign:"right"}}>{new Date(m.fecha).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
+                <div style={{fontSize:10,opacity:.6,marginTop:4,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
               </div>
             </div>
           );
@@ -2875,231 +2866,3 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
 }
 
 
-function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
-  const [open,setOpen] = useState(false);
-  const p = psicos.find(function(x){return x.nombre===user;});
-  const [wa,setWa] = useState(p?p.wa||"":"");
-  const [email,setEmail] = useState(p?p.email||"":"");
-  const [profesion,setProfesion] = useState(p?p.profesion||"Psicologa":"Psicologa");
-  const PROF_OPTS = ["Psicologa","Psicologo","Psiquiatra","Nutricionista","Kinesiologo","Otro"];
-  const [otroProfesion,setOtroProfesion] = useState(
-    p&&p.profesion&&!["Psicologa","Psicologo","Psiquiatra","Nutricionista","Kinesiologo"].includes(p.profesion)?p.profesion:""
-  );
-  const [analisis,setAnalisis] = useState(p?p.analisis||[]:[]);
-  const [otroAnalisis,setOtroAnalisis] = useState(p?p.otroAnalisis||"":"");
-  const [poblacion,setPoblacion] = useState(p?p.poblacion||[]:[]);
-  const [disponible,setDisponible] = useState(p?p.disponible!==false:true);
-
-  function save() {
-    if(!p) return;
-    const analFinal=analisis.includes("Otro")&&otroAnalisis.trim()?analisis.filter(function(x){return x!=="Otro";}).concat([otroAnalisis.trim()]):analisis;
-    const profFinal = profesion==="Otro"&&otroProfesion.trim() ? otroProfesion.trim() : profesion;
-    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,profesion:profFinal,analisis:analFinal,otroAnalisis:otroAnalisis,poblacion:poblacion,disponible:disponible}));
-    notify("Perfil actualizado");
-    setOpen(false);
-  }
-
-  const ANALS=["Cognitivo Conductual","Psicoanalitico","Sistemico / Familiar","Humanista / Gestalt","EMDR","Mindfulness / ACT","Integrativo","Otro"];
-  const POBS=["Ninos","Adolescentes","Adultos","Adultos mayores","Parejas","Familias"];
-
-  return (
-    <div>
-      <button onClick={function(){setOpen(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",borderBottom:"1px solid #C9E4EF",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:"#1C3A4A",fontSize:15}}>
-        <span style={{fontSize:20}}>&#9998;</span>
-        <span>Editar mi perfil</span>
-      </button>
-      {open && (
-        <div style={{padding:"12px 20px",borderBottom:"1px solid #C9E4EF",background:"#F0F8FB",display:"flex",flexDirection:"column",gap:10}}>
-          <div>
-            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>WhatsApp (549...)</label>
-            <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={wa} onChange={function(e){setWa(e.target.value);}} placeholder="Ej: 5491161572283"/>
-          </div>
-          <div>
-            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Email</label>
-            <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="tu@email.com"/>
-          </div>
-          <div>
-            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Profesion</label>
-            <select style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={profesion} onChange={function(e){setProfesion(e.target.value);}}>
-              <option>Psicologa</option>
-              <option>Psicologo</option>
-              <option>Psiquiatra</option>
-              <option>Nutricionista</option>
-              <option>Kinesiologo</option>
-              <option>Otro</option>
-            </select>
-            {profesion==="Otro" && (
-              <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:13,width:"100%",fontFamily:"inherit",marginTop:8}} value={otroProfesion} onChange={function(e){setOtroProfesion(e.target.value);}} placeholder="Especifica tu profesion..."/>
-            )}
-          </div>
-          <div>
-            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Tipo de analisis</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {ANALS.map(function(a){
-                const sel=analisis.includes(a);
-                return <button key={a} onClick={function(){setAnalisis(function(prev){return sel?prev.filter(function(x){return x!==a;}):[...prev,a];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{a}</button>;
-              })}
-            </div>
-            {analisis.includes("Otro") && (
-              <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:13,width:"100%",fontFamily:"inherit",marginTop:6}} value={otroAnalisis} onChange={function(e){setOtroAnalisis(e.target.value);}} placeholder="Especifica tu tipo de analisis..."/>
-            )}
-          </div>
-          <div>
-            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Poblacion que atendes</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-              {POBS.map(function(pb){
-                const sel=poblacion.includes(pb);
-                return <button key={pb} onClick={function(){setPoblacion(function(prev){return sel?prev.filter(function(x){return x!==pb;}):[...prev,pb];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{pb}</button>;
-              })}
-            </div>
-            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6,marginTop:8}}>Trabaja con</label>
-            <div style={{display:"flex",gap:8}}>
-              {["Ninos y/o Adolescentes","Adultos"].map(function(g){
-                const sel=poblacion.includes(g);
-                return <button key={g} onClick={function(){setPoblacion(function(prev){return sel?prev.filter(function(x){return x!==g;}):[...prev,g];});}} style={{flex:1,background:sel?"#2E86AB":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #2E86AB":"1.5px solid #C9E4EF",borderRadius:10,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{g}</button>;
-              })}
-            </div>
-          </div>
-          <label style={{display:"flex",alignItems:"center",gap:8,color:"#1C3A4A",fontSize:14,cursor:"pointer"}}>
-            <input type="checkbox" checked={disponible} onChange={function(e){setDisponible(e.target.checked);}}/>
-            Disponible para derivaciones
-          </label>
-          <div style={{display:"flex",gap:8}}>
-            <button style={{flex:1,background:"#4BA3C3",color:"#fff",border:"none",borderRadius:10,padding:"10px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={save}>Guardar</button>
-            <button style={{flex:1,background:"#fff",color:"#1C3A4A",border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setOpen(false);}}>Cancelar</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CambiarPassBtn({user,setPsicos,notify}) {
-  const [open,setOpen] = useState(false);
-  const [actual,setActual] = useState("");
-  const [nueva,setNueva] = useState("");
-  const [conf,setConf] = useState("");
-  function cambiar() {
-    if(nueva.length<4){notify("Minimo 4 caracteres","err");return;}
-    if(nueva!==conf){notify("Las contrasenas no coinciden","err");return;}
-    setPsicos(function(ps){
-      const p = ps.find(function(x){return x.nombre===user;});
-      if(!p){notify("Error","err");return ps;}
-      if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return ps;}
-      notify("Contrasena cambiada");
-      setOpen(false);setActual("");setNueva("");setConf("");
-      return ps.map(function(x){return x.nombre===user?Object.assign({},x,{pass:nueva}):x;});
-    });
-  }
-  return (
-    <div>
-      <button onClick={function(){setOpen(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",borderBottom:"1px solid #C9E4EF",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:tx,fontSize:15}}>
-        <span style={{fontSize:20}}>&#128274;</span>
-        <span>Cambiar contrasena</span>
-      </button>
-      {open && (
-        <div style={{padding:"12px 20px",borderBottom:"1px solid #C9E4EF",background:bg,display:"flex",flexDirection:"column",gap:8}}>
-          <input style={Object.assign({},sInp,{fontSize:13})} type="password" value={actual} onChange={function(e){setActual(e.target.value);}} placeholder="Contrasena actual"/>
-          <input style={Object.assign({},sInp,{fontSize:13})} type="password" value={nueva} onChange={function(e){setNueva(e.target.value);}} placeholder="Nueva contrasena (min 4 car.)"/>
-          <input style={Object.assign({},sInp,{fontSize:13})} type="password" value={conf} onChange={function(e){setConf(e.target.value);}} placeholder="Confirmar nueva contrasena" onKeyDown={function(e){if(e.key==="Enter")cambiar();}}/>
-          <button style={btn(br,wh)} onClick={cambiar}>Guardar contrasena</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
-  const [dia,setDia] = useState(h?h.diaSemana:1);
-  const [ini,setIni] = useState(h?h.inicio:"09:00");
-  const [fin,setFin] = useState(h?h.fin:"14:00");
-  const [cons,setCons] = useState(h?h.consultorio:"C1");
-  const pr = calcPrecio(ini,fin);
-  function checkConflicto() {
-    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
-    const sMin=toMin(ini), eMin=toMin(fin);
-    const c=(horarios||[]).filter(function(x){
-      if(x.consultorio!==cons) return false;
-      if(Number(x.diaSemana)!==Number(dia)) return false;
-      if(h && x.id===h.id) return false; // exclude own horario when editing
-      return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
-    });
-    return c.length ? "Ese horario esta ocupado en "+cons : null;
-  }
-  const conflicto = checkConflicto();
-
-  // Find available consultorios at same time same day
-  function getLibres() {
-    if(!ini||!fin||toMin(fin)<=toMin(ini)) return [];
-    const sMin=toMin(ini),eMin=toMin(fin);
-    return CONS.filter(function(c){
-      if(c.id===cons) return false;
-      const ocupado=(horarios||[]).some(function(x){
-        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
-      });
-      return !ocupado;
-    });
-  }
-  const libres = conflicto ? getLibres() : [];
-  const sedeNombre = function(sede){ return sede==="VL"?"Vicente Lopez":"Uruguay"; };
-
-  return (
-    <div>
-      <div style={sModH}>
-        <h3 style={{margin:0,color:tx}}>{tipo==="add"?"Solicitar horario":"Modificar horario"}</h3>
-        <button style={sXBtn} onClick={onClose}>X</button>
-      </div>
-      <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div>
-            <label style={sLbl}>Dia</label>
-            <select style={sInp} value={dia} onChange={function(e){setDia(Number(e.target.value));}}>
-              {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
-            </select>
-          </div>
-          <div>
-            <label style={sLbl}>Consultorio</label>
-            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
-              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
-            </select>
-          </div>
-          <div>
-            <label style={sLbl}>Desde</label>
-            <input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
-          </div>
-          <div>
-            <label style={sLbl}>Hasta</label>
-            <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
-          </div>
-        </div>
-        {conflicto&&(
-          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"12px 14px",color:er,fontSize:13}}>
-            <div style={{fontWeight:700,marginBottom:6}}>{conflicto}</div>
-            {libres.length>0?(
-              <div>
-                <div style={{color:tx,fontSize:12,fontWeight:600,marginBottom:4}}>Consultorios disponibles en ese horario:</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {libres.map(function(c){return(
-                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}} onClick={function(){setCons(c.id);}}>
-                      <div>{c.id}</div>
-                      <div style={{fontWeight:400,fontSize:11,color:"#2D8A5E"}}>{sedeNombre(c.sede)}</div>
-                    </button>
-                  );})}
-                </div>
-                <div style={{color:mu,fontSize:11,marginTop:4}}>Toca uno para seleccionarlo</div>
-              </div>
-            ):(
-              <div style={{color:mu,fontSize:12,marginTop:4}}>No hay consultorios disponibles en ese horario ese dia.</div>
-            )}
-          </div>
-        )}
-        {!conflicto&&ini&&fin&&toMin(fin)>toMin(ini)&&<div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>Horario disponible - <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}</div>}
-        <div style={{color:mu,fontSize:11}}>Queda pendiente de aprobacion.</div>
-        <div style={{display:"flex",gap:10}}>
-          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});}}>Enviar solicitud</button>
-          <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
