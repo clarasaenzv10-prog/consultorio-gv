@@ -1,4 +1,4 @@
-// v2026-05-23-DESC-V2
+// v2026-06-02
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
