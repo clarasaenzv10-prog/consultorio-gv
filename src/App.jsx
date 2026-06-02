@@ -1,4 +1,4 @@
-// v2026-06-02
+// v2026-05-23-DESC-V2
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
@@ -2554,8 +2554,6 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     var mn = MESES[xMes]+" "+xAnio;
     var totalGeneral = 0;
     var rows = [
-      ["Facturacion "+mn],
-      [],
       ["Profesional","Monto a pagar"]
     ];
     psicos.forEach(function(p){
@@ -2568,7 +2566,14 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     });
     rows.push([]);
     rows.push(["TOTAL GENERAL", totalGeneral]);
-    var csv = rows.map(function(row){return row.map(function(c){return String(c==null?"":c).replace(/;/g," ");}).join(";");}).join("\n");
+    var header = "sep=,\n";
+    var csv = header + rows.map(function(row){
+      return row.map(function(c){
+        var s = String(c==null?"":c);
+        if(s.indexOf(",")>-1||s.indexOf("\n")>-1) s = "\""+s+"\"";
+        return s;
+      }).join(",");
+    }).join("\n");
     var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");a.href=url;a.download="Facturacion_"+mn.replace(" ","_")+".csv";
