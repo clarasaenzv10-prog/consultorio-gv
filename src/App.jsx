@@ -384,7 +384,6 @@ export default function App() {
   const nav = role==="invitada" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para===user&&!m.leido;}).length},
     {id:"solicitar",icon:"✉",label:"Solicitar",badge:0},
   ] : role==="admin" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
@@ -397,20 +396,20 @@ export default function App() {
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
+    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para==="admin"&&!m.leido;}).length},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
-    {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
+    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para===user&&!m.leido;}).length},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:0},
   ];
 
   const nav5 = nav.slice(0,5);
   const navX = nav.slice(5);
-  const isX = ["facturacion","precios","gestion","mishorarios"].indexOf(tab) >= 0;
+  const isX = ["facturacion","precios","gestion","mishorarios","chat"].indexOf(tab) >= 0;
 
   return (
     <AppRoot>
