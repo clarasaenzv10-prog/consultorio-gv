@@ -2778,88 +2778,85 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 // ─── Chat ─────────────────────────────────────────────────────
 function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
   const [texto,setTexto] = useState("");
-  const bottomRef = useRef(null);
+  const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
 
-  function convKey2(name) { return [name,"admin"].sort().join("_"); }
-  const convKey = role==="admin" ? (chatOpen ? convKey2(chatOpen) : null) : convKey2(user);
-  const msgs = convKey ? mensajes.filter(function(m){return m.conv===convKey;}) : [];
-
-  function unreadFor(pName) {
-    return mensajes.filter(function(m){return m.conv===convKey2(pName)&&!m.leido&&m.de!==user;}).length;
-  }
-
-  useEffect(function(){
-    if(bottomRef.current) bottomRef.current.scrollIntoView({behavior:"smooth"});
-  },[msgs.length]);
-
-  useEffect(function(){
-    if(!convKey) return;
-    msgs.filter(function(m){return !m.leido&&m.de!==user;}).forEach(function(m){
-      saveDoc("mensajes",m.id,Object.assign({},m,{leido:true}));
-    });
-  },[convKey,msgs.length]);
+  function getKey(a,b) { return [a,b].sort().join("__"); }
+  var activeWith = role==="admin" ? convWith : "admin";
+  var key = activeWith ? getKey(user,activeWith) : null;
+  var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
 
   function send() {
-    if(!texto.trim()||!convKey) return;
-    var para = role==="admin" ? chatOpen : "admin";
-    var msg = {id:Date.now(),conv:convKey,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false};
-    saveDoc("mensajes",msg.id,msg);
-    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    if(!texto.trim()||!key) return;
+    saveDoc("mensajes","m"+Date.now(),{
+      id:"m"+Date.now(),conv:key,de:user,para:activeWith,
+      texto:texto.trim(),fecha:new Date().toISOString(),leido:false
+    });
     setTexto("");
   }
 
-  // Admin: show list of psicos
-  if(role==="admin" && !chatOpen) {
+  if(role==="admin" && !convWith) {
     return (
       <div>
         <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {psicos.map(function(p){
-            var u = unreadFor(p.nombre);
-            var lastMsg = mensajes.filter(function(m){return m.conv===convKey2(p.nombre);}).slice(-1)[0];
-            return (
-              <button key={p.id} onClick={function(){setChatOpen(p.nombre);}} style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",textAlign:"left",width:"100%"}}>
-                <div style={{width:42,height:42,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:18,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{color:tx,fontWeight:600,fontSize:14}}>{p.nombre}</div>
-                  {lastMsg && <div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{lastMsg.texto}</div>}
-                </div>
-                {u>0 && <span style={{background:er,color:wh,borderRadius:"50%",width:22,height:22,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
-              </button>
-            );
-          })}
-        </div>
+        {psicos.map(function(p){
+          var k2 = getKey(user,p.nombre);
+          var u = mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
+          return (
+            <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);}}
+              style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",
+                display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",
+                width:"100%",marginBottom:8,textAlign:"left"}}>
+              <div style={{width:40,height:40,borderRadius:"50%",background:br,color:wh,
+                display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16}}>
+                {(p.nombre||"?")[0].toUpperCase()}
+              </div>
+              <div style={{flex:1,color:tx,fontWeight:600}}>{p.nombre}</div>
+              {u>0&&<span style={{background:er,color:wh,borderRadius:"50%",width:20,height:20,
+                fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{u}</span>}
+            </button>
+          );
+        })}
       </div>
     );
   }
 
-  // Chat view
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 140px)"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         {role==="admin" && (
-          <button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",padding:"0 8px 0 0",fontWeight:700}} onClick={function(){setChatOpen(null);}}>{"<"}</button>
+          <button style={{background:"transparent",border:"none",color:br,fontSize:22,
+            cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>
+            {"<"}
+          </button>
         )}
-        <h2 style={{color:tx,fontSize:18,fontWeight:800,margin:0}}>{role==="admin"?chatOpen:"Admin"}</h2>
+        <div style={{color:tx,fontSize:17,fontWeight:700}}>{activeWith}</div>
       </div>
       <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
-        {msgs.length===0 && <div style={{color:mu,textAlign:"center",marginTop:40,fontSize:14}}>Sin mensajes aun.</div>}
+        {msgs.length===0&&(
+          <div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>
+        )}
         {msgs.map(function(m){
           var isMe = m.de===user;
           return (
             <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
-              <div style={{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
+              <div style={{background:isMe?br:wh,color:isMe?wh:tx,
+                borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,
+                border:isMe?"none":"1.5px solid #C9E4EF"}}>
                 <div>{m.texto}</div>
-                <div style={{fontSize:10,opacity:.6,marginTop:4,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
+                <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>
+                  {new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}
+                </div>
               </div>
             </div>
           );
         })}
-        <div ref={bottomRef}/>
       </div>
       <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
-        <input style={Object.assign({},sInp,{flex:1,fontSize:14})} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}/>
-        <button style={Object.assign({},btn(br,wh),{padding:"10px 18px",fontSize:14,flexShrink:0})} onClick={send}>Enviar</button>
+        <input style={Object.assign({},sInp,{flex:1})} value={texto}
+          onChange={function(e){setTexto(e.target.value);}}
+          placeholder="Escribi un mensaje..."
+          onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
+        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={send}>Enviar</button>
       </div>
     </div>
   );
