@@ -1,4 +1,4 @@
-// v20260602-0131
+// v2026-05-23-DESC-V2
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
@@ -505,7 +505,7 @@ export default function App() {
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
-          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
+          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
@@ -1037,7 +1037,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
               <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {(p.nombre||"?")[0].toUpperCase()}
+                {p.nombre[0].toUpperCase()}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
@@ -1108,7 +1108,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {(perfilSel.nombre||"?")[0].toUpperCase()}
+                {perfilSel.nombre[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1138,19 +1138,12 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                       const wa = perfilSel.wa||"";
                       const tel = wa.startsWith("+") ? wa : (wa ? "+"+wa : "");
                       const msg = perfilSel.nombre+" - Consultorio Gloria Videla"+(tel?"\nTel: "+tel:"")+(perfilSel.email?"\nEmail: "+perfilSel.email:"");
-                      const wa=perfilSel.wa||"";
-                      const tel=wa.startsWith("+")? wa:(wa?"+"+wa:"");
-                      const vcf=["BEGIN:VCARD","VERSION:3.0","FN:"+perfilSel.nombre,"N:"+perfilSel.nombre+";;;;",tel?"TEL;TYPE=CELL:"+tel:"","ORG:Consultorio Gloria Videla",perfilSel.email?"EMAIL:"+perfilSel.email:"","END:VCARD"].filter(Boolean).join("\r\n");
-                      const file=new File([vcf],(perfilSel.nombre||"contacto").replace(/ /g,"_")+".vcf",{type:"text/vcard"});
-                      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-                        navigator.share({files:[file],title:perfilSel.nombre}).catch(function(){
-                          const u=URL.createObjectURL(file);const a=document.createElement("a");a.href=u;a.download=file.name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
-                        });
-                      } else {
-                        const u=URL.createObjectURL(file);const a=document.createElement("a");a.href=u;a.download=file.name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
-                      }
+                      const a = document.createElement("a");
+                      a.href = "https://wa.me/?text="+encodeURIComponent(msg);
+                      a.target = "_blank";
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     }}>
-                      Compartir contacto
+                      Compartir por WhatsApp
                     </button>
                   )}
                   {perfilSel.email && (
@@ -1569,9 +1562,9 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                         <div>
                           <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
                           <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({typeof d.horas==="number"?d.horas.toFixed(1):d.horas}hs)</div>
-                          {d.ley && <div style={{color:mu,fontSize:12}}>{d.ley}</div>}
+                          {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
-                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]} en {MESES[mes]} = {ars(d.sub)}</div>
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
@@ -1836,7 +1829,7 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
   );
 }
 
-function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,reservas,notify}) {
+function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,notify}) {
   const [gt,setGt] = useState("horarios");
   const [selP,setSelP] = useState(null);
   const [eid,setEid] = useState(null);
@@ -1880,7 +1873,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
         <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
-        
+        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
       </div>
       {gt==="horarios" && (
         <div>
@@ -2550,38 +2543,30 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 }
 
 
-
 // ─── Estadisticas ─────────────────────────────────────────────
 
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
-  const [estMes,setEstMes] = useState(now.getMonth());
-  const [estAnio,setEstAnio] = useState(now.getFullYear());
+  const [xMes,setXMes] = useState(now.getMonth());
+  const [xAnio,setXAnio] = useState(now.getFullYear());
 
   function exportarExcel() {
-    var mNombre = MESES[estMes]+" "+estAnio;
-    var lines = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]];
+    var mn = MESES[xMes]+" "+xAnio;
+    var rows = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento","Total"]];
     psicos.forEach(function(p){
-      var r = calcFact(p,estMes,estAnio);
-      r.df.forEach(function(d){
-        lines.push([p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
-          typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"",d.sem,d.sub,(p.descuento||0)+"%",""]);
-      });
-      r.de.forEach(function(d){
-        lines.push([p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,
-          typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"","1",d.sub,(p.descuento||0)+"%",""]);
-      });
-      lines.push([p.nombre,"TOTAL","","","","","","","",r.bruto,(p.descuento||0)+"%",r.total]);
-      lines.push([]);
+      var r = calcFact(p,xMes,xAnio);
+      (r.df||[]).forEach(function(d){rows.push([p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"",d.sem,d.sub,(p.descuento||0)+"%",""]);});
+      (r.de||[]).forEach(function(d){rows.push([p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"","1",d.sub,(p.descuento||0)+"%",""]);});
+      rows.push([p.nombre,"TOTAL","","","","","","","",r.bruto||0,(p.descuento||0)+"%",r.total||0]);
+      rows.push([]);
     });
-    var csv = lines.map(function(row){return row.map(function(c){return String(c==null?"":c).replace(/;/g," ");}).join(";");}).join("\n");
+    var csv = rows.map(function(row){return row.map(function(c){return String(c==null?"":c).replace(/;/g," ");}).join(";");}).join("\n");
     var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href=url; a.download="Facturacion_"+mNombre.replace(" ","_")+".csv";
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    var a = document.createElement("a");a.href=url;a.download="Facturacion_"+mn.replace(" ","_")+".csv";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   }
+
   // Hours per consultorio per week
   function hrsConsultorio(consId) {
     return horarios.filter(function(h){return h.consultorio===consId;}).reduce(function(acc,h){return acc+(toMin(h.fin)-toMin(h.inicio))/60;},0);
@@ -2591,17 +2576,17 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 
   // Global monthly total
   function totalMes() {
-    return psicos.reduce(function(acc,p){return acc+calcFact(p,estMes,estAnio).total;},0);
+    return psicos.reduce(function(acc,p){return acc+calcFact(p,xMes,xAnio).total;},0);
   }
   function totalBruto() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,estMes,estAnio);return acc+r.bruto;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,xMes,xAnio);return acc+r.bruto;},0);
   }
   function totalDesc() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,estMes,estAnio);return acc+r.montoDesc;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,xMes,xAnio);return acc+r.montoDesc;},0);
   }
 
   // Psico ranking by billing
-  const ranking = psicos.map(function(p){return {nombre:p.nombre,total:calcFact(p,estMes,estAnio).total};}).sort(function(a,b){return b.total-a.total;});
+  const ranking = psicos.map(function(p){return {nombre:p.nombre,total:calcFact(p,xMes,xAnio).total};}).sort(function(a,b){return b.total-a.total;});
 
   // Occupancy by sede
   function hrsSede(sede) {
@@ -2614,19 +2599,19 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Estadisticas</h2>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
-        <select style={Object.assign({},sInp,{width:"auto"})} value={estMes} onChange={function(e){setEstMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
-        <select style={Object.assign({},sInp,{width:"auto"})} value={estAnio} onChange={function(e){setEstAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
+        <select style={Object.assign({},sInp,{width:"auto"})} value={xMes} onChange={function(e){setXMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
+        <select style={Object.assign({},sInp,{width:"auto"})} value={xAnio} onChange={function(e){setXAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
-          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Total del estMes</div>
+          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Total del xMes</div>
           <div style={{color:ok,fontSize:24,fontWeight:800}}>{ars(totalMes())}</div>
           {totalDesc()>0 && <div style={{color:er,fontSize:12,marginTop:4}}>Desc. aplicados: {ars(totalDesc())}</div>}
         </div>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Profesionals activas</div>
-          <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,estMes,estAnio).total>0;}).length}</div>
+          <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,xMes,xAnio).total>0;}).length}</div>
           <div style={{color:mu,fontSize:12}}>de {psicos.length} total</div>
         </div>
       </div>
@@ -2664,7 +2649,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
 
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:14}}>Ranking facturacion {MESES[estMes]}</div>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:14}}>Ranking facturacion {MESES[xMes]}</div>
         {ranking.filter(function(r){return r.total>0;}).map(function(r,i) {
           const maxT = ranking[0].total || 1;
           const pct = Math.round((r.total/maxT)*100);
@@ -2681,7 +2666,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
           );
         })}
         {ranking.filter(function(r){return r.total>0;}).length===0 && (
-          <div style={{color:mu,textAlign:"center",padding:20}}>Sin datos para este estMes</div>
+          <div style={{color:mu,textAlign:"center",padding:20}}>Sin datos para este xMes</div>
         )}
       </div>
 
@@ -2717,9 +2702,9 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
-        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del estMes en formato Excel.</div>
+        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del xMes en formato Excel.</div>
         <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel();}}>
-          Descargar Excel - Facturacion {MESES[estMes]} {estAnio}
+          Descargar Excel - Facturacion {MESES[xMes]} {xAnio}
         </button>
       </div>
     </div>
