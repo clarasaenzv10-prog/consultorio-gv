@@ -506,7 +506,7 @@ export default function App() {
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
-          {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
+          {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact} mes={mes} anio={anio}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
@@ -1138,12 +1138,19 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                       const wa = perfilSel.wa||"";
                       const tel = wa.startsWith("+") ? wa : (wa ? "+"+wa : "");
                       const msg = perfilSel.nombre+" - Consultorio Gloria Videla"+(tel?"\nTel: "+tel:"")+(perfilSel.email?"\nEmail: "+perfilSel.email:"");
-                      const a = document.createElement("a");
-                      a.href = "https://wa.me/?text="+encodeURIComponent(msg);
-                      a.target = "_blank";
-                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      const wa=perfilSel.wa||"";
+                      const tel=wa.startsWith("+")? wa:(wa?"+"+wa:"");
+                      const vcf=["BEGIN:VCARD","VERSION:3.0","FN:"+perfilSel.nombre,"N:"+perfilSel.nombre+";;;;",tel?"TEL;TYPE=CELL:"+tel:"","ORG:Consultorio Gloria Videla",perfilSel.email?"EMAIL:"+perfilSel.email:"","END:VCARD"].filter(Boolean).join("\r\n");
+                      const file=new File([vcf],(perfilSel.nombre||"contacto").replace(/ /g,"_")+".vcf",{type:"text/vcard"});
+                      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+                        navigator.share({files:[file],title:perfilSel.nombre}).catch(function(){
+                          const u=URL.createObjectURL(file);const a=document.createElement("a");a.href=u;a.download=file.name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
+                        });
+                      } else {
+                        const u=URL.createObjectURL(file);const a=document.createElement("a");a.href=u;a.download=file.name;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);
+                      }
                     }}>
-                      Compartir por WhatsApp
+                      Compartir contacto
                     </button>
                   )}
                   {perfilSel.email && (
@@ -2543,67 +2550,34 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 }
 
 
+
 // ─── Estadisticas ─────────────────────────────────────────────
-function exportarExcel(psicos,mes,anio) {
-  var lines = [];
-  var mNombre = MESES[mes]+" "+anio;
 
-  // Header
-  lines.push(["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]);
-
-  psicos.forEach(function(p){
-    var r = calcFact(p,mes,anio);
-    // Fijos
-    r.df.forEach(function(d){
-      lines.push([
-        p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
-        d.horas.toFixed?d.horas.toFixed(1):d.horas,
-        d.ley||d.des||"",d.sem,d.sub,
-        (p.descuento||0)+"%",
-        ""
-      ]);
+function EstadisticasView({psicos,horarios,reservas,calcFact,mes,anio}) {
+  function exportarExcel() {
+    var mNombre = MESES[mes]+" "+anio;
+    var lines = [["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]];
+    psicos.forEach(function(p){
+      var r = calcFact(p,mes,anio);
+      r.df.forEach(function(d){
+        lines.push([p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
+          typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"",d.sem,d.sub,(p.descuento||0)+"%",""]);
+      });
+      r.de.forEach(function(d){
+        lines.push([p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,
+          typeof d.horas==="number"?d.horas.toFixed(1):d.horas,d.ley||d.des||"","1",d.sub,(p.descuento||0)+"%",""]);
+      });
+      lines.push([p.nombre,"TOTAL","","","","","","","",r.bruto,(p.descuento||0)+"%",r.total]);
+      lines.push([]);
     });
-    // Extras
-    r.de.forEach(function(d){
-      lines.push([
-        p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,
-        d.horas.toFixed?d.horas.toFixed(1):d.horas,
-        d.ley||d.des||"","1",d.sub,
-        (p.descuento||0)+"%",
-        ""
-      ]);
-    });
-    // Totals row per psico
-    lines.push([
-      p.nombre,"TOTAL","","","","","","",
-      "",r.bruto,
-      (p.descuento||0)+"%",
-      r.total
-    ]);
-    lines.push([]); // empty row between psicos
-  });
-
-  // Convert to CSV with semicolons (Excel-friendly for Argentina)
-  var csv = lines.map(function(row){
-    return row.map(function(cell){
-      return String(cell==null?"":cell).replace(/;/g," ");
-    }).join(";");
-  }).join("\n");
-
-  // Add BOM for Excel UTF-8
-  var bom = "\uFEFF";
-  var blob = new Blob([bom+csv],{type:"text/csv;charset=utf-8;"});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement("a");
-  a.href = url;
-  a.download = "Facturacion_"+mNombre.replace(" ","_")+".csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function EstadisticasView({psicos,horarios,reservas,calcFact}) {
+    var csv = lines.map(function(row){return row.map(function(c){return String(c==null?"":c).replace(/;/g," ");}).join(";");}).join("\n");
+    var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href=url; a.download="Facturacion_"+mNombre.replace(" ","_")+".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
@@ -2744,7 +2718,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
         <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del mes en formato Excel.</div>
-        <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel(psicos,mes,anio);}}>
+        <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel();}}>
           Descargar Excel - Facturacion {MESES[mes]} {anio}
         </button>
       </div>
