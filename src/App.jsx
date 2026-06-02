@@ -2777,8 +2777,8 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 
 // ─── Chat ─────────────────────────────────────────────────────
 function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
-  const [texto,setTexto] = React.useState("");
-  const bottomRef = React.useRef(null);
+  const [texto,setTexto] = useState("");
+  const bottomRef = useRef(null);
 
   function convKey2(name) { return [name,"admin"].sort().join("_"); }
   const convKey = role==="admin" ? (chatOpen ? convKey2(chatOpen) : null) : convKey2(user);
@@ -2788,11 +2788,11 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
     return mensajes.filter(function(m){return m.conv===convKey2(pName)&&!m.leido&&m.de!==user;}).length;
   }
 
-  React.useEffect(function(){
+  useEffect(function(){
     if(bottomRef.current) bottomRef.current.scrollIntoView({behavior:"smooth"});
   },[msgs.length]);
 
-  React.useEffect(function(){
+  useEffect(function(){
     if(!convKey) return;
     msgs.filter(function(m){return !m.leido&&m.de!==user;}).forEach(function(m){
       saveDoc("mensajes",m.id,Object.assign({},m,{leido:true}));
