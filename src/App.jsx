@@ -2780,15 +2780,17 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
   const [texto,setTexto] = useState("");
   const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
 
-  function getKey(a,b) { return [a,b].sort().join("__"); }
+  function getKey(psicoName) { return "chat__"+psicoName.trim().toLowerCase(); }
   var activeWith = role==="admin" ? convWith : "admin";
-  var key = activeWith ? getKey(user,activeWith) : null;
+  var psicoName = role==="admin" ? (convWith||"") : user;
+  var key = psicoName ? getKey(psicoName) : null;
   var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
 
   function send() {
     if(!texto.trim()||!key) return;
-    saveDoc("mensajes","m"+Date.now(),{
-      id:"m"+Date.now(),conv:key,de:user,para:activeWith,
+    var msgId = "msg"+Date.now();
+    saveDoc("mensajes",msgId,{
+      id:msgId,conv:key,de:user,para:activeWith,
       texto:texto.trim(),fecha:new Date().toISOString(),leido:false
     });
     setTexto("");
