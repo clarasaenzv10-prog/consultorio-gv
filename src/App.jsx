@@ -231,6 +231,8 @@ export default function App() {
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
+  const [mensajes,setMensajesLocal] = useState([]);
+  const [chatOpen,setChatOpen] = useState(null);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -238,6 +240,12 @@ export default function App() {
     fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}
   });
   const [dbReady,setDbReady] = useState(false);
+
+  useEffect(function(){
+    if(tab!=="chat"||!user) return;
+    mensajes.filter(function(m){return m.para===user&&!m.leido;})
+      .forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
+  },[tab,mensajes.length,user]);
 
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
@@ -257,6 +265,7 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("mensajes", function(d){ setMensajesLocal(d.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");})); }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
@@ -393,11 +402,13 @@ export default function App() {
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
+    {id:"chat",icon:"💬",label:"Mensajes",badge:adminNotifs.filter(function(n){return n.tipo==="mensaje"&&!n.leido;}).length},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
+    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para===user&&!m.leido;}).length},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
@@ -405,7 +416,7 @@ export default function App() {
 
   const nav5 = nav.slice(0,5);
   const navX = nav.slice(5);
-  const isX = ["facturacion","precios","gestion","mishorarios"].indexOf(tab) >= 0;
+  const isX = ["facturacion","precios","gestion","mishorarios","chat"].indexOf(tab) >= 0;
 
   return (
     <AppRoot>
@@ -511,6 +522,7 @@ export default function App() {
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
+          {tab==="chat" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
           {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
@@ -2753,6 +2765,85 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     </div>
   );
 }
+
+function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
+  const [texto,setTexto] = useState("");
+  const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
+
+  function getKey(pName) { return "chat__"+(pName||"").trim().toLowerCase(); }
+  var psicoName = role==="admin" ? (convWith||"") : user;
+  var key = psicoName ? getKey(psicoName) : null;
+  var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
+
+  function markRead() {
+    if(!key) return;
+    mensajes.filter(function(m){return m.conv===key&&!m.leido&&m.de!==user;})
+      .forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
+  }
+
+  function send() {
+    if(!texto.trim()||!key) return;
+    var para=role==="admin"?convWith:"admin";
+    var msgId="msg"+Date.now();
+    saveDoc("mensajes",msgId,{id:msgId,conv:key,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
+    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    setTexto("");
+  }
+
+  if(role==="admin"&&!convWith) {
+    return (
+      <div>
+        <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {psicos.map(function(p){
+            var k2=getKey(p.nombre);
+            var u=mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
+            var last=mensajes.filter(function(m){return m.conv===k2;}).slice(-1)[0];
+            return (
+              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});}}
+                style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:tx,fontWeight:600,fontSize:14}}>{p.nombre}</div>
+                  {last&&<div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last.de===user?"Yo: ":last.de+": "}{last.texto}</div>}
+                </div>
+                {u>0&&<span style={{background:er,color:wh,borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+        {role==="admin"&&<button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
+        <div style={{color:tx,fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
+      </div>
+      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
+        {msgs.length===0&&<div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
+        {msgs.map(function(m){
+          var isMe=m.de===user;
+          return (
+            <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
+              <div style={{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
+                <div>{m.texto}</div>
+                <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
+        <input style={Object.assign({},sInp,{flex:1})} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
+        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={function(){markRead();send();}}>Enviar</button>
+      </div>
+    </div>
+  );
+}
+
 
 function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   const [open,setOpen] = useState(false);
