@@ -251,6 +251,16 @@ export default function App() {
   });
   const [dbReady,setDbReady] = useState(false);
 
+  // Mark chat messages as read when on chat tab
+  useEffect(function(){
+    if(tab !== "chat" || !user) return;
+    mensajes.filter(function(m){
+      return m.para===user && !m.leido;
+    }).forEach(function(m){
+      saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
+    });
+  },[tab, mensajes.length, user]);
+
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
     const TAB_INI = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
