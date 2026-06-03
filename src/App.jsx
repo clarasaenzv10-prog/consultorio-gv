@@ -2803,13 +2803,16 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen,gc}) {
     );
   }
 
+  // Mark unread messages as read when viewing the chat
+  markRead();
+
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         {role==="admin" && <button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
         <div style={{color:tx,fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
       </div>
-      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
+      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}} onMouseEnter={markRead} onTouchStart={markRead}>
         {msgs.length===0 && <div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
         {msgs.map(function(m){
           var isMe=m.de===user;
