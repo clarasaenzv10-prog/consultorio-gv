@@ -217,16 +217,26 @@ export default function App() {
   const [tab,setTab] = useState("calendario");
   const [perfilSel,setPerfilSel] = useState(null);
   const [notifMsg,setNotifMsg] = useState(null);
+
+  // Mark chat messages as read when on chat tab
+  useEffect(function(){
+    if(tab !== "chat" || !user) return;
+    mensajes.filter(function(m){
+      return m.para===user && !m.leido;
+    }).forEach(function(m){
+      saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
+    });
+  },[tab, mensajes.length, user]);
   const [wk,setWk] = useState(new Date());
   const [fSede,setFSede] = useState("todas");
   const [fCons,setFCons] = useState("todos");
   const [fPsico,setFPsico] = useState("todas");
   const [mod,setMod] = useState(null);
   const [notif,setNotif] = useState(null);
-  const [psicos,setPsicosLocal] = useState(PBASE);
+  const [psicos,setPsicosLocal] = useState([]);
   const [reservas,setReservasLocal] = useState([]);
   const [bloques,setBloquesLocal] = useState([]);
-  const [horarios,setHorariosLocal] = useState(HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});}));
+  const [horarios,setHorariosLocal] = useState([]);
   const [anuncios,setAnunciosLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
@@ -2761,18 +2771,13 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen,gc}) {
   var key = psicoName ? getKey(psicoName) : null;
   var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
 
-  // Mark messages as read - useEffect BEFORE any conditional return
-  useEffect(function(){
-    if(!key) return;
-    var unread = mensajes.filter(function(m){
+  function markRead() {
+    mensajes.filter(function(m){
       return m.conv===key && !m.leido && m.de!==user;
-    });
-    unread.forEach(function(m){
+    }).forEach(function(m){
       saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
     });
-  },[key, mensajes.length]);
-
-  function markRead() {}
+  }
 
   function send() {
     if(!texto.trim()||!key) return;
