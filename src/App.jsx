@@ -254,11 +254,14 @@ export default function App() {
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
     const TAB_INI = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
+    // Set ready after 3 seconds max regardless
+    var fallback = setTimeout(function(){ setDbReady(true); }, 3000);
     Promise.all([
       seedIfEmpty("psicos", PBASE),
       seedIfEmpty("horarios", HORARIOS_WITH_IDS),
       seedIfEmpty("tabP", TAB_INI),
-    ]).then(function(){ setDbReady(true); });
+    ]).then(function(){ clearTimeout(fallback); setDbReady(true); })
+      .catch(function(){ clearTimeout(fallback); setDbReady(true); });
     const unsubs = [
       listenCol("psicos", function(d){ setPsicosLocal(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
