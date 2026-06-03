@@ -1326,7 +1326,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   const [notas,setNotas] = useState({});
   const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";});
   const pendInv = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo==="invitada";});
-  const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";});
+  const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
     if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});delDoc("horarios",s.horarioId);if(h){const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
