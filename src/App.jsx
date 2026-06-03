@@ -2761,12 +2761,18 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen,gc}) {
   var key = psicoName ? getKey(psicoName) : null;
   var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
 
-  function markRead() {
+  // Mark messages as read - useEffect BEFORE any conditional return
+  useEffect(function(){
     if(!key) return;
-    msgs.filter(function(m){return !m.leido&&m.de!==user;}).forEach(function(m){
+    var unread = mensajes.filter(function(m){
+      return m.conv===key && !m.leido && m.de!==user;
+    });
+    unread.forEach(function(m){
       saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
     });
-  }
+  },[key, mensajes.length]);
+
+  function markRead() {}
 
   function send() {
     if(!texto.trim()||!key) return;
@@ -2803,16 +2809,13 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen,gc}) {
     );
   }
 
-  // Mark unread messages as read when viewing the chat
-  markRead();
-
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         {role==="admin" && <button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
         <div style={{color:tx,fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
       </div>
-      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}} onMouseEnter={markRead} onTouchStart={markRead}>
+      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
         {msgs.length===0 && <div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
         {msgs.map(function(m){
           var isMe=m.de===user;
