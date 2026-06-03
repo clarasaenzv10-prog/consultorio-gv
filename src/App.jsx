@@ -514,7 +514,7 @@ export default function App() {
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
-          {tab==="chat" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes} notify={notify} chatOpen={chatOpen} setChatOpen={setChatOpen}/>}
+          {tab==="chat" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes} notify={notify} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
           {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
@@ -2752,7 +2752,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 }
 
 // ─── Chat ─────────────────────────────────────────────────────
-function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
+function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen,gc}) {
   const [texto,setTexto] = useState("");
   const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
 
