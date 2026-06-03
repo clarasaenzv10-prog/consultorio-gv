@@ -2761,13 +2761,12 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
   var key = psicoName ? getKey(psicoName) : null;
   var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
 
-  // Mark messages as read when opening a conversation
-  useEffect(function(){
+  function markRead() {
     if(!key) return;
     msgs.filter(function(m){return !m.leido&&m.de!==user;}).forEach(function(m){
-      saveDoc("mensajes",m.id,Object.assign({},m,{leido:true}));
+      saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
     });
-  },[key, msgs.length]);
+  }
 
   function send() {
     if(!texto.trim()||!key) return;
@@ -2788,15 +2787,12 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
             var u = mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
             var last = mensajes.filter(function(m){return m.conv===k2;}).slice(-1)[0];
             return (
-              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);}}
+              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);var k2=getKey(p.nombre);mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});}}
                 style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}}>
                 <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{color:tx,fontWeight:600,fontSize:14}}>{p.nombre}</div>
-                  {last && <div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    <span style={{fontWeight:last.de===user?"400":"600",color:last.de===user?mu:tx}}>{last.de===user?"Yo: ":last.de+": "}</span>
-                    {last.texto}
-                  </div>}
+                  {last && <div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last.de===user?"Yo: ":(last.de||"")+ ": "}{last.texto}</div>}
                 </div>
                 {u>0 && <span style={{background:er,color:wh,borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
               </button>
@@ -2829,7 +2825,7 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
       </div>
       <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
         <input style={Object.assign({},sInp,{flex:1})} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
-        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={send}>Enviar</button>
+        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={function(){markRead();send();}}>Enviar</button>
       </div>
     </div>
   );
