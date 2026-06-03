@@ -217,16 +217,6 @@ export default function App() {
   const [tab,setTab] = useState("calendario");
   const [perfilSel,setPerfilSel] = useState(null);
   const [notifMsg,setNotifMsg] = useState(null);
-
-  // Mark chat messages as read when on chat tab
-  useEffect(function(){
-    if(tab !== "chat" || !user) return;
-    mensajes.filter(function(m){
-      return m.para===user && !m.leido;
-    }).forEach(function(m){
-      saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
-    });
-  },[tab, mensajes.length, user]);
   const [wk,setWk] = useState(new Date());
   const [fSede,setFSede] = useState("todas");
   const [fCons,setFCons] = useState("todos");
@@ -241,8 +231,6 @@ export default function App() {
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
-  const [mensajes,setMensajesLocal] = useState([]);
-  const [chatOpen,setChatOpen] = useState(null);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -251,27 +239,16 @@ export default function App() {
   });
   const [dbReady,setDbReady] = useState(false);
 
-  // Mark chat messages as read when on chat tab
-  useEffect(function(){
-    if(tab !== "chat" || !user) return;
-    mensajes.filter(function(m){
-      return m.para===user && !m.leido;
-    }).forEach(function(m){
-      saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
-    });
-  },[tab, mensajes.length, user]);
-
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
     const TAB_INI = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
-    // Set ready after 3 seconds max regardless
-    var fallback = setTimeout(function(){ setDbReady(true); }, 3000);
+    var fbTimeout = setTimeout(function(){ setDbReady(true); }, 4000);
     Promise.all([
       seedIfEmpty("psicos", PBASE),
       seedIfEmpty("horarios", HORARIOS_WITH_IDS),
       seedIfEmpty("tabP", TAB_INI),
-    ]).then(function(){ clearTimeout(fallback); setDbReady(true); })
-      .catch(function(){ clearTimeout(fallback); setDbReady(true); });
+    ]).then(function(){ clearTimeout(fbTimeout); setDbReady(true); })
+      .catch(function(){ clearTimeout(fbTimeout); setDbReady(true); });
     const unsubs = [
       listenCol("psicos", function(d){ setPsicosLocal(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
@@ -280,7 +257,6 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
-      listenCol("mensajes", function(d){ setMensajesLocal(d.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");})); }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
@@ -417,13 +393,11 @@ export default function App() {
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para===user&&!m.leido;}).length},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
@@ -431,7 +405,7 @@ export default function App() {
 
   const nav5 = nav.slice(0,5);
   const navX = nav.slice(5);
-  const isX = ["facturacion","precios","gestion","mishorarios","chat"].indexOf(tab) >= 0;
+  const isX = ["facturacion","precios","gestion","mishorarios"].indexOf(tab) >= 0;
 
   return (
     <AppRoot>
@@ -533,11 +507,10 @@ export default function App() {
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
-          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
+          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
-          {tab==="chat" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes} notify={notify} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
           {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
@@ -1066,7 +1039,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
               <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {(p.nombre||"?")[0].toUpperCase()}
+                {p.nombre[0].toUpperCase()}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
@@ -1137,7 +1110,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {(perfilSel.nombre||"?")[0].toUpperCase()}
+                {perfilSel.nombre[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1452,7 +1425,6 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
                 <div style={{flex:1}}>
                   <span style={{color:tx,fontWeight:600}}>{s.psico}</span>
                   <span style={{color:mu,fontSize:12}}> - {lbl(s)} - {det(s)}</span>
-                  {s.fechaRes && <div style={{color:mu,fontSize:11,marginTop:2}}>{s.estado==="aprobada"?"Aprobada":"Rechazada"} el {new Date(s.fechaRes).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"})}</div>}
                 </div>
                 <span style={bge(s.estado==="aprobada"?ob:eb,s.estado==="aprobada"?ok:er)}>{s.estado==="aprobada"?"OK":"X"}</span>
               </div>
@@ -1592,9 +1564,9 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                         <div>
                           <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
                           <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({typeof d.horas==="number"?d.horas.toFixed(1):d.horas}hs)</div>
-                          {d.ley && <div style={{color:mu,fontSize:12}}>{d.ley}</div>}
+                          {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
-                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]} en {MESES[mes]} = {ars(d.sub)}</div>
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
@@ -1859,7 +1831,7 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
   );
 }
 
-function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,reservas,notify}) {
+function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,notify}) {
   const [gt,setGt] = useState("horarios");
   const [selP,setSelP] = useState(null);
   const [eid,setEid] = useState(null);
@@ -1902,8 +1874,8 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Gestion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
-        <button style={tabBtn(gt==="psicologas")} onClick={function(){setGt("psicologas");}}>Profesionales</button>
-        
+        <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
+        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
       </div>
       {gt==="horarios" && (
         <div>
@@ -2001,35 +1973,6 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
               <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>
             );
           })}
-        </div>
-      )}
-      {gt==="psicologas" && (
-        <div>
-          <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
-            {showNewP?"Cancelar":"+ Agregar nuevo profesional"}
-          </button>
-          {showNewP && (
-            <div style={{background:lt,borderRadius:12,padding:16,marginBottom:16,border:"1.5px solid #4BA3C3",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{color:br,fontWeight:700,fontSize:13,marginBottom:4}}>Nuevo profesional</div>
-              <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={newP.nombre} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nombre:e.target.value});});}} placeholder="Nombre y apellido"/></div>
-              <div><label style={sLbl}>Profesion</label><select style={sInp} value={newP.profesion} onChange={function(e){setNewP(function(p){return Object.assign({},p,{profesion:e.target.value});});}}><option>Psicologa</option><option>Psicologo</option><option>Psiquiatra</option><option>Nutricionista</option><option>Kinesiologo</option><option>Otro</option></select></div>
-              <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={newP.wa} onChange={function(e){setNewP(function(p){return Object.assign({},p,{wa:e.target.value});});}} placeholder="549..."/></div>
-              <div><label style={sLbl}>Email</label><input style={sInp} value={newP.email} onChange={function(e){setNewP(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="email@ejemplo.com"/></div>
-              <div><label style={sLbl}>Contrasena</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
-              <div><label style={sLbl}>Descuento (%)</label><input style={sInp} type="number" min="0" max="100" value={newP.descuento} onChange={function(e){setNewP(function(p){return Object.assign({},p,{descuento:e.target.value});});}}/></div>
-              <div style={{background:wh,borderRadius:10,padding:12,border:"1px solid #C9E4EF"}}>
-                <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de horario</div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:false});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:!newP.fijas?br:bg,color:!newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:!newP.fijas?700:400,fontSize:13}}>Solo extras</button>
-                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:true});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:newP.fijas?br:bg,color:newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:newP.fijas?700:400,fontSize:13}}>Tiene fijos</button>
-                </div>
-              </div>
-              <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={addPsico} disabled={!newP.nombre.trim()}>Crear profesional</button>
-            </div>
-          )}
-          <div style={{display:"flex",flexDirection:"column",gap:2}}>
-            {psicos.map(function(p){return(<GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>);})}
-          </div>
         </div>
       )}
       {gt==="bloques" && (
@@ -2603,32 +2546,69 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 
 
 // ─── Estadisticas ─────────────────────────────────────────────
+function exportarExcel(psicos,mes,anio) {
+  var lines = [];
+  var mNombre = MESES[mes]+" "+anio;
+
+  // Header
+  lines.push(["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]);
+
+  psicos.forEach(function(p){
+    var r = calcFact(p,mes,anio);
+    // Fijos
+    r.df.forEach(function(d){
+      lines.push([
+        p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
+        d.horas.toFixed?d.horas.toFixed(1):d.horas,
+        d.ley||d.des||"",d.sem,d.sub,
+        (p.descuento||0)+"%",
+        ""
+      ]);
+    });
+    // Extras
+    r.de.forEach(function(d){
+      lines.push([
+        p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,
+        d.horas.toFixed?d.horas.toFixed(1):d.horas,
+        d.ley||d.des||"","1",d.sub,
+        (p.descuento||0)+"%",
+        ""
+      ]);
+    });
+    // Totals row per psico
+    lines.push([
+      p.nombre,"TOTAL","","","","","","",
+      "",r.bruto,
+      (p.descuento||0)+"%",
+      r.total
+    ]);
+    lines.push([]); // empty row between psicos
+  });
+
+  // Convert to CSV with semicolons (Excel-friendly for Argentina)
+  var csv = lines.map(function(row){
+    return row.map(function(cell){
+      return String(cell==null?"":cell).replace(/;/g," ");
+    }).join(";");
+  }).join("\n");
+
+  // Add BOM for Excel UTF-8
+  var bom = "\uFEFF";
+  var blob = new Blob([bom+csv],{type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "Facturacion_"+mNombre.replace(" ","_")+".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
-
-  function exportarExcel() {
-    var mn = MESES[mes]+" "+anio;
-    var totalGeneral = 0;
-    var rows = [["Profesional","Monto a pagar"]];
-    psicos.forEach(function(p){
-      var r = calcFact(p,mes,anio);
-      var total = r.total||0;
-      if(total>0){ rows.push([p.nombre, total]); totalGeneral += total; }
-    });
-    rows.push([]); rows.push(["TOTAL GENERAL", totalGeneral]);
-    var header = "sep=,\n";
-    var csv = header+rows.map(function(row){
-      return row.map(function(c){var s=String(c==null?"":c);if(s.indexOf(",")>-1)s="\""+s+"\"";return s;}).join(",");
-    }).join("\n");
-    var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href=url;a.download="Facturacion_"+mn.replace(" ","_")+".csv";
-    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-  }
 
   // Hours per consultorio per week
   function hrsConsultorio(consId) {
@@ -2766,95 +2746,13 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
         <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del mes en formato Excel.</div>
-        <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel();}}>
+        <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel(psicos,mes,anio);}}>
           Descargar Excel - Facturacion {MESES[mes]} {anio}
         </button>
       </div>
     </div>
   );
 }
-
-// ─── Chat ─────────────────────────────────────────────────────
-function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen,gc}) {
-  const [texto,setTexto] = useState("");
-  const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
-
-  function getKey(pName) { return "chat__"+(pName||"").trim().toLowerCase(); }
-  var psicoName = role==="admin" ? (convWith||"") : user;
-  var key = psicoName ? getKey(psicoName) : null;
-  var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
-
-  function markRead() {
-    mensajes.filter(function(m){
-      return m.conv===key && !m.leido && m.de!==user;
-    }).forEach(function(m){
-      saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));
-    });
-  }
-
-  function send() {
-    if(!texto.trim()||!key) return;
-    var para = role==="admin" ? convWith : "admin";
-    var msgId = "msg"+Date.now();
-    saveDoc("mensajes",msgId,{id:msgId,conv:key,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
-    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
-    setTexto("");
-  }
-
-  if(role==="admin" && !convWith) {
-    return (
-      <div>
-        <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {psicos.map(function(p){
-            var k2 = getKey(p.nombre);
-            var u = mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
-            var last = mensajes.filter(function(m){return m.conv===k2;}).slice(-1)[0];
-            return (
-              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);var k2=getKey(p.nombre);mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});}}
-                style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{color:tx,fontWeight:600,fontSize:14}}>{p.nombre}</div>
-                  {last && <div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last.de===user?"Yo: ":(last.de||"")+ ": "}{last.texto}</div>}
-                </div>
-                {u>0 && <span style={{background:er,color:wh,borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-        {role==="admin" && <button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
-        <div style={{color:tx,fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
-      </div>
-      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
-        {msgs.length===0 && <div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
-        {msgs.map(function(m){
-          var isMe=m.de===user;
-          return (
-            <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
-              <div style={{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
-                <div>{m.texto}</div>
-                <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
-        <input style={Object.assign({},sInp,{flex:1})} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
-        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={function(){markRead();send();}}>Enviar</button>
-      </div>
-    </div>
-  );
-}
-
 
 function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   const [open,setOpen] = useState(false);
