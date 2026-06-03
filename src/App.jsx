@@ -232,7 +232,7 @@ export default function App() {
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
   const [mensajes,setMensajesLocal] = useState([]);
-  const [chatOpen,setChatOpen] = useState(null); // nombre del psico con quien chatea
+  const [chatOpen,setChatOpen] = useState(null);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -257,11 +257,9 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("mensajes", function(d){ setMensajesLocal(d.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");})); }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
-      }),
-      listenCol("mensajes", function(d){
-        setMensajesLocal(d.sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'');}));
       }),
       listenCol("config", function(d){
         if(d&&d.length>0) {
@@ -396,13 +394,14 @@ export default function App() {
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para==="admin"&&!m.leido;}).length},
+    {id:"chat",icon:"💬",label:"Mensajes",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
     {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para===user&&!m.leido;}).length},
+    {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
   ];
@@ -1044,7 +1043,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
               <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {p.nombre[0].toUpperCase()}
+                {(p.nombre||"?")[0].toUpperCase()}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
@@ -1115,7 +1114,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {perfilSel.nombre[0].toUpperCase()}
+                {(perfilSel.nombre||"?")[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1426,13 +1425,11 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
           <h3 style={{color:mu,margin:"20px 0 10px"}}>Historial</h3>
           {hist.map(function(s) {
             return (
-              <div key={s.id} style={Object.assign({},sCard,{opacity:.85})}>
+              <div key={s.id} style={Object.assign({},sCard,{opacity:.65})}>
                 <div style={{flex:1}}>
                   <span style={{color:tx,fontWeight:600}}>{s.psico}</span>
                   <span style={{color:mu,fontSize:12}}> - {lbl(s)} - {det(s)}</span>
-                  {s.fechaRes && <div style={{color:mu,fontSize:11,marginTop:2}}>
-                    {s.estado==="aprobada"?"Aprobada":"Rechazada"} el {new Date(s.fechaRes).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"})}
-                  </div>}
+                  {s.fechaRes && <div style={{color:mu,fontSize:11,marginTop:2}}>{s.estado==="aprobada"?"Aprobada":"Rechazada"} el {new Date(s.fechaRes).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"})}</div>}
                 </div>
                 <span style={bge(s.estado==="aprobada"?ob:eb,s.estado==="aprobada"?ok:er)}>{s.estado==="aprobada"?"OK":"X"}</span>
               </div>
@@ -1572,9 +1569,9 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                         <div>
                           <div style={{color:tx,fontSize:13,fontWeight:600}}>{DIAS[d.diaSemana]} - {d.cons}</div>
                           <div style={{color:mu,fontSize:12}}>{d.ini}-{d.fin} ({typeof d.horas==="number"?d.horas.toFixed(1):d.horas}hs)</div>
-                          {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
+                          {d.ley && <div style={{color:mu,fontSize:12}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
-                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
+                          <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]} en {MESES[mes]} = {ars(d.sub)}</div>
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
@@ -1883,6 +1880,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
         <button style={tabBtn(gt==="psicologas")} onClick={function(){setGt("psicologas");}}>Profesionales</button>
+        
       </div>
       {gt==="horarios" && (
         <div>
@@ -1991,22 +1989,11 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
             <div style={{background:lt,borderRadius:12,padding:16,marginBottom:16,border:"1.5px solid #4BA3C3",display:"flex",flexDirection:"column",gap:10}}>
               <div style={{color:br,fontWeight:700,fontSize:13,marginBottom:4}}>Nuevo profesional</div>
               <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={newP.nombre} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nombre:e.target.value});});}} placeholder="Nombre y apellido"/></div>
-              <div>
-                <label style={sLbl}>Profesion</label>
-                <select style={sInp} value={newP.profesion} onChange={function(e){setNewP(function(p){return Object.assign({},p,{profesion:e.target.value});});}}>
-                  <option>Psicologa</option>
-                  <option>Psicologo</option>
-                  <option>Psiquiatra</option>
-                  <option>Nutricionista</option>
-                  <option>Kinesiologo</option>
-                  <option>Otro</option>
-                </select>
-              </div>
+              <div><label style={sLbl}>Profesion</label><select style={sInp} value={newP.profesion} onChange={function(e){setNewP(function(p){return Object.assign({},p,{profesion:e.target.value});});}}><option>Psicologa</option><option>Psicologo</option><option>Psiquiatra</option><option>Nutricionista</option><option>Kinesiologo</option><option>Otro</option></select></div>
               <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={newP.wa} onChange={function(e){setNewP(function(p){return Object.assign({},p,{wa:e.target.value});});}} placeholder="549..."/></div>
               <div><label style={sLbl}>Email</label><input style={sInp} value={newP.email} onChange={function(e){setNewP(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="email@ejemplo.com"/></div>
-              <div><label style={sLbl}>Contrasena inicial</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
+              <div><label style={sLbl}>Contrasena</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
               <div><label style={sLbl}>Descuento (%)</label><input style={sInp} type="number" min="0" max="100" value={newP.descuento} onChange={function(e){setNewP(function(p){return Object.assign({},p,{descuento:e.target.value});});}}/></div>
-              <div><label style={sLbl}>Nota interna</label><input style={sInp} value={newP.nota} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nota:e.target.value});});}} placeholder="Nota privada (solo admin)"/></div>
               <div style={{background:wh,borderRadius:10,padding:12,border:"1px solid #C9E4EF"}}>
                 <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de horario</div>
                 <div style={{display:"flex",gap:8}}>
@@ -2018,9 +2005,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
             </div>
           )}
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
-            {psicos.map(function(p){return(
-              <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>
-            );})}
+            {psicos.map(function(p){return(<GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>);})}
           </div>
         </div>
       )}
@@ -2598,36 +2583,27 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
-  const [xMes,setXMes] = useState(now.getMonth());
-  const [xAnio,setXAnio] = useState(now.getFullYear());
+  const [mes,setMes] = useState(now.getMonth());
+  const [anio,setAnio] = useState(now.getFullYear());
 
   function exportarExcel() {
-    var mn = MESES[xMes]+" "+xAnio;
+    var mn = MESES[mes]+" "+anio;
     var totalGeneral = 0;
-    var rows = [
-      ["Profesional","Monto a pagar"]
-    ];
+    var rows = [["Profesional","Monto a pagar"]];
     psicos.forEach(function(p){
-      var r = calcFact(p,xMes,xAnio);
+      var r = calcFact(p,mes,anio);
       var total = r.total||0;
-      if(total>0){
-        rows.push([p.nombre, total]);
-        totalGeneral += total;
-      }
+      if(total>0){ rows.push([p.nombre, total]); totalGeneral += total; }
     });
-    rows.push([]);
-    rows.push(["TOTAL GENERAL", totalGeneral]);
+    rows.push([]); rows.push(["TOTAL GENERAL", totalGeneral]);
     var header = "sep=,\n";
-    var csv = header + rows.map(function(row){
-      return row.map(function(c){
-        var s = String(c==null?"":c);
-        if(s.indexOf(",")>-1||s.indexOf("\n")>-1) s = "\""+s+"\"";
-        return s;
-      }).join(",");
+    var csv = header+rows.map(function(row){
+      return row.map(function(c){var s=String(c==null?"":c);if(s.indexOf(",")>-1)s="\""+s+"\"";return s;}).join(",");
     }).join("\n");
     var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
     var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");a.href=url;a.download="Facturacion_"+mn.replace(" ","_")+".csv";
+    var a = document.createElement("a");
+    a.href=url;a.download="Facturacion_"+mn.replace(" ","_")+".csv";
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   }
 
@@ -2640,17 +2616,17 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 
   // Global monthly total
   function totalMes() {
-    return psicos.reduce(function(acc,p){return acc+calcFact(p,xMes,xAnio).total;},0);
+    return psicos.reduce(function(acc,p){return acc+calcFact(p,mes,anio).total;},0);
   }
   function totalBruto() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,xMes,xAnio);return acc+r.bruto;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.bruto;},0);
   }
   function totalDesc() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,xMes,xAnio);return acc+r.montoDesc;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.montoDesc;},0);
   }
 
   // Psico ranking by billing
-  const ranking = psicos.map(function(p){return {nombre:p.nombre,total:calcFact(p,xMes,xAnio).total};}).sort(function(a,b){return b.total-a.total;});
+  const ranking = psicos.map(function(p){return {nombre:p.nombre,total:calcFact(p,mes,anio).total};}).sort(function(a,b){return b.total-a.total;});
 
   // Occupancy by sede
   function hrsSede(sede) {
@@ -2663,19 +2639,19 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Estadisticas</h2>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
-        <select style={Object.assign({},sInp,{width:"auto"})} value={xMes} onChange={function(e){setXMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
-        <select style={Object.assign({},sInp,{width:"auto"})} value={xAnio} onChange={function(e){setXAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
+        <select style={Object.assign({},sInp,{width:"auto"})} value={mes} onChange={function(e){setMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
+        <select style={Object.assign({},sInp,{width:"auto"})} value={anio} onChange={function(e){setAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
-          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Total del xMes</div>
+          <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Total del mes</div>
           <div style={{color:ok,fontSize:24,fontWeight:800}}>{ars(totalMes())}</div>
           {totalDesc()>0 && <div style={{color:er,fontSize:12,marginTop:4}}>Desc. aplicados: {ars(totalDesc())}</div>}
         </div>
         <div style={Object.assign({},sPanel,{textAlign:"center"})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Profesionals activas</div>
-          <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,xMes,xAnio).total>0;}).length}</div>
+          <div style={{color:br,fontSize:24,fontWeight:800}}>{psicos.filter(function(p){return calcFact(p,mes,anio).total>0;}).length}</div>
           <div style={{color:mu,fontSize:12}}>de {psicos.length} total</div>
         </div>
       </div>
@@ -2713,7 +2689,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
 
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
-        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:14}}>Ranking facturacion {MESES[xMes]}</div>
+        <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:14}}>Ranking facturacion {MESES[mes]}</div>
         {ranking.filter(function(r){return r.total>0;}).map(function(r,i) {
           const maxT = ranking[0].total || 1;
           const pct = Math.round((r.total/maxT)*100);
@@ -2730,7 +2706,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
           );
         })}
         {ranking.filter(function(r){return r.total>0;}).length===0 && (
-          <div style={{color:mu,textAlign:"center",padding:20}}>Sin datos para este xMes</div>
+          <div style={{color:mu,textAlign:"center",padding:20}}>Sin datos para este mes</div>
         )}
       </div>
 
@@ -2766,9 +2742,9 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
-        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del xMes en formato Excel.</div>
+        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del mes en formato Excel.</div>
         <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel();}}>
-          Descargar Excel - Facturacion {MESES[xMes]} {xAnio}
+          Descargar Excel - Facturacion {MESES[mes]} {anio}
         </button>
       </div>
     </div>
@@ -2780,19 +2756,25 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
   const [texto,setTexto] = useState("");
   const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
 
-  function getKey(psicoName) { return "chat__"+psicoName.trim().toLowerCase(); }
-  var activeWith = role==="admin" ? convWith : "admin";
+  function getKey(pName) { return "chat__"+(pName||"").trim().toLowerCase(); }
   var psicoName = role==="admin" ? (convWith||"") : user;
   var key = psicoName ? getKey(psicoName) : null;
   var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
 
+  // Mark messages as read when opening a conversation
+  useEffect(function(){
+    if(!key) return;
+    msgs.filter(function(m){return !m.leido&&m.de!==user;}).forEach(function(m){
+      saveDoc("mensajes",m.id,Object.assign({},m,{leido:true}));
+    });
+  },[key, msgs.length]);
+
   function send() {
     if(!texto.trim()||!key) return;
+    var para = role==="admin" ? convWith : "admin";
     var msgId = "msg"+Date.now();
-    saveDoc("mensajes",msgId,{
-      id:msgId,conv:key,de:user,para:activeWith,
-      texto:texto.trim(),fecha:new Date().toISOString(),leido:false
-    });
+    saveDoc("mensajes",msgId,{id:msgId,conv:key,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
+    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
     setTexto("");
   }
 
@@ -2800,24 +2782,27 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
     return (
       <div>
         <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
-        {psicos.map(function(p){
-          var k2 = getKey(user,p.nombre);
-          var u = mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
-          return (
-            <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);}}
-              style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",
-                display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",
-                width:"100%",marginBottom:8,textAlign:"left"}}>
-              <div style={{width:40,height:40,borderRadius:"50%",background:br,color:wh,
-                display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16}}>
-                {(p.nombre||"?")[0].toUpperCase()}
-              </div>
-              <div style={{flex:1,color:tx,fontWeight:600}}>{p.nombre}</div>
-              {u>0&&<span style={{background:er,color:wh,borderRadius:"50%",width:20,height:20,
-                fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{u}</span>}
-            </button>
-          );
-        })}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {psicos.map(function(p){
+            var k2 = getKey(p.nombre);
+            var u = mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
+            var last = mensajes.filter(function(m){return m.conv===k2;}).slice(-1)[0];
+            return (
+              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);}}
+                style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:tx,fontWeight:600,fontSize:14}}>{p.nombre}</div>
+                  {last && <div style={{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    <span style={{fontWeight:last.de===user?"400":"600",color:last.de===user?mu:tx}}>{last.de===user?"Yo: ":last.de+": "}</span>
+                    {last.texto}
+                  </div>}
+                </div>
+                {u>0 && <span style={{background:er,color:wh,borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -2825,39 +2810,25 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-        {role==="admin" && (
-          <button style={{background:"transparent",border:"none",color:br,fontSize:22,
-            cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>
-            {"<"}
-          </button>
-        )}
-        <div style={{color:tx,fontSize:17,fontWeight:700}}>{activeWith}</div>
+        {role==="admin" && <button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
+        <div style={{color:tx,fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
       </div>
       <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
-        {msgs.length===0&&(
-          <div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>
-        )}
+        {msgs.length===0 && <div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
         {msgs.map(function(m){
-          var isMe = m.de===user;
+          var isMe=m.de===user;
           return (
             <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
-              <div style={{background:isMe?br:wh,color:isMe?wh:tx,
-                borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,
-                border:isMe?"none":"1.5px solid #C9E4EF"}}>
+              <div style={{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
                 <div>{m.texto}</div>
-                <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>
-                  {new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}
-                </div>
+                <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
               </div>
             </div>
           );
         })}
       </div>
       <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
-        <input style={Object.assign({},sInp,{flex:1})} value={texto}
-          onChange={function(e){setTexto(e.target.value);}}
-          placeholder="Escribi un mensaje..."
-          onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
+        <input style={Object.assign({},sInp,{flex:1})} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
         <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={send}>Enviar</button>
       </div>
     </div>
@@ -2865,3 +2836,231 @@ function ChatView({user,role,psicos,mensajes,notify,chatOpen,setChatOpen}) {
 }
 
 
+function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
+  const [open,setOpen] = useState(false);
+  const p = psicos.find(function(x){return x.nombre===user;});
+  const [wa,setWa] = useState(p?p.wa||"":"");
+  const [email,setEmail] = useState(p?p.email||"":"");
+  const [profesion,setProfesion] = useState(p?p.profesion||"Psicologa":"Psicologa");
+  const PROF_OPTS = ["Psicologa","Psicologo","Psiquiatra","Nutricionista","Kinesiologo","Otro"];
+  const [otroProfesion,setOtroProfesion] = useState(
+    p&&p.profesion&&!["Psicologa","Psicologo","Psiquiatra","Nutricionista","Kinesiologo"].includes(p.profesion)?p.profesion:""
+  );
+  const [analisis,setAnalisis] = useState(p?p.analisis||[]:[]);
+  const [otroAnalisis,setOtroAnalisis] = useState(p?p.otroAnalisis||"":"");
+  const [poblacion,setPoblacion] = useState(p?p.poblacion||[]:[]);
+  const [disponible,setDisponible] = useState(p?p.disponible!==false:true);
+
+  function save() {
+    if(!p) return;
+    const analFinal=analisis.includes("Otro")&&otroAnalisis.trim()?analisis.filter(function(x){return x!=="Otro";}).concat([otroAnalisis.trim()]):analisis;
+    const profFinal = profesion==="Otro"&&otroProfesion.trim() ? otroProfesion.trim() : profesion;
+    saveDoc("psicos",p.id,Object.assign({},p,{wa:wa,email:email,profesion:profFinal,analisis:analFinal,otroAnalisis:otroAnalisis,poblacion:poblacion,disponible:disponible}));
+    notify("Perfil actualizado");
+    setOpen(false);
+  }
+
+  const ANALS=["Cognitivo Conductual","Psicoanalitico","Sistemico / Familiar","Humanista / Gestalt","EMDR","Mindfulness / ACT","Integrativo","Otro"];
+  const POBS=["Ninos","Adolescentes","Adultos","Adultos mayores","Parejas","Familias"];
+
+  return (
+    <div>
+      <button onClick={function(){setOpen(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",borderBottom:"1px solid #C9E4EF",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:"#1C3A4A",fontSize:15}}>
+        <span style={{fontSize:20}}>&#9998;</span>
+        <span>Editar mi perfil</span>
+      </button>
+      {open && (
+        <div style={{padding:"12px 20px",borderBottom:"1px solid #C9E4EF",background:"#F0F8FB",display:"flex",flexDirection:"column",gap:10}}>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>WhatsApp (549...)</label>
+            <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={wa} onChange={function(e){setWa(e.target.value);}} placeholder="Ej: 5491161572283"/>
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Email</label>
+            <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={email} onChange={function(e){setEmail(e.target.value);}} placeholder="tu@email.com"/>
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:4}}>Profesion</label>
+            <select style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:14,width:"100%",fontFamily:"inherit"}} value={profesion} onChange={function(e){setProfesion(e.target.value);}}>
+              <option>Psicologa</option>
+              <option>Psicologo</option>
+              <option>Psiquiatra</option>
+              <option>Nutricionista</option>
+              <option>Kinesiologo</option>
+              <option>Otro</option>
+            </select>
+            {profesion==="Otro" && (
+              <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:13,width:"100%",fontFamily:"inherit",marginTop:8}} value={otroProfesion} onChange={function(e){setOtroProfesion(e.target.value);}} placeholder="Especifica tu profesion..."/>
+            )}
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Tipo de analisis</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {ANALS.map(function(a){
+                const sel=analisis.includes(a);
+                return <button key={a} onClick={function(){setAnalisis(function(prev){return sel?prev.filter(function(x){return x!==a;}):[...prev,a];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{a}</button>;
+              })}
+            </div>
+            {analisis.includes("Otro") && (
+              <input style={{background:"#fff",border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 12px",color:"#1C3A4A",fontSize:13,width:"100%",fontFamily:"inherit",marginTop:6}} value={otroAnalisis} onChange={function(e){setOtroAnalisis(e.target.value);}} placeholder="Especifica tu tipo de analisis..."/>
+            )}
+          </div>
+          <div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6}}>Poblacion que atendes</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+              {POBS.map(function(pb){
+                const sel=poblacion.includes(pb);
+                return <button key={pb} onClick={function(){setPoblacion(function(prev){return sel?prev.filter(function(x){return x!==pb;}):[...prev,pb];});}} style={{background:sel?"#4BA3C3":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #4BA3C3":"1.5px solid #C9E4EF",borderRadius:20,padding:"4px 12px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{pb}</button>;
+              })}
+            </div>
+            <label style={{color:"#6B97AA",fontSize:11,fontWeight:600,textTransform:"uppercase",display:"block",marginBottom:6,marginTop:8}}>Trabaja con</label>
+            <div style={{display:"flex",gap:8}}>
+              {["Ninos y/o Adolescentes","Adultos"].map(function(g){
+                const sel=poblacion.includes(g);
+                return <button key={g} onClick={function(){setPoblacion(function(prev){return sel?prev.filter(function(x){return x!==g;}):[...prev,g];});}} style={{flex:1,background:sel?"#2E86AB":"#fff",color:sel?"#fff":"#6B97AA",border:sel?"1.5px solid #2E86AB":"1.5px solid #C9E4EF",borderRadius:10,padding:"8px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:sel?700:400}}>{g}</button>;
+              })}
+            </div>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:8,color:"#1C3A4A",fontSize:14,cursor:"pointer"}}>
+            <input type="checkbox" checked={disponible} onChange={function(e){setDisponible(e.target.checked);}}/>
+            Disponible para derivaciones
+          </label>
+          <div style={{display:"flex",gap:8}}>
+            <button style={{flex:1,background:"#4BA3C3",color:"#fff",border:"none",borderRadius:10,padding:"10px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={save}>Guardar</button>
+            <button style={{flex:1,background:"#fff",color:"#1C3A4A",border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setOpen(false);}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CambiarPassBtn({user,setPsicos,notify}) {
+  const [open,setOpen] = useState(false);
+  const [actual,setActual] = useState("");
+  const [nueva,setNueva] = useState("");
+  const [conf,setConf] = useState("");
+  function cambiar() {
+    if(nueva.length<4){notify("Minimo 4 caracteres","err");return;}
+    if(nueva!==conf){notify("Las contrasenas no coinciden","err");return;}
+    setPsicos(function(ps){
+      const p = ps.find(function(x){return x.nombre===user;});
+      if(!p){notify("Error","err");return ps;}
+      if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return ps;}
+      notify("Contrasena cambiada");
+      setOpen(false);setActual("");setNueva("");setConf("");
+      return ps.map(function(x){return x.nombre===user?Object.assign({},x,{pass:nueva}):x;});
+    });
+  }
+  return (
+    <div>
+      <button onClick={function(){setOpen(function(v){return !v;});}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",borderBottom:"1px solid #C9E4EF",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:tx,fontSize:15}}>
+        <span style={{fontSize:20}}>&#128274;</span>
+        <span>Cambiar contrasena</span>
+      </button>
+      {open && (
+        <div style={{padding:"12px 20px",borderBottom:"1px solid #C9E4EF",background:bg,display:"flex",flexDirection:"column",gap:8}}>
+          <input style={Object.assign({},sInp,{fontSize:13})} type="password" value={actual} onChange={function(e){setActual(e.target.value);}} placeholder="Contrasena actual"/>
+          <input style={Object.assign({},sInp,{fontSize:13})} type="password" value={nueva} onChange={function(e){setNueva(e.target.value);}} placeholder="Nueva contrasena (min 4 car.)"/>
+          <input style={Object.assign({},sInp,{fontSize:13})} type="password" value={conf} onChange={function(e){setConf(e.target.value);}} placeholder="Confirmar nueva contrasena" onKeyDown={function(e){if(e.key==="Enter")cambiar();}}/>
+          <button style={btn(br,wh)} onClick={cambiar}>Guardar contrasena</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
+  const [dia,setDia] = useState(h?h.diaSemana:1);
+  const [ini,setIni] = useState(h?h.inicio:"09:00");
+  const [fin,setFin] = useState(h?h.fin:"14:00");
+  const [cons,setCons] = useState(h?h.consultorio:"C1");
+  const pr = calcPrecio(ini,fin);
+  function checkConflicto() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
+    const sMin=toMin(ini), eMin=toMin(fin);
+    const c=(horarios||[]).filter(function(x){
+      if(x.consultorio!==cons) return false;
+      if(Number(x.diaSemana)!==Number(dia)) return false;
+      if(h && x.id===h.id) return false; // exclude own horario when editing
+      return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
+    });
+    return c.length ? "Ese horario esta ocupado en "+cons : null;
+  }
+  const conflicto = checkConflicto();
+
+  // Find available consultorios at same time same day
+  function getLibres() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return [];
+    const sMin=toMin(ini),eMin=toMin(fin);
+    return CONS.filter(function(c){
+      if(c.id===cons) return false;
+      const ocupado=(horarios||[]).some(function(x){
+        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      });
+      return !ocupado;
+    });
+  }
+  const libres = conflicto ? getLibres() : [];
+  const sedeNombre = function(sede){ return sede==="VL"?"Vicente Lopez":"Uruguay"; };
+
+  return (
+    <div>
+      <div style={sModH}>
+        <h3 style={{margin:0,color:tx}}>{tipo==="add"?"Solicitar horario":"Modificar horario"}</h3>
+        <button style={sXBtn} onClick={onClose}>X</button>
+      </div>
+      <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div>
+            <label style={sLbl}>Dia</label>
+            <select style={sInp} value={dia} onChange={function(e){setDia(Number(e.target.value));}}>
+              {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
+            </select>
+          </div>
+          <div>
+            <label style={sLbl}>Consultorio</label>
+            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
+              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
+            </select>
+          </div>
+          <div>
+            <label style={sLbl}>Desde</label>
+            <input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
+          </div>
+          <div>
+            <label style={sLbl}>Hasta</label>
+            <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
+          </div>
+        </div>
+        {conflicto&&(
+          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"12px 14px",color:er,fontSize:13}}>
+            <div style={{fontWeight:700,marginBottom:6}}>{conflicto}</div>
+            {libres.length>0?(
+              <div>
+                <div style={{color:tx,fontSize:12,fontWeight:600,marginBottom:4}}>Consultorios disponibles en ese horario:</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {libres.map(function(c){return(
+                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}} onClick={function(){setCons(c.id);}}>
+                      <div>{c.id}</div>
+                      <div style={{fontWeight:400,fontSize:11,color:"#2D8A5E"}}>{sedeNombre(c.sede)}</div>
+                    </button>
+                  );})}
+                </div>
+                <div style={{color:mu,fontSize:11,marginTop:4}}>Toca uno para seleccionarlo</div>
+              </div>
+            ):(
+              <div style={{color:mu,fontSize:12,marginTop:4}}>No hay consultorios disponibles en ese horario ese dia.</div>
+            )}
+          </div>
+        )}
+        {!conflicto&&ini&&fin&&toMin(fin)>toMin(ini)&&<div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>Horario disponible - <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}</div>}
+        <div style={{color:mu,fontSize:11}}>Queda pendiente de aprobacion.</div>
+        <div style={{display:"flex",gap:10}}>
+          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});}}>Enviar solicitud</button>
+          <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
