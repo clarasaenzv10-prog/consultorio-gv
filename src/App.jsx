@@ -241,22 +241,16 @@ export default function App() {
   });
   const [dbReady,setDbReady] = useState(false);
 
-  useEffect(function(){
-    if(tab!=="chat"||!user) return;
-    mensajes.filter(function(m){return m.para===user&&!m.leido;})
-      .forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
-  },[tab,mensajes.length,user]);
-
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
     const TAB_INI = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
-    var fbTimeout = setTimeout(function(){ setDbReady(true); }, 4000);
+    var fbT = setTimeout(function(){ setDbReady(true); }, 4000);
     Promise.all([
       seedIfEmpty("psicos", PBASE),
       seedIfEmpty("horarios", HORARIOS_WITH_IDS),
       seedIfEmpty("tabP", TAB_INI),
-    ]).then(function(){ clearTimeout(fbTimeout); setDbReady(true); })
-      .catch(function(){ clearTimeout(fbTimeout); setDbReady(true); });
+    ]).then(function(){ clearTimeout(fbT); setDbReady(true); })
+      .catch(function(){ clearTimeout(fbT); setDbReady(true); });
     const unsubs = [
       listenCol("psicos", function(d){ setPsicosLocal(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
@@ -402,7 +396,7 @@ export default function App() {
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:adminNotifs.filter(function(n){return n.tipo==="mensaje"&&!n.leido;}).length},
+    {id:"chat",icon:"💬",label:"Mensajes",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
@@ -1456,6 +1450,21 @@ function FactView({psicos,calcFact,genMsg,notify}) {
   const [anio,setAnio] = useState(now.getFullYear());
   const [sel,setSel] = useState(null);
   const [vista,setVista] = useState("mes"); // "mes" | "historial"
+  const mesKey = mes+"_"+anio;
+  const [enviadas,setEnviadas] = useState({});
+  // Load enviadas from Firebase on mount
+  useEffect(function(){
+    var stored = {};
+    try { stored = JSON.parse(localStorage.getItem("enviadas_"+mesKey)||"{}"); } catch(e){}
+    setEnviadas(stored);
+  },[mesKey]);
+  function toggleEnviada(nombre) {
+    setEnviadas(function(prev){
+      var next = Object.assign({},prev,{[nombre]:!prev[nombre]});
+      try { localStorage.setItem("enviadas_"+mesKey, JSON.stringify(next)); } catch(e){}
+      return next;
+    });
+  }
   const ps = sel ? psicos.find(function(p){return p.nombre===sel;}) : null;
 
   // Generate last 6 months
@@ -1547,7 +1556,15 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                     {r.desc>0 && " - "+r.desc+"% desc."}
                   </div>
                 </div>
-                <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
+                  {r.total>0&&(
+                    <button onClick={function(e){e.stopPropagation();toggleEnviada(p.nombre);}}
+                      style={{background:enviadas[p.nombre]?ok:"transparent",color:enviadas[p.nombre]?wh:mu,border:enviadas[p.nombre]?"1.5px solid #2D8A5E":"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>
+                      {enviadas[p.nombre]?"✓ Enviada":"Enviar"}
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -2768,25 +2785,29 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
 
 function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
   const [texto,setTexto] = useState("");
-  const [convWith,setConvWith] = useState(role==="psico"?"admin":chatOpen);
+  const [convWith,setConvWith] = useState(role==="psico"?"admin":(chatOpen||null));
 
   function getKey(pName) { return "chat__"+(pName||"").trim().toLowerCase(); }
+  function getKeyOld(a,b) { return [a,b].sort().join("__"); }
   var psicoName = role==="admin" ? (convWith||"") : user;
   var key = psicoName ? getKey(psicoName) : null;
-  var msgs = key ? mensajes.filter(function(m){return m.conv===key;}) : [];
+  var keyOld = psicoName ? (role==="admin" ? getKeyOld(user,convWith||"") : getKeyOld(user,"admin")) : null;
+  var msgs = key ? mensajes.filter(function(m){return m.conv===key||m.conv===keyOld;}) : [];
 
-  function markRead() {
-    if(!key) return;
-    mensajes.filter(function(m){return m.conv===key&&!m.leido&&m.de!==user;})
+  function markRead(k) {
+    if(!k) return;
+    var kOld = role==="admin" ? getKeyOld(user,convWith||"") : getKeyOld(user,"admin");
+    mensajes.filter(function(m){return (m.conv===k||m.conv===kOld)&&!m.leido&&m.de!==user;})
       .forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
   }
 
   function send() {
     if(!texto.trim()||!key) return;
-    var para=role==="admin"?convWith:"admin";
-    var msgId="msg"+Date.now();
+    var para = role==="admin" ? convWith : "admin";
+    var msgId = "msg"+Date.now();
     saveDoc("mensajes",msgId,{id:msgId,conv:key,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
     saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    markRead(key);
     setTexto("");
   }
 
@@ -2797,10 +2818,11 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {psicos.map(function(p){
             var k2=getKey(p.nombre);
-            var u=mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).length;
-            var last=mensajes.filter(function(m){return m.conv===k2;}).slice(-1)[0];
+            var k2old=getKeyOld(user,p.nombre);
+            var u=mensajes.filter(function(m){return (m.conv===k2||m.conv===k2old)&&!m.leido&&m.de!==user;}).length;
+            var last=mensajes.filter(function(m){return m.conv===k2||m.conv===k2old;}).slice(-1)[0];
             return (
-              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);mensajes.filter(function(m){return m.conv===k2&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});}}
+              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);markRead(k2);}}
                 style={{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}}>
                 <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -2821,6 +2843,7 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         {role==="admin"&&<button style={{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
         <div style={{color:tx,fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
+        <button style={{marginLeft:"auto",background:"transparent",border:"none",color:mu,fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}} onClick={function(){markRead(key);}}>Marcar leidos</button>
       </div>
       <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
         {msgs.length===0&&<div style={{color:mu,textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
@@ -2838,7 +2861,7 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
       </div>
       <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
         <input style={Object.assign({},sInp,{flex:1})} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
-        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={function(){markRead();send();}}>Enviar</button>
+        <button style={Object.assign({},btn(br,wh),{padding:"10px 20px"})} onClick={send}>Enviar</button>
       </div>
     </div>
   );
