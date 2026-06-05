@@ -1235,8 +1235,8 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
 
 // ─── Solicitudes ──────────────────────────────────────────────
 function SolicitudesView({reservas,setReservas,gc,notify}) {
-  const pend = reservas.filter(function(r){return r.estado==="pendiente";});
-  const hist = reservas.filter(function(r){return r.estado!=="pendiente";});
+  const pend = reservas.filter(function(r){return r.estado==="pendiente";}).sort(function(a,b){return (b.fecha||b.id||"").toString().localeCompare((a.fecha||a.id||"").toString());});
+  const hist = reservas.filter(function(r){return r.estado!=="pendiente";}).sort(function(a,b){return (b.fecha||b.id||"").toString().localeCompare((a.fecha||a.id||"").toString());});
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitudes de reserva</h2>
