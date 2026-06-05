@@ -512,7 +512,7 @@ export default function App() {
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
-          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
+          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
@@ -1860,7 +1860,7 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
   );
 }
 
-function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,notify}) {
+function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,reservas,notify}) {
   const [gt,setGt] = useState("horarios");
   const [selP,setSelP] = useState(null);
   const [eid,setEid] = useState(null);
@@ -1903,8 +1903,8 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Gestion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
-        <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
-        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
+        <button style={tabBtn(gt==="psicologas")} onClick={function(){setGt("psicologas");}}>Profesionales</button>
+        
       </div>
       {gt==="horarios" && (
         <div>
@@ -2002,6 +2002,35 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
               <GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>
             );
           })}
+        </div>
+      )}
+      {gt==="psicologas" && (
+        <div>
+          <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
+            {showNewP?"Cancelar":"+ Agregar nuevo profesional"}
+          </button>
+          {showNewP && (
+            <div style={{background:lt,borderRadius:12,padding:16,marginBottom:16,border:"1.5px solid #4BA3C3",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{color:br,fontWeight:700,fontSize:13}}>Nuevo profesional</div>
+              <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={newP.nombre} onChange={function(e){setNewP(function(p){return Object.assign({},p,{nombre:e.target.value});});}} placeholder="Nombre y apellido"/></div>
+              <div><label style={sLbl}>Profesion</label><select style={sInp} value={newP.profesion} onChange={function(e){setNewP(function(p){return Object.assign({},p,{profesion:e.target.value});});}}><option>Psicologa</option><option>Psicologo</option><option>Psiquiatra</option><option>Nutricionista</option><option>Kinesiologo</option><option>Otro</option></select></div>
+              <div><label style={sLbl}>WhatsApp</label><input style={sInp} value={newP.wa} onChange={function(e){setNewP(function(p){return Object.assign({},p,{wa:e.target.value});});}} placeholder="549..."/></div>
+              <div><label style={sLbl}>Email</label><input style={sInp} value={newP.email} onChange={function(e){setNewP(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="email@ejemplo.com"/></div>
+              <div><label style={sLbl}>Contrasena</label><input style={sInp} value={newP.pass} onChange={function(e){setNewP(function(p){return Object.assign({},p,{pass:e.target.value});});}} placeholder="psico123"/></div>
+              <div><label style={sLbl}>Descuento (%)</label><input style={sInp} type="number" min="0" max="100" value={newP.descuento} onChange={function(e){setNewP(function(p){return Object.assign({},p,{descuento:e.target.value});});}}/></div>
+              <div style={{background:wh,borderRadius:10,padding:12,border:"1px solid #C9E4EF"}}>
+                <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de horario</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:false});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:!newP.fijas?br:bg,color:!newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:!newP.fijas?700:400,fontSize:13}}>Solo extras</button>
+                  <button onClick={function(){setNewP(function(p){return Object.assign({},p,{fijas:true});});}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:newP.fijas?br:bg,color:newP.fijas?wh:mu,cursor:"pointer",fontFamily:"inherit",fontWeight:newP.fijas?700:400,fontSize:13}}>Tiene fijos</button>
+                </div>
+              </div>
+              <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={addPsico} disabled={!newP.nombre.trim()}>Crear profesional</button>
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {psicos.map(function(p){return(<GestionPsicoRow key={p.id} p={p} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} notify={notify}/>);})}
+          </div>
         </div>
       )}
       {gt==="bloques" && (
