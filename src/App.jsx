@@ -1758,6 +1758,12 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
 function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
+  const [editCuit,setEditCuit] = useState(false);
+  const [newCuit,setNewCuit] = useState(p.cuit||"");
+  function saveCuit() {
+    saveDoc("psicos",p.id,Object.assign({},p,{cuit:newCuit.trim()}));
+    setEditCuit(false); notify("CUIT guardado");
+  }
   const [editNombre,setEditNombre] = useState(false);
   const [newNombre,setNewNombre] = useState(p.nombre);
   function saveNombre() {
@@ -1792,6 +1798,20 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
             <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditNombre(true);setNewNombre(p.nombre);}}>editar nombre</button>
           </div>
         )}
+        <div style={{marginTop:4,marginBottom:4}}>
+          {editCuit ? (
+            <div style={{display:"flex",gap:6}}>
+              <input style={Object.assign({},sInp,{flex:1,padding:"4px 8px",fontSize:12})} value={newCuit} onChange={function(e){setNewCuit(e.target.value);}} placeholder="XX-XXXXXXXX-X" autoFocus/>
+              <button style={Object.assign({},btn(ok,wh),{padding:"4px 10px",fontSize:12})} onClick={saveCuit}>OK</button>
+              <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"4px 8px",fontSize:12})} onClick={function(){setEditCuit(false);}}>X</button>
+            </div>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{color:mu,fontSize:11}}>CUIT: {p.cuit||<span style={{color:er}}>sin cargar</span>}</span>
+              <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditCuit(true);setNewCuit(p.cuit||"");}}>editar</button>
+            </div>
+          )}
+        </div>
         <button
           style={{background:p.fijas?lt:bg,color:p.fijas?dk:mu,border:"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}
           onClick={function(){
@@ -2667,6 +2687,36 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
+
+  function exportarExcel(ps,m,a) {
+    var mn = MESES[m]+" "+a;
+    var totalGeneral = 0;
+    var rows = [["CUIT","Profesional","Monto a pagar"]];
+    ps.forEach(function(p){
+      var r = calcFact(p,m,a);
+      var total = r.total||0;
+      if(total>0){
+        rows.push([p.cuit||"", p.nombre, total]);
+        totalGeneral += total;
+      }
+    });
+    rows.push([]);
+    rows.push(["","TOTAL GENERAL", totalGeneral]);
+    var header = "sep=,\n";
+    var csv = header+rows.map(function(row){
+      return row.map(function(c){
+        var s=String(c==null?"":c);
+        if(s.indexOf(",")>-1) s="\""+s+"\"";
+        return s;
+      }).join(",");
+    }).join("\n");
+    var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a2 = document.createElement("a");
+    a2.href=url; a2.download="Facturacion_"+mn.replace(" ","_")+".csv";
+    document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+    URL.revokeObjectURL(url);
+  }
 
   // Hours per consultorio per week
   function hrsConsultorio(consId) {
