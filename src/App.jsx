@@ -310,10 +310,14 @@ export default function App() {
     });
     let tf=0; const df=[];
     fp.forEach(function(h) {
-      const sem = mesFechas(mes,anio,Number(h.diaSemana)).length;
+      var todasFechas = mesFechas(mes,anio,Number(h.diaSemana));
+      var fechas = todasFechas;
+      if(h.fechaInicio) fechas = fechas.filter(function(f){return f>=h.fechaInicio;});
+      if(h.fechaFin) fechas = fechas.filter(function(f){return f<=h.fechaFin;});
+      const sem = fechas.length;
       const p = calcPrecio(h.inicio,h.fin,pr);
       tf += p.sub*sem;
-      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
+      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,fechaInicio:h.fechaInicio||null,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
@@ -1324,8 +1328,32 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
   function aprobar(s) {
     if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});delDoc("horarios",s.horarioId);if(h){const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
-    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h)saveDoc("horarios",s.horarioId,Object.assign({},h,s.datos,{sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana)}));}
-    else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
+    else if(s.accion==="modificar"&&s.tipo==="fijo"){
+      const c=CONS.find(function(x){return x.id===s.datos.consultorio;});
+      const h=horarios.find(function(x){return x.id===s.horarioId;});
+      var jsD2=Number(s.datos.diaSemana||h&&h.diaSemana||1); if(jsD2===7)jsD2=0;
+      var nd2=new Date(); var diff2=(jsD2-nd2.getDay()+7)%7; if(diff2===0)diff2=7;
+      nd2.setDate(nd2.getDate()+diff2);
+      var fi2=nd2.toISOString().split("T")[0];
+      // Un dia antes de fechaInicio = fechaFin del horario viejo
+      var nd2prev=new Date(fi2); nd2prev.setDate(nd2prev.getDate()-1);
+      var ff2=nd2prev.toISOString().split("T")[0];
+      // Guardar horario viejo con fechaFin (para facturar dias anteriores)
+      if(h) saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:ff2}));
+      // Crear horario nuevo con fechaInicio
+      var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:(h?h.sede:"VL"),diaSemana:Number(s.datos.diaSemana),fechaInicio:fi2});
+      delete hNuevo.fechaFin;
+      saveDoc("horarios",hNuevo.id,hNuevo);
+    }
+    else if(s.accion==="agregar"&&s.tipo==="fijo"){
+      const c=CONS.find(function(x){return x.id===s.datos.consultorio;});
+      var jsD=Number(s.datos.diaSemana); if(jsD===7)jsD=0;
+      var nd=new Date(); var diff=(jsD-nd.getDay()+7)%7; if(diff===0)diff=7;
+      nd.setDate(nd.getDate()+diff);
+      var fi=nd.toISOString().split("T")[0];
+      const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana),fechaInicio:fi});
+      saveDoc("horarios",h.id,h);
+    }
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
     else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
@@ -2689,31 +2717,30 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const [anio,setAnio] = useState(now.getFullYear());
 
   function exportarExcel(ps,m,a) {
-    var mn = MESES[m]+" "+a;
+    var mn = "Facturacion "+MESES[m]+" "+a;
     var totalGeneral = 0;
-    var rows = [["CUIT","Profesional","Monto a pagar"]];
+    var filas = [];
     ps.forEach(function(p){
       var r = calcFact(p,m,a);
       var total = r.total||0;
-      if(total>0){
-        rows.push([p.cuit||"", p.nombre, total]);
-        totalGeneral += total;
-      }
+      if(total>0){ filas.push({cuit:p.cuit||"",nombre:p.nombre,total:total}); totalGeneral+=total; }
     });
-    rows.push([]);
-    rows.push(["","TOTAL GENERAL", totalGeneral]);
-    var header = "sep=,\n";
-    var csv = header+rows.map(function(row){
-      return row.map(function(c){
-        var s=String(c==null?"":c);
-        if(s.indexOf(",")>-1) s="\""+s+"\"";
-        return s;
-      }).join(",");
-    }).join("\n");
-    var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    var ars2 = function(n){ return "$ "+Number(n).toLocaleString("es-AR"); };
+    var rows = filas.map(function(f){
+      return "<tr><td style=\"font-weight:bold\">"+f.cuit+"</td><td style=\"font-weight:bold\">"+f.nombre+"</td><td style=\"text-align:right;font-weight:bold\">"+ars2(f.total)+"</td></tr>";
+    }).join("");
+    var html = "<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" xmlns:x=\"urn:schemas-microsoft-com:office:excel\" xmlns=\"http://www.w3.org/TR/REC-html40\">"+
+      "<head><meta charset=\"UTF-8\"></head><body>"+
+      "<table border=\"1\" style=\"border-collapse:collapse;font-family:Arial;font-size:11pt\">"+
+      "<tr><td colspan=\"3\" style=\"font-size:14pt;font-weight:bold;background:#4BA3C3;color:white;padding:8px\">"+mn+"</td></tr>"+
+      "<tr style=\"background:#EBF6FA\"><th style=\"padding:6px;font-weight:bold\">CUIT</th><th style=\"padding:6px;font-weight:bold\">Profesional</th><th style=\"padding:6px;font-weight:bold;text-align:right\">Monto a pagar</th></tr>"+
+      rows+
+      "<tr><td></td><td style=\"font-weight:bold;padding:6px\">TOTAL GENERAL</td><td style=\"font-weight:bold;text-align:right;font-size:12pt;color:#2D8A5E;padding:6px\">"+ars2(totalGeneral)+"</td></tr>"+
+      "</table></body></html>";
+    var blob = new Blob([html],{type:"application/vnd.ms-excel;charset=utf-8"});
     var url = URL.createObjectURL(blob);
     var a2 = document.createElement("a");
-    a2.href=url; a2.download="Facturacion_"+mn.replace(" ","_")+".csv";
+    a2.href=url; a2.download=mn.replace(/ /g,"_")+".xls";
     document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
     URL.revokeObjectURL(url);
   }
