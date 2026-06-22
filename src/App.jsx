@@ -299,14 +299,17 @@ export default function App() {
   }
   function getPM(mes,anio) { return getP(anio+"-"+String(mes+1).padStart(2,"0")+"-01"); }
 
+  function normName(s) {
+    return (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase().replace(/\s+/g," ");
+  }
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
-    const pn=psico.nombre.trim().toLowerCase();
+    const pn=normName(psico.nombre);
     const pnFirst=pn.split(" ")[0]; // first name only for fallback
     const fp = horarios.filter(function(h){
       if(!h.psico) return false;
-      const hn=h.psico.trim().toLowerCase();
-      return hn===pn || hn===pnFirst; // match full name OR just first name
+      const hn=normName(h.psico);
+      return hn===pn || hn===pnFirst || pn.split(" ")[0]===hn; // match full name OR just first name (ambos sentidos)
     });
     let tf=0; const df=[];
     fp.forEach(function(h) {
@@ -322,8 +325,8 @@ export default function App() {
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
-      const rn=r.psico?r.psico.trim().toLowerCase():"";
-      if(!(rn===pn||rn===pnFirst)) return false;
+      const rn=normName(r.psico);
+      if(!(rn===pn||rn===pnFirst||pn.split(" ")[0]===rn)) return false;
       if(r.tipo!=="extra") return false;
       if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
       if(parseLocalDate(r.fecha).getFullYear()!==anio) return false;
@@ -454,7 +457,7 @@ export default function App() {
               <div style={{color:mu,fontSize:12}}>{role==="admin"?"Administradora":"Profesional"}</div>
             </div>
             {role==="psico" && <EditarPerfilBtn user={user} psicos={psicos} setPsicos={setPsicos} notify={notify}/>}
-            {role==="psico" && <CambiarPassBtn user={user} setPsicos={setPsicos} notify={notify}/>}
+            {role==="psico" && <CambiarPassBtn user={user} psicos={psicos} notify={notify}/>}
             <button onClick={function(){setView("login");setRole(null);setUser(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:er,fontSize:15,fontWeight:600}}>
               <span style={{fontSize:20}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
@@ -1808,7 +1811,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
   }
   function savePass() {
     if(newPass.length < 4) { notify("Minimo 4 caracteres","err"); return; }
-    setPsicos(function(ps){return ps.map(function(x){return x.id===p.id?Object.assign({},x,{pass:newPass}):x;});});
+    saveDoc("psicos",p.id,Object.assign({},p,{pass:newPass}));
     setNewPass(""); setEditPass(false); notify("Contrasena actualizada");
   }
   return (
@@ -3073,7 +3076,7 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   );
 }
 
-function CambiarPassBtn({user,setPsicos,notify}) {
+function CambiarPassBtn({user,psicos,notify}) {
   const [open,setOpen] = useState(false);
   const [actual,setActual] = useState("");
   const [nueva,setNueva] = useState("");
@@ -3081,14 +3084,12 @@ function CambiarPassBtn({user,setPsicos,notify}) {
   function cambiar() {
     if(nueva.length<4){notify("Minimo 4 caracteres","err");return;}
     if(nueva!==conf){notify("Las contrasenas no coinciden","err");return;}
-    setPsicos(function(ps){
-      const p = ps.find(function(x){return x.nombre===user;});
-      if(!p){notify("Error","err");return ps;}
-      if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return ps;}
-      notify("Contrasena cambiada");
-      setOpen(false);setActual("");setNueva("");setConf("");
-      return ps.map(function(x){return x.nombre===user?Object.assign({},x,{pass:nueva}):x;});
-    });
+    const p = psicos.find(function(x){return x.nombre===user;});
+    if(!p){notify("Error","err");return;}
+    if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return;}
+    saveDoc("psicos",p.id,Object.assign({},p,{pass:nueva}));
+    notify("Contrasena cambiada");
+    setOpen(false);setActual("");setNueva("");setConf("");
   }
   return (
     <div>
