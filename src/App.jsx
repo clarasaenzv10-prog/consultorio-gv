@@ -1827,6 +1827,31 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
 
 // ─── Gestion ──────────────────────────────────────────────────
 function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
+  // Todos los nombres/apodos que puede tener esta psico en Firebase
+  var ALIASES = {
+    "Magdalena Perisse":["Magda","Magdalena"],
+    "Eugenia Eguren":["Euge","Eugenia"],
+    "Josefina Cesareo":["Jose Cesareo","Josefina"],
+    "Milagros Vazquez":["Milagros"],
+    "Belen Bancalari":["Belen"],
+    "Bernadette Houssay":["Bernadette"],
+    "Carolina Podversich":["Carolina"],
+    "Agustina Mohr":["Agus Mohr","Agustina"],
+    "Delfina Mohr":["Delfi Mohr","Delfina"],
+    "Sofia Elkin":["Sofi","Sofia"],
+    "Marcela Fernandez Sanchez":["Marce","Marcela"],
+    "Angeles Rodriguez Feito":["Angeles"],
+    "Dolores Torreira":["Dolores Torreira"],
+    "Jesica Lavia":["Jesica"],
+    "Marta Pitzer":["Marta"]
+  };
+  function matchesPsico(nombreEnHorario) {
+    if(!nombreEnHorario) return false;
+    var hn = nombreEnHorario.trim().toLowerCase();
+    if(hn === p.nombre.trim().toLowerCase()) return true;
+    var aliases = ALIASES[p.nombre] || [];
+    return aliases.some(function(a){return a.toLowerCase()===hn;});
+  }
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
   const [editAlias,setEditAlias] = useState(false);
@@ -1855,10 +1880,10 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
     const oldNombre=p.nombre; const nn=newNombre.trim();
     saveDoc("psicos",p.id,Object.assign({},p,{nombre:nn}));
     // Update all horarios with old name
-    (horarios||[]).filter(function(h){return h.psico&&h.psico.toLowerCase()===oldNombre.toLowerCase();})
+    (horarios||[]).filter(function(h){return matchesPsico(h.psico);})
       .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:nn}));});
     // Also update reservas
-    (reservas||[]).filter(function(r){return r.psico&&r.psico.toLowerCase()===oldNombre.toLowerCase();})
+    (reservas||[]).filter(function(r){return r.psico&&matchesPsico(r.psico);})
       .forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:nn}));});
     setEditNombre(false); notify("Nombre actualizado en perfil, horarios y reservas");
   }
@@ -1936,7 +1961,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
         <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){
               if(!window.confirm("Eliminar a "+p.nombre+"?\nTambien se eliminaran sus horarios fijos.")) return;
               delDoc("psicos",p.id);
-              horarios.filter(function(h){return h.psico&&h.psico.toLowerCase()===p.nombre.toLowerCase();})
+              horarios.filter(function(h){return matchesPsico(h.psico);})
                 .forEach(function(h){delDoc("horarios",h.id);});
               notify("Profesional y horarios eliminados");
             }}>X</button>
