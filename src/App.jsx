@@ -1921,23 +1921,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
             </div>
           )}
         </div>
-        {(function(){
-          var tieneHorarios = (horarios||[]).some(function(h){return matchesPsico(h.psico);});
-          return !tieneHorarios ? (
-            <div style={{background:eb,borderRadius:8,padding:"8px 10px",marginBottom:6,border:"1px solid #F5B8B3"}}>
-              <div style={{color:er,fontSize:11,fontWeight:700,marginBottom:6}}>Sin horarios — ingresa el nombre anterior para reasignar</div>
-              {editAlias ? (
-                <div style={{display:"flex",gap:6}}>
-                  <input style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"4px 8px"})} value={oldNombreInput} onChange={function(e){setOldNombreInput(e.target.value);}} placeholder="Nombre anterior..."/>
-                  <button style={Object.assign({},btn(br,wh),{padding:"4px 10px",fontSize:12})} onClick={reasignarHorarios}>OK</button>
-                  <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"4px 8px",fontSize:12})} onClick={function(){setEditAlias(false);}}>X</button>
-                </div>
-              ) : (
-                <button style={Object.assign({},btn(er,wh),{fontSize:11,padding:"4px 12px"})} onClick={function(){setEditAlias(true);}}>Reasignar horarios</button>
-              )}
-            </div>
-          ) : null;
-        })()}
+
         <button
           style={{background:p.fijas?lt:bg,color:p.fijas?dk:mu,border:"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}
           onClick={function(){
@@ -2015,7 +1999,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
-  const misH = selP ? horarios.filter(function(h){return h.psico.toLowerCase()===selP.toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);}) : [];
+  const misH = selP ? horarios.filter(function(h){if(!h.psico)return false;var pn=selP.trim().toLowerCase();var hn=h.psico.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===pn||(AL[pn]||[]).some(function(a){return a===hn;});}).sort(function(a,b){return a.diaSemana-b.diaSemana;}) : [];
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
@@ -2062,7 +2046,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
                   <div key={p.id} style={Object.assign({},sCard,{cursor:"pointer"})} onClick={function(){setSelP(p.nombre);setEid(null);setShowAdd(false);}}>
                     <div style={{flex:1}}>
                       <div style={{color:tx,fontWeight:700}}>{p.nombre}</div>
-                      <div style={{color:mu,fontSize:12}}>{horarios.filter(function(h){return h.psico.toLowerCase()===p.nombre.toLowerCase();}).length} horarios fijos</div>
+                      <div style={{color:mu,fontSize:12}}>{horarios.filter(function(h){if(!h.psico)return false;var hn=h.psico.trim().toLowerCase();var pn=p.nombre.trim().toLowerCase();var aliases={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===pn||(aliases[pn]||[]).some(function(a){return a===hn;});}).length} horarios fijos</div>
                     </div>
                     <span style={{color:mu,fontSize:18}}>›</span>
                   </div>
