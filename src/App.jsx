@@ -624,7 +624,7 @@ function LoginView({onLogin,psicos,config}) {
   const [p,setP] = useState("");
   const [err,setErr] = useState("");
   function go() {
-    if(u==="admin" && p==="admin123") { onLogin("admin","Admin"); return; }
+    if(u==="admin" && p===(config.adminPass||"admin123")) { onLogin("admin","Admin"); return; }
     if(u.toLowerCase()==="invitada" && p===((config&&config.invPass)||"invitada123")) { onLogin("invitada","Invitada"); return; }
     const f = psicos.find(function(x){return x.nombre.toLowerCase()===u.toLowerCase();});
     if(f && p===(f.pass||"psico123")) { onLogin("psico",f.nombre); return; }
@@ -1922,8 +1922,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
           )}
         </div>
         {(function(){
-          var pn = p.nombre.trim().toLowerCase();
-          var tieneHorarios = (horarios||[]).some(function(h){return h.psico&&h.psico.trim().toLowerCase()===pn;});
+          var tieneHorarios = (horarios||[]).some(function(h){return matchesPsico(h.psico);});
           return !tieneHorarios ? (
             <div style={{background:eb,borderRadius:8,padding:"8px 10px",marginBottom:6,border:"1px solid #F5B8B3"}}>
               <div style={{color:er,fontSize:11,fontWeight:700,marginBottom:6}}>Sin horarios — ingresa el nombre anterior para reasignar</div>
@@ -2465,6 +2464,12 @@ function ConfigView({config,setConfig,notify}) {
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
+      </div>
+      <div style={sPanel}>
+        <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:12}}>Acceso admin</div>
+        <label style={sLbl}>Contrasena para admin</label>
+        <input style={sInp} type="password" value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
+        <div style={{color:mu,fontSize:11,marginTop:4}}>Admin ingresa con usuario "admin" y esta contrasena</div>
       </div>
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Datos de transferencia</div>
