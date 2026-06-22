@@ -302,14 +302,39 @@ export default function App() {
   function normName(s) {
     return (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase().replace(/\s+/g," ");
   }
+  // Mapeo de nombres cortos/apodos al nombre completo actual
+  var NAME_MAP = {
+    "magda":"magdalena perisse","magdalena":"magdalena perisse",
+    "euge":"eugenia eguren","eugenia":"eugenia eguren",
+    "jose cesareo":"josefina cesareo",
+    "milagros":"milagros vazquez",
+    "belen":"belen bancalari",
+    "bernadette":"bernadette houssay",
+    "carolina":"carolina podversich",
+    "agus mohr":"agustina mohr",
+    "delfi mohr":"delfina mohr",
+    "sofi":"sofia elkin","sofia":"sofia elkin",
+    "marce":"marcela fernandez sanchez","marcela":"marcela fernandez sanchez",
+    "angeles":"angeles rodriguez feito",
+    "dolores torreira":"dolores torreira",
+    "josefina cesareo":"josefina cesareo",
+    "milagros vazquez":"milagros vazquez",
+    "jesica lavia":"jesica lavia","jesica":"jesica lavia",
+    "marta pitzer":"marta pitzer","marta":"marta pitzer",
+    "agustina mohr":"agustina mohr","agustina":"agustina mohr",
+    "delfina mohr":"delfina mohr","delfina":"delfina mohr"
+  };
+  function resolveName(s) {
+    var n = normName(s);
+    return NAME_MAP[n] || n;
+  }
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
-    const pn=normName(psico.nombre);
-    const pnFirst=pn.split(" ")[0]; // first name only for fallback
+    const pn=resolveName(psico.nombre);
     const fp = horarios.filter(function(h){
       if(!h.psico) return false;
-      const hn=normName(h.psico);
-      return hn===pn || hn===pnFirst || pn.split(" ")[0]===hn; // match full name OR just first name (ambos sentidos)
+      var hn=resolveName(h.psico);
+      return hn===pn;
     });
     let tf=0; const df=[];
     fp.forEach(function(h) {
@@ -325,8 +350,8 @@ export default function App() {
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
-      const rn=normName(r.psico);
-      if(!(rn===pn||rn===pnFirst||pn.split(" ")[0]===rn)) return false;
+      var rn=resolveName(r.psico);
+      if(rn!==pn) return false;
       if(r.tipo!=="extra") return false;
       if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
       if(parseLocalDate(r.fecha).getFullYear()!==anio) return false;
@@ -513,7 +538,7 @@ export default function App() {
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
-          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
+          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
@@ -1039,10 +1064,25 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
 }
 
 // ─── Perfiles ─────────────────────────────────────────────────
-function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
+function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,horarios,reservas}) {
   const [eid,setEid] = useState(null);
   const [form,setForm] = useState({});
-  function save() { saveDoc("psicos",eid,Object.assign({},form)); setEid(null); notify("Perfil actualizado"); }
+  function save() {
+    var oldNombre = (psicos.find(function(x){return x.id===eid;})||{}).nombre||"";
+    var newNombre = (form.nombre||"").trim();
+    saveDoc("psicos",eid,Object.assign({},form,{nombre:newNombre}));
+    // Si cambio el nombre, actualizar horarios y reservas
+    if(oldNombre && newNombre && oldNombre!==newNombre) {
+      (horarios||[]).filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===oldNombre.trim().toLowerCase();})
+        .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:newNombre}));});
+      (reservas||[]).filter(function(r){return r.psico&&r.psico.trim().toLowerCase()===oldNombre.trim().toLowerCase();})
+        .forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:newNombre}));});
+      notify("Perfil y horarios actualizados");
+    } else {
+      notify("Perfil actualizado");
+    }
+    setEid(null);
+  }
   return (
     <>
     <div>
@@ -1789,6 +1829,19 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
 function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
+  const [editAlias,setEditAlias] = useState(false);
+  const [oldNombreInput,setOldNombreInput] = useState("");
+  function reasignarHorarios() {
+    var old = oldNombreInput.trim();
+    if(!old) return;
+    var found = 0;
+    (horarios||[]).filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===old.toLowerCase();})
+      .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:p.nombre}));found++;});
+    (reservas||[]).filter(function(r){return r.psico&&r.psico.trim().toLowerCase()===old.toLowerCase();})
+      .forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:p.nombre}));});
+    notify(found>0?"Reasignados "+found+" horarios a "+p.nombre:"No se encontraron horarios con ese nombre");
+    setEditAlias(false); setOldNombreInput("");
+  }
   const [editCuit,setEditCuit] = useState(false);
   const [newCuit,setNewCuit] = useState(p.cuit||"");
   function saveCuit() {
@@ -1843,6 +1896,24 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
             </div>
           )}
         </div>
+        {(function(){
+          var pn = p.nombre.trim().toLowerCase();
+          var tieneHorarios = (horarios||[]).some(function(h){return h.psico&&h.psico.trim().toLowerCase()===pn;});
+          return !tieneHorarios ? (
+            <div style={{background:eb,borderRadius:8,padding:"8px 10px",marginBottom:6,border:"1px solid #F5B8B3"}}>
+              <div style={{color:er,fontSize:11,fontWeight:700,marginBottom:6}}>Sin horarios — ingresa el nombre anterior para reasignar</div>
+              {editAlias ? (
+                <div style={{display:"flex",gap:6}}>
+                  <input style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"4px 8px"})} value={oldNombreInput} onChange={function(e){setOldNombreInput(e.target.value);}} placeholder="Nombre anterior..."/>
+                  <button style={Object.assign({},btn(br,wh),{padding:"4px 10px",fontSize:12})} onClick={reasignarHorarios}>OK</button>
+                  <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"4px 8px",fontSize:12})} onClick={function(){setEditAlias(false);}}>X</button>
+                </div>
+              ) : (
+                <button style={Object.assign({},btn(er,wh),{fontSize:11,padding:"4px 12px"})} onClick={function(){setEditAlias(true);}}>Reasignar horarios</button>
+              )}
+            </div>
+          ) : null;
+        })()}
         <button
           style={{background:p.fijas?lt:bg,color:p.fijas?dk:mu,border:"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}
           onClick={function(){
