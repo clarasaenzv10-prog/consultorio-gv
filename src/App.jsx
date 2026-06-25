@@ -550,7 +550,7 @@ export default function App() {
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
           {tab==="chat" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
-          {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
+          {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){if(!user)return false;var un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};function match(n){if(!n)return false;var hn=n.trim().toLowerCase();return hn===un||(AL[un]||[]).some(function(a){return a===hn;});}return match(r.psico)||match(r.solicitante);})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
         </main>
 
@@ -1485,6 +1485,33 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
               <div style={{color:mu,fontSize:12}}>{new Date(s.fechaSol).toLocaleDateString("es-AR")}</div>
             </div>
             <div style={{background:bg,borderRadius:8,padding:10,color:tx,fontSize:13,marginBottom:12,border:"1px solid #C9E4EF"}}>{det(s)}</div>
+            {s.tipo==="fijo"&&(function(){
+              var dia = s.datos&&s.datos.diaSemana!=null ? Number(s.datos.diaSemana) : null;
+              var cons = s.datos&&s.datos.consultorio ? s.datos.consultorio : null;
+              var ini = s.datos&&s.datos.inicio ? s.datos.inicio : null;
+              var fin = s.datos&&s.datos.fin ? s.datos.fin : null;
+              if(!dia||!cons||!ini||!fin) return null;
+              var conflictos = reservas.filter(function(r){
+                if(r.estado!=="aprobada"&&r.estado!=="pendiente") return false;
+                if(r.consultorio!==cons) return false;
+                var rDate = r.fecha ? new Date(r.fecha+"T12:00:00") : null;
+                if(!rDate) return false;
+                var rDia = rDate.getDay()===0?7:rDate.getDay();
+                if(rDia!==dia) return false;
+                var sMin=toMin(ini),eMin=toMin(fin),rMin=toMin(r.inicio),rEnd=toMin(r.fin);
+                return sMin<rEnd&&eMin>rMin;
+              });
+              if(!conflictos.length) return null;
+              return (
+                <div style={{background:"#FEF9C3",border:"1.5px solid #EAB308",borderRadius:10,padding:"10px 14px",marginBottom:12}}>
+                  <div style={{color:"#854D0E",fontWeight:700,fontSize:12,marginBottom:6}}>⚠️ Atencion: hay eventuales que se superpondrían con este fijo</div>
+                  {conflictos.map(function(r){
+                    return <div key={r.id} style={{color:"#713F12",fontSize:12,marginBottom:2}}>• {r.psico} — {r.fecha} {r.inicio}-{r.fin} ({r.estado==="pendiente"?"pendiente":"aprobada"})</div>;
+                  })}
+                  <div style={{color:"#854D0E",fontSize:11,marginTop:6}}>Si aprobas el fijo, avisale a {conflictos.map(function(r){return r.psico;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(", ")} que su eventual queda cancelado.</div>
+                </div>
+              );
+            })()}
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
               <button style={Object.assign({},btn(br,wh),{padding:"7px 14px",fontSize:13})} onClick={function(){aprobar(s);}}>Aprobar</button>
               <input style={Object.assign({},sInp,{flex:1,fontSize:12})} placeholder="Motivo de rechazo" value={notas[s.id]||""} onChange={function(e){setNotas(function(n){return Object.assign({},n,{[s.id]:e.target.value});});}}/>
@@ -2217,8 +2244,8 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   const [vistos,setVistos] = useState([]);
   const [showHist,setShowHist] = useState(false);
   const mF = horarios.filter(function(h){return h.psico&&user&&h.psico.trim().toLowerCase()===user.trim().toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
-  const mE = reservas.filter(function(r){return r.psico===user&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
-  const mS = solicitudes.filter(function(s){return s.psico===user;}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
+  const mE = reservas.filter(function(r){if(!r.psico||!user)return false;var hn=r.psico.trim().toLowerCase(),un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};var match=hn===un||(AL[un]||[]).some(function(a){return a===hn;});return match&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
+  const mS = solicitudes.filter(function(s){if(!s.psico||!user)return false;var hn=s.psico.trim().toLowerCase(),un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===un||(AL[un]||[]).some(function(a){return a===hn;});}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
 
   function sol(tipo,accion,datos,hId,rId) {
     const s={id:Date.now(),psico:user,tipo:tipo,accion:accion,datos:datos,horarioId:hId||null,reservaId:rId||null,estado:"pendiente",fechaSol:new Date().toISOString()};
