@@ -331,11 +331,20 @@ export default function App() {
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
     const pn=resolveName(psico.nombre);
-    const fp = horarios.filter(function(h){
+    var fpAll = horarios.filter(function(h){
       if(!h.psico) return false;
       var hn=resolveName(h.psico);
       return hn===pn;
     });
+    // Deduplicar: agrupar por dia+consultorio+inicio, quedarse con el mejor de cada grupo
+    var fpBest = {};
+    fpAll.forEach(function(h){
+      var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");
+      if(!fpBest[k]){fpBest[k]=h;return;}
+      // Preferir el que tiene fechaInicio sobre el que no tiene
+      if(h.fechaInicio&&!fpBest[k].fechaInicio) fpBest[k]=h;
+    });
+    var fp = Object.values(fpBest);
     let tf=0; const df=[];
     fp.forEach(function(h) {
       var todasFechas = mesFechas(mes,anio,Number(h.diaSemana));
@@ -2026,7 +2035,9 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
-  const misH = selP ? horarios.filter(function(h){if(!h.psico)return false;var pn=selP.trim().toLowerCase();var hn=h.psico.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===pn||(AL[pn]||[]).some(function(a){return a===hn;});}).sort(function(a,b){return a.diaSemana-b.diaSemana;}) : [];
+  const misHAll = selP ? horarios.filter(function(h){if(!h.psico)return false;var pn=selP.trim().toLowerCase();var hn=h.psico.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===pn||(AL[pn]||[]).some(function(a){return a===hn;});}) : [];
+    var misHBest={};misHAll.forEach(function(h){var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");if(!misHBest[k]||(!misHBest[k].fechaInicio&&h.fechaInicio))misHBest[k]=h;});
+    const misH = Object.values(misHBest).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
@@ -2420,6 +2431,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
 // ─── Configuracion (Admin) ────────────────────────────────────
 function ConfigView({config,setConfig,notify}) {
   const [invPass,setInvPass] = useState(config.invPass||"invitada123");
+  const [adminPass,setAdminPass] = useState(config.adminPass||"admin123");
   const [alias,setAlias] = useState((config.transferencia&&config.transferencia.alias)||"");
   const [cbu,setCbu] = useState((config.transferencia&&config.transferencia.cbu)||"");
   const [banco,setBanco] = useState((config.transferencia&&config.transferencia.banco)||"");
@@ -2432,6 +2444,7 @@ function ConfigView({config,setConfig,notify}) {
 
   useEffect(function() {
     setInvPass(config.invPass||"invitada123");
+    setAdminPass(config.adminPass||"admin123");
     setAlias((config.transferencia&&config.transferencia.alias)||"");
     setCbu((config.transferencia&&config.transferencia.cbu)||"");
     setBanco((config.transferencia&&config.transferencia.banco)||"");
@@ -2442,7 +2455,7 @@ function ConfigView({config,setConfig,notify}) {
   }, [config]);
 
   function save() {
-    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
+    setConfig({id:"main",invPass:invPass,adminPass:adminPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
     notify("Configuracion guardada");
   }
   function fixUrl(url) {
@@ -2767,64 +2780,6 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
 
 
 // ─── Estadisticas ─────────────────────────────────────────────
-function exportarExcel(psicos,mes,anio) {
-  var lines = [];
-  var mNombre = MESES[mes]+" "+anio;
-
-  // Header
-  lines.push(["Profesional","Tipo","Dia/Fecha","Consultorio","Desde","Hasta","Horas","Detalle","Semanas","Subtotal","Descuento %","Total"]);
-
-  psicos.forEach(function(p){
-    var r = calcFact(p,mes,anio);
-    // Fijos
-    r.df.forEach(function(d){
-      lines.push([
-        p.nombre,"Fijo",DIAS[d.diaSemana],d.cons,d.ini,d.fin,
-        d.horas.toFixed?d.horas.toFixed(1):d.horas,
-        d.ley||d.des||"",d.sem,d.sub,
-        (p.descuento||0)+"%",
-        ""
-      ]);
-    });
-    // Extras
-    r.de.forEach(function(d){
-      lines.push([
-        p.nombre,"Extra",d.fecha,d.cons,d.ini,d.fin,
-        d.horas.toFixed?d.horas.toFixed(1):d.horas,
-        d.ley||d.des||"","1",d.sub,
-        (p.descuento||0)+"%",
-        ""
-      ]);
-    });
-    // Totals row per psico
-    lines.push([
-      p.nombre,"TOTAL","","","","","","",
-      "",r.bruto,
-      (p.descuento||0)+"%",
-      r.total
-    ]);
-    lines.push([]); // empty row between psicos
-  });
-
-  // Convert to CSV with semicolons (Excel-friendly for Argentina)
-  var csv = lines.map(function(row){
-    return row.map(function(cell){
-      return String(cell==null?"":cell).replace(/;/g," ");
-    }).join(";");
-  }).join("\n");
-
-  // Add BOM for Excel UTF-8
-  var bom = "\uFEFF";
-  var blob = new Blob([bom+csv],{type:"text/csv;charset=utf-8;"});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement("a");
-  a.href = url;
-  a.download = "Facturacion_"+mNombre.replace(" ","_")+".csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 
 function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
@@ -2834,28 +2789,24 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   function exportarExcel(ps,m,a) {
     var mn = "Facturacion "+MESES[m]+" "+a;
     var totalGeneral = 0;
-    var filas = [];
+    var csvRows = ["sep=,","CUIT,Profesional,Monto a pagar"];
     ps.forEach(function(p){
       var r = calcFact(p,m,a);
       var total = r.total||0;
-      if(total>0){ filas.push({cuit:p.cuit||"",nombre:p.nombre,total:total}); totalGeneral+=total; }
+      if(total>0){
+        var nombre = p.nombre.indexOf(",")>-1 ? '"'+p.nombre+'"' : p.nombre;
+        var cuit = (p.cuit||"").indexOf(",")>-1 ? '"'+(p.cuit||"")+'"' : (p.cuit||"");
+        csvRows.push(cuit+","+nombre+","+total);
+        totalGeneral += total;
+      }
     });
-    var ars2 = function(n){ return "$ "+Number(n).toLocaleString("es-AR"); };
-    var rows = filas.map(function(f){
-      return "<tr><td style=\"font-weight:bold\">"+f.cuit+"</td><td style=\"font-weight:bold\">"+f.nombre+"</td><td style=\"text-align:right;font-weight:bold\">"+ars2(f.total)+"</td></tr>";
-    }).join("");
-    var html = "<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" xmlns:x=\"urn:schemas-microsoft-com:office:excel\" xmlns=\"http://www.w3.org/TR/REC-html40\">"+
-      "<head><meta charset=\"UTF-8\"></head><body>"+
-      "<table border=\"1\" style=\"border-collapse:collapse;font-family:Arial;font-size:11pt\">"+
-      "<tr><td colspan=\"3\" style=\"font-size:14pt;font-weight:bold;background:#4BA3C3;color:white;padding:8px\">"+mn+"</td></tr>"+
-      "<tr style=\"background:#EBF6FA\"><th style=\"padding:6px;font-weight:bold\">CUIT</th><th style=\"padding:6px;font-weight:bold\">Profesional</th><th style=\"padding:6px;font-weight:bold;text-align:right\">Monto a pagar</th></tr>"+
-      rows+
-      "<tr><td></td><td style=\"font-weight:bold;padding:6px\">TOTAL GENERAL</td><td style=\"font-weight:bold;text-align:right;font-size:12pt;color:#2D8A5E;padding:6px\">"+ars2(totalGeneral)+"</td></tr>"+
-      "</table></body></html>";
-    var blob = new Blob([html],{type:"application/vnd.ms-excel;charset=utf-8"});
+    csvRows.push("");
+    csvRows.push(",TOTAL GENERAL,"+totalGeneral);
+    var csv = csvRows.join("\r\n");
+    var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
     var url = URL.createObjectURL(blob);
     var a2 = document.createElement("a");
-    a2.href=url; a2.download=mn.replace(/ /g,"_")+".xls";
+    a2.href=url; a2.download=mn.replace(/ /g,"_")+".csv";
     document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
     URL.revokeObjectURL(url);
   }
