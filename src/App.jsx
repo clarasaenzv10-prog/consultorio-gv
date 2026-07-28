@@ -1234,22 +1234,43 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
 // ─── Anuncios ─────────────────────────────────────────────────
 function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
   const [txt,setTxt] = useState("");
+  const [imgs,setImgs] = useState(["","",""]);
+  function setImg(i,v){setImgs(function(prev){var n=[...prev];n[i]=v;return n;});}
   function pub() {
     if(!txt.trim()) return;
-    const a={id:Date.now(),texto:txt.trim(),fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
+    var imgList = imgs.map(function(u){return u.trim();}).filter(Boolean);
+    var imgFixed = imgList.map(function(u){
+      // Convert Google Drive share link to direct image
+      var m = u.match(/\/d\/([^/]+)/);
+      if(m) return "https://drive.google.com/uc?export=view&id="+m[1];
+      return u;
+    });
+    const a={id:Date.now(),texto:txt.trim(),fotos:imgFixed,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
-    // Save pending notification to Firestore for cloud function to send
     saveDoc("pendingNotifs","notif_"+a.id,{
       title:"Consultorio Gloria Videla",
       body:txt.trim().substring(0,100),
       created:new Date().toISOString(),
       sent:false
     });
-    setTxt(""); notify("Anuncio publicado");
+    setTxt(""); setImgs(["","",""]); notify("Anuncio publicado");
   }
   function sWA(p,t) {
     if(!p.wa){notify("Sin WA: "+p.nombre,"err");return;}
     openLink("https://wa.me/"+p.wa+"?text="+encodeURIComponent("Anuncio Consultorio GV:\n\n"+t),"_blank");
+  }
+  function renderTexto(t) {
+    // Render line breaks and **bold** text
+    return t.split("\n").map(function(line,i){
+      var parts = line.split(/\*\*([^*]+)\*\*/g);
+      return React.createElement("div",{key:i,style:{minHeight:"1em"}},
+        parts.map(function(part,j){
+          return j%2===1
+            ? React.createElement("strong",{key:j},part)
+            : part;
+        })
+      );
+    });
   }
   const mios = anuncios.filter(function(a){return role==="admin"||(a.para==="todas"?a.excluir!==user:a.para===user);});
   return (
@@ -1258,7 +1279,17 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
       {role==="admin" && (
         <div style={Object.assign({},sPanel,{marginBottom:20})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Nuevo anuncio</div>
-          <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical"})} value={txt} onChange={function(e){setTxt(e.target.value);}} placeholder="Ej: Se corto la luz en Uruguay, vuelve en 2 horas..."/>
+          <textarea style={Object.assign({},sInp,{minHeight:100,resize:"vertical",fontFamily:"inherit"})} value={txt} onChange={function(e){setTxt(e.target.value);}} placeholder="Escribi el anuncio... Usa **negrita** para resaltar. Enter para nueva linea."/>
+          <div style={{color:mu,fontSize:11,marginTop:4}}>Tip: **palabra** = <strong>negrita</strong>, Enter = nueva linea</div>
+          <div style={{marginTop:10}}>
+            <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Fotos (links de Google Drive o imagen directa)</div>
+            {imgs.map(function(url,i){return(
+              <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
+                <input style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"6px 10px"})} value={url} onChange={function(e){setImg(i,e.target.value);}} placeholder={"Foto "+(i+1)+": pega el link de Google Drive o imagen..."}/>
+                {url&&<div style={{width:40,height:40,borderRadius:8,overflow:"hidden",flexShrink:0,border:"1px solid #C9E4EF"}}><img src={url.match(/\/d\/([^/]+)/)?"https://drive.google.com/uc?export=view&id="+url.match(/\/d\/([^/]+)/)[1]:url} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={function(e){e.target.style.display="none";}}/></div>}
+              </div>
+            );})}
+          </div>
           <div style={{display:"flex",gap:10,marginTop:12,flexWrap:"wrap"}}>
             <button style={btn(br,wh)} onClick={pub}>Publicar en app</button>
             <button style={{background:"#25D366",color:wh,border:"none",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){if(txt.trim())psicos.filter(function(p){return p.wa;}).forEach(function(p,i){setTimeout(function(){sWA(p,txt);},i*700);});}}>WA a todas</button>
@@ -1281,7 +1312,14 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
                 {role==="admin" && <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:11,padding:"3px 8px"})} onClick={function(){delDoc("anuncios",a.id);}}>X</button>}
               </div>
             </div>
-            <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{a.texto}</div>
+            <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{renderTexto(a.texto)}</div>
+              {(a.fotos||[]).length>0&&(
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                  {(a.fotos||[]).map(function(url,i){return(
+                    <img key={i} src={url} style={{maxWidth:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",cursor:"pointer"}} onClick={function(){var a=document.createElement("a");a.href=url;a.target="_blank";document.body.appendChild(a);a.click();document.body.removeChild(a);}} onError={function(e){e.target.style.display="none";}}/>
+                  );})}
+                </div>
+              )}
           </div>
         );
       })}
@@ -1850,10 +1888,55 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
                   <div key={p.id} style={Object.assign({},sCard,{padding:"10px 14px",marginBottom:8})}>
                     <div style={{flex:1,color:tx,fontWeight:600}}>{p.nombre}{!p.wa&&" (sin WA)"}</div>
                     <button style={{background:"#25D366",color:wh,border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={function(){sWA(p);}}>WA</button>
+                    {p.email&&<button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={function(){
+                      if(!sel)return;
+                      var P=sel.p;
+                      var asunto="Nuevos precios - "+sel.label;
+                      var cuerpo="Hola "+p.nombre+"!\n\nNuevos precios vigentes desde "+new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")+".\n\n";
+                      cuerpo+="MODULOS\n";
+                      cuerpo+="M1 Manana (8-14hs):   "+ars(P.m1)+"\n";
+                      cuerpo+="M2 Tarde  (14-18hs):  "+ars(P.m2)+"\n";
+                      cuerpo+="M3 Noche  (18-21hs):  "+ars(P.m3)+"\n";
+                      cuerpo+="Dia completo:          "+ars(P.dia)+"\n\n";
+                      cuerpo+="HORAS SUELTAS\n";
+                      cuerpo+="Manana: "+ars(P.man)+"/hs\n";
+                      cuerpo+="Tarde:  "+ars(P.tar)+"/hs\n";
+                      cuerpo+="Noche:  "+ars(P.noc)+"/hs\n\n";
+                      cuerpo+="Saludos,\nConsultorio Gloria Videla";
+                      var a=document.createElement("a");
+                      a.href="mailto:"+p.email+"?subject="+encodeURIComponent(asunto)+"&body="+encodeURIComponent(cuerpo);
+                      document.body.appendChild(a);a.click();document.body.removeChild(a);
+                    }}>Mail</button>}
                   </div>
                 );
               })}
             </div>
+            {sel&&(
+              <button style={Object.assign({},btn(br,wh),{width:"100%",marginTop:12,fontSize:13})} onClick={function(){
+                var P=sel.p;
+                var emails=psicos.filter(function(p){return p.email;}).map(function(p){return p.email;}).join(",");
+                if(!emails){notify("Ninguna profesional tiene mail cargado","err");return;}
+                var asunto="Nuevos precios - "+sel.label;
+                var cuerpo="Hola a todas!\n\nLes compartimos los nuevos precios vigentes desde "+new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")+".\n\n";
+                cuerpo+="MODULOS\n";
+                cuerpo+="+-----------------------+-----------+\n";
+                cuerpo+="| M1 Manana  (8-14hs)   | "+ars(P.m1).padStart(10)+" |\n";
+                cuerpo+="| M2 Tarde   (14-18hs)  | "+ars(P.m2).padStart(10)+" |\n";
+                cuerpo+="| M3 Noche   (18-21hs)  | "+ars(P.m3).padStart(10)+" |\n";
+                cuerpo+="| Dia completo          | "+ars(P.dia).padStart(10)+" |\n";
+                cuerpo+="+-----------------------+-----------+\n\n";
+                cuerpo+="HORAS SUELTAS\n";
+                cuerpo+="+-----------+-----------+\n";
+                cuerpo+="| Manana    | "+ars(P.man)+"/hs |\n";
+                cuerpo+="| Tarde     | "+ars(P.tar)+"/hs |\n";
+                cuerpo+="| Noche     | "+ars(P.noc)+"/hs |\n";
+                cuerpo+="+-----------+-----------+\n\n";
+                cuerpo+="Saludos,\nConsultorio Gloria Videla";
+                var a=document.createElement("a");
+                a.href="mailto:"+emails+"?subject="+encodeURIComponent(asunto)+"&body="+encodeURIComponent(cuerpo);
+                document.body.appendChild(a);a.click();document.body.removeChild(a);
+              }}>📧 Enviar precios por mail a todas las profesionales</button>
+            )}
           </div>
         )}
       </div>
