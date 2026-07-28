@@ -1232,6 +1232,22 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
 }
 
 // ─── Anuncios ─────────────────────────────────────────────────
+function gdUrl(url) {
+  if(!url) return url;
+  var m = url.match(/\/d\/([^/?&]+)/);
+  if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+  return url;
+}
+function ImagePreview({url}) {
+  var src = gdUrl(url);
+  return (
+    <div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",background:bg,minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <img src={src} style={{maxWidth:"100%",maxHeight:160,objectFit:"contain",display:"block"}}
+        onError={function(e){e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+      <div style={{display:"none",color:mu,fontSize:11,padding:8}}>Link no válido o imagen no pública</div>
+    </div>
+  );
+}
 function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
   const [txt,setTxt] = useState("");
   const [imgs,setImgs] = useState(["","",""]);
@@ -1286,14 +1302,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
             {imgs.map(function(url,i){return(
               <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
                 <input style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"6px 10px"})} value={url} onChange={function(e){setImg(i,e.target.value);}} placeholder={"Foto "+(i+1)+": link de Google Drive o URL de imagen"}/>
-                {url&&(function(){
-                var src=url;
-                var m=url.match(/\/d\/([^/?]+)/);
-                if(m) src="https://drive.google.com/thumbnail?id="+m[1]+"&sz=w400";
-                return <div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",maxHeight:120,display:"flex",alignItems:"center",justifyContent:"center",background:bg}}>
-                  <img src={src} style={{maxWidth:"100%",maxHeight:120,objectFit:"contain"}} onError={function(e){e.target.parentNode.innerHTML="<div style=\"color:#C0392B;font-size:11px;padding:8px\">No se pudo cargar la imagen. Verificá que el link sea público.</div>";}}/>
-                </div>;
-              })()}
+                {url&&<ImagePreview url={url}/>}
               </div>
             );})}
           </div>
@@ -1323,7 +1332,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
               {(a.fotos||[]).length>0&&(
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
                   {(a.fotos||[]).map(function(url,i){return(
-                    <img key={i} src={url} style={{maxWidth:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",cursor:"pointer"}} onClick={function(){var a=document.createElement("a");a.href=url;a.target="_blank";document.body.appendChild(a);a.click();document.body.removeChild(a);}} onError={function(e){e.target.style.display="none";}}/>
+                    <img key={i} src={gdUrl(url)} style={{maxWidth:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",cursor:"pointer"}} onClick={function(){var a=document.createElement("a");a.href=gdUrl(url);a.target="_blank";document.body.appendChild(a);a.click();document.body.removeChild(a);}} onError={function(e){e.target.style.display="none";}}/>
                   );})}
                 </div>
               )}
