@@ -1242,7 +1242,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
     var imgFixed = imgList.map(function(u){
       // Convert Google Drive share link to direct image
       var m = u.match(/\/d\/([^/]+)/);
-      if(m) return "https://drive.google.com/uc?export=view&id="+m[1];
+      if(m) return "https://drive.google.com/thumbnail?id="+m[1]+"&sz=w800";
       return u;
     });
     const a={id:Date.now(),texto:txt.trim(),fotos:imgFixed,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
@@ -1285,8 +1285,15 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
             <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Fotos (links de Google Drive o imagen directa)</div>
             {imgs.map(function(url,i){return(
               <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
-                <input style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"6px 10px"})} value={url} onChange={function(e){setImg(i,e.target.value);}} placeholder={"Foto "+(i+1)+": pega el link de Google Drive o imagen..."}/>
-                {url&&<div style={{width:40,height:40,borderRadius:8,overflow:"hidden",flexShrink:0,border:"1px solid #C9E4EF"}}><img src={url.match(/\/d\/([^/]+)/)?"https://drive.google.com/uc?export=view&id="+url.match(/\/d\/([^/]+)/)[1]:url} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={function(e){e.target.style.display="none";}}/></div>}
+                <input style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"6px 10px"})} value={url} onChange={function(e){setImg(i,e.target.value);}} placeholder={"Foto "+(i+1)+": link de Google Drive o URL de imagen"}/>
+                {url&&(function(){
+                var src=url;
+                var m=url.match(/\/d\/([^/?]+)/);
+                if(m) src="https://drive.google.com/thumbnail?id="+m[1]+"&sz=w400";
+                return <div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",maxHeight:120,display:"flex",alignItems:"center",justifyContent:"center",background:bg}}>
+                  <img src={src} style={{maxWidth:"100%",maxHeight:120,objectFit:"contain"}} onError={function(e){e.target.parentNode.innerHTML="<div style=\"color:#C0392B;font-size:11px;padding:8px\">No se pudo cargar la imagen. Verificá que el link sea público.</div>";}}/>
+                </div>;
+              })()}
               </div>
             );})}
           </div>
