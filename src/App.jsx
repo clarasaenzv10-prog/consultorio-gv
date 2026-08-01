@@ -1527,7 +1527,16 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   function aprobar(s) {
     if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});delDoc("horarios",s.horarioId);if(h){const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
     else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h)saveDoc("horarios",s.horarioId,Object.assign({},h,s.datos,{sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana)}));}
-    else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
+    else if(s.accion==="agregar"&&s.tipo==="fijo"){
+      var diaF=s.datos&&Number(s.datos.diaSemana),consF=s.datos&&s.datos.consultorio,iniF=s.datos&&s.datos.inicio,finF=s.datos&&s.datos.fin;
+      if(diaF&&consF&&iniF&&finF){
+        var confF=(horarios||[]).some(function(hx){return hx.consultorio===consF&&Number(hx.diaSemana)===diaF&&toMin(iniF)<toMin(hx.fin)&&toMin(finF)>toMin(hx.inicio);});
+        if(confF){notify("No se puede aprobar: "+consF+" ya tiene un horario fijo ese dia en ese horario","err");return;}
+      }
+      const c=CONS.find(function(x){return x.id===s.datos.consultorio;});
+      const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});
+      saveDoc("horarios",h.id,h);
+    }
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
     else if(s.accion==="agregar"&&s.tipo==="extra"){
       var fecha2=s.datos&&s.datos.fecha, cons2=s.datos&&s.datos.consultorio, ini2=s.datos&&s.datos.inicio, fin2=s.datos&&s.datos.fin;
@@ -2302,6 +2311,11 @@ function MisReservasView({reservas,onNew}) {
             <span style={bge(r.estado==="aprobada"?ob:r.estado==="rechazada"?eb:lt,r.estado==="aprobada"?ok:r.estado==="rechazada"?er:dk)}>
               {r.estado==="aprobada"?"Aprobada":r.estado==="rechazada"?"Rechazada":"Pendiente"}
             </span>
+            {r.estado==="pendiente"&&(
+              <button style={{background:"transparent",border:"1.5px solid #F5B8B3",borderRadius:8,padding:"4px 10px",fontSize:12,color:"#C0392B",cursor:"pointer",fontFamily:"inherit",fontWeight:600,marginLeft:8}} onClick={function(){
+                delDoc("reservas",r.id);
+              }}>Cancelar</button>
+            )}
           </div>
         );
       })}
@@ -2314,7 +2328,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   const [mH,setMH] = useState(null);
   const [vistos,setVistos] = useState([]);
   const [showHist,setShowHist] = useState(false);
-  const AL_MF={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};const mF = horarios.filter(function(h){if(!h.psico||!user)return false;var hn=h.psico.trim().toLowerCase(),un=user.trim().toLowerCase();return hn===un||(AL_MF[un]||[]).some(function(a){return a===hn;});}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  const AL_MF={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};const mF = horarios.filter(function(h){if(!h.psico||!user)return false;var hn=h.psico.trim().toLowerCase(),un=user.trim().toLowerCase();return hn===un||(AL_MF[un]||[]).some(function(a){return a===hn;})||(AL_MF[hn]||[]).some(function(a){return a===un;});}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
   const mE = reservas.filter(function(r){if(!r.psico||!user)return false;var hn=r.psico.trim().toLowerCase(),un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};var match=hn===un||(AL[un]||[]).some(function(a){return a===hn;});return match&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
   const mS = solicitudes.filter(function(s){if(!s.psico||!user)return false;var hn=s.psico.trim().toLowerCase(),un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===un||(AL[un]||[]).some(function(a){return a===hn;});}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
 
@@ -2562,7 +2576,10 @@ function ConfigView({config,setConfig,notify}) {
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
         <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:8,marginTop:4}}>Contrasena Admin</div>
         <label style={sLbl}>Nueva contrasena para admin</label>
-        <input style={sInp} value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
+        <div style={{display:"flex",gap:8,marginBottom:4}}>
+          <input style={Object.assign({},sInp,{flex:1})} value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
+          <button style={{background:"#4BA3C3",color:"#FFFFFF",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){saveDoc("config","main",Object.assign({},config,{adminPass:adminPass}));notify("Contrasena guardada");}}>Guardar</button>
+        </div>
         <div style={{color:mu,fontSize:11,marginTop:4,marginBottom:16}}>Ingresá con usuario "admin" y esta contrasena</div>
         <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:8}}>Contrasena Invitadas</div>
         <label style={sLbl}>Contrasena para invitadas</label>
