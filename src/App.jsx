@@ -215,6 +215,15 @@ function Logo({size,col}) {
 }
 
 // ─── App ──────────────────────────────────────────────────────
+var CF_ALIASES={"agustina mohr":["agus mohr"],"delfina mohr":["delfi mohr"],"magdalena perisse":["magda"],"eugenia eguren":["euge"],"josefina cesareo":["jose cesareo"],"sofia elkin":["sofi"],"marcela fernandez sanchez":["marce"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"angeles rodriguez feito":["angeles"],"milagros vazquez":["milagros"],"dolores torreira":["dolores torreira"]};
+function matchHorario(pNombre, hPsico) {
+  if(!hPsico||!pNombre) return false;
+  var pn = pNombre.trim().toLowerCase();
+  var hn = hPsico.trim().toLowerCase();
+  if(hn===pn) return true;
+  return (CF_ALIASES[pn]||[]).some(function(a){return a===hn;});
+}
+
 export default function App() {
   const [view,setView] = useState("login");
   const [role,setRole] = useState(null);
@@ -314,15 +323,7 @@ export default function App() {
   }
   function getPM(mes,anio) { return getP(anio+"-"+String(mes+1).padStart(2,"0")+"-01"); }
 
-  var CF_ALIASES={"agustina mohr":["agus mohr"],"delfina mohr":["delfi mohr"],"magdalena perisse":["magda"],"eugenia eguren":["euge"],"josefina cesareo":["jose cesareo"],"sofia elkin":["sofi"],"marcela fernandez sanchez":["marce"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"angeles rodriguez feito":["angeles"],"milagros vazquez":["milagros"],"dolores torreira":["dolores torreira"]};
-  function matchHorario(pNombre, hPsico) {
-    if(!hPsico) return false;
-    var pn = pNombre.trim().toLowerCase();
-    var hn = hPsico.trim().toLowerCase();
-    if(hn===pn) return true;
-    var aliases = CF_ALIASES[pn]||[];
-    return aliases.some(function(a){return a===hn;});
-  }
+
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
     var fpAll = horarios.filter(function(h){ return matchHorario(psico.nombre, h.psico); });
@@ -1857,6 +1858,9 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
   function matchesPsico(n){if(!n)return false;var hn=n.trim().toLowerCase();if(hn===p.nombre.trim().toLowerCase())return true;return (ALIASES[p.nombre]||[]).some(function(a){return a.toLowerCase()===hn;});}
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
+  const [editCuit,setEditCuit] = useState(false);
+  const [newCuit,setNewCuit] = useState(p.cuit||"");
+  function saveCuit(){saveDoc("psicos",p.id,Object.assign({},p,{cuit:newCuit.trim()}));setEditCuit(false);notify("CUIT guardado");}
   const [editNombre,setEditNombre] = useState(false);
   const [newNombre,setNewNombre] = useState(p.nombre);
   function saveNombre() {
@@ -1891,6 +1895,16 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
             <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditNombre(true);setNewNombre(p.nombre);}}>editar nombre</button>
           </div>
         )}
+        <div style={{marginTop:4,marginBottom:4}}>
+          {editCuit?(<div style={{display:"flex",gap:6}}>
+            <input style={Object.assign({},sInp,{flex:1,padding:"4px 8px",fontSize:12})} value={newCuit} onChange={function(e){setNewCuit(e.target.value);}} placeholder="XX-XXXXXXXX-X" autoFocus/>
+            <button style={Object.assign({},btn(ok,wh),{padding:"4px 10px",fontSize:12})} onClick={saveCuit}>OK</button>
+            <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"4px 8px",fontSize:12})} onClick={function(){setEditCuit(false);}}>X</button>
+          </div>):(<div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{color:mu,fontSize:11}}>CUIT: {p.cuit||<span style={{color:er}}>sin cargar</span>}</span>
+            <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditCuit(true);setNewCuit(p.cuit||"");}}>editar</button>
+          </div>)}
+        </div>
         <button
           style={{background:p.fijas?lt:bg,color:p.fijas?dk:mu,border:"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}
           onClick={function(){
