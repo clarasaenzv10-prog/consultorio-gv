@@ -341,7 +341,7 @@ export default function App() {
       const sem = fechas.length;
       const p = calcPrecio(h.inicio,h.fin,pr);
       tf += p.sub*sem;
-      df.push({diaSemana:Number(h.diaSemana),sem:sem,cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
+      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
@@ -1968,7 +1968,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
-  const misHAll = selP ? horarios.filter(function(h){if(!h.psico)return false;var pn=selP.trim().toLowerCase();var hn=h.psico.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===pn||(AL[pn]||[]).some(function(a){return a===hn;});}) : [];var misHBest={};misHAll.forEach(function(h){var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");if(!misHBest[k]||(!misHBest[k].fechaInicio&&h.fechaInicio))misHBest[k]=h;});const misH = Object.values(misHBest).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  const misHAll = selP ? horarios.filter(function(h){return matchHorario(selP,h.psico);}) : [];var misHBest={};misHAll.forEach(function(h){var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");if(!misHBest[k]||(!misHBest[k].fechaInicio&&h.fechaInicio))misHBest[k]=h;});const misH = Object.values(misHBest).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
@@ -2015,7 +2015,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
                   <div key={p.id} style={Object.assign({},sCard,{cursor:"pointer"})} onClick={function(){setSelP(p.nombre);setEid(null);setShowAdd(false);}}>
                     <div style={{flex:1}}>
                       <div style={{color:tx,fontWeight:700}}>{p.nombre}</div>
-                      <div style={{color:mu,fontSize:12}}>{horarios.filter(function(h){return h.psico.toLowerCase()===p.nombre.toLowerCase();}).length} horarios fijos</div>
+                      <div style={{color:mu,fontSize:12}}>{horarios.filter(function(h){return matchHorario(p.nombre,h.psico);}).length} horarios fijos</div>
                     </div>
                     <span style={{color:mu,fontSize:18}}>›</span>
                   </div>
@@ -2403,6 +2403,11 @@ function ConfigView({config,setConfig,notify}) {
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
+        <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:8,marginTop:4}}>Contrasena Admin</div>
+        <label style={sLbl}>Nueva contrasena para admin</label>
+        <input style={sInp} value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
+        <div style={{color:mu,fontSize:11,marginTop:4,marginBottom:16}}>Ingresá con usuario "admin" y esta contrasena</div>
+        <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:8}}>Contrasena Invitadas</div>
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
