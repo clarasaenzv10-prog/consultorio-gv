@@ -224,6 +224,163 @@ function matchHorario(pNombre, hPsico) {
   return (CF_ALIASES[pn]||[]).some(function(a){return a===hn;});
 }
 
+
+
+function gdUrl(url) {
+  if(!url) return url;
+  var m = url.match(/\/d\/([^/?&]+)/);
+  if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+  return url;
+}
+
+function ImagePreview({url}
+
+function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}
+
+function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
+  const [dia,setDia] = useState(h?Number(h.diaSemana):1);
+  const [ini,setIni] = useState(h?h.inicio:"09:00");
+  const [fin,setFin] = useState(h?h.fin:"13:00");
+  const [cons,setCons] = useState(h?h.consultorio:"C1");
+  var DIAS2=["","Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
+  var CONS2=["C1","C2","C3","C4","C5"];
+  function toMin2(t){var p=(t||"00:00").split(":");return Number(p[0])*60+Number(p[1]);}
+  function conflict(){
+    return (horarios||[]).some(function(hh){
+      if(Number(hh.diaSemana)!==Number(dia)) return false;
+      if(hh.consultorio!==cons) return false;
+      if(h&&hh.id===h.id) return false;
+      return toMin2(ini)<toMin2(hh.fin)&&toMin2(fin)>toMin2(hh.inicio);
+    });
+  }
+  function submit(){
+    if(toMin2(fin)<=toMin2(ini)){notify("Fin debe ser mayor al inicio");return;}
+    onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons});
+  }
+  var sI={border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 10px",fontSize:14,fontFamily:"inherit",background:"#FFFFFF",color:"#1C3A4A",outline:"none",width:"100%",boxSizing:"border-box"};
+  var lbl={color:"#6B97AA",fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6};
+  var hasConflict=conflict();
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #C9E4EF"}}>
+        <h3 style={{margin:0,color:"#1C3A4A"}}>Modificar horario</h3>
+        <button style={{background:"transparent",border:"none",fontSize:20,cursor:"pointer",color:"#6B97AA"}} onClick={onClose}>X</button>
+      </div>
+      <div style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
+        <div>
+          <label style={lbl}>Dia</label>
+          <select style={sI} value={dia} onChange={function(e){setDia(Number(e.target.value));}}>
+            {[1,2,3,4,5,6,7].map(function(d){return <option key={d} value={d}>{DIAS2[d]}</option>;})}
+          </select>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <div style={{flex:1}}>
+            <label style={lbl}>Inicio</label>
+            <input style={sI} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
+          </div>
+          <div style={{flex:1}}>
+            <label style={lbl}>Fin</label>
+            <input style={sI} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
+          </div>
+        </div>
+        <div>
+          <label style={lbl}>Consultorio</label>
+          <select style={sI} value={cons} onChange={function(e){setCons(e.target.value);}}>
+            {CONS2.map(function(c){return <option key={c} value={c}>{c}</option>;})}
+          </select>
+        </div>
+        {hasConflict&&<div style={{background:"#FFF0F0",border:"1px solid #F5B8B3",borderRadius:8,padding:10,color:"#C0392B",fontSize:12}}>Ese consultorio ya tiene un horario en ese dia y horario</div>}
+        <div style={{display:"flex",gap:10}}>
+          <button style={{flex:1,background:hasConflict?"#ccc":"#4BA3C3",color:"#FFFFFF",border:"none",borderRadius:10,padding:"10px 0",fontSize:14,fontWeight:700,cursor:hasConflict?"not-allowed":"pointer",fontFamily:"inherit"}} onClick={submit} disabled={hasConflict}>Solicitar cambio</button>
+          <button style={{flex:1,background:"transparent",border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px 0",fontSize:14,cursor:"pointer",fontFamily:"inherit",color:"#6B97AA"}} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function gdUrl(url) {
+  if(!url) return url;
+  var m = url.match(/\/d\/([^/?&]+)/);
+  if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
+  return url;
+}
+
+function ImagePreview({url}) {
+  var src = gdUrl(url);
+  return React.createElement("div",{style:{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",background:"#F0F8FB",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}},
+    React.createElement("img",{src:src,style:{maxWidth:"100%",maxHeight:160,objectFit:"contain",display:"block"},onError:function(e){e.target.style.display="none";}}),
+    React.createElement("div",{style:{display:"none",color:"#6B97AA",fontSize:11,padding:8}},"Link no valido")
+  );
+}
+
+function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
+  const [texto,setTexto] = useState("");
+  const [convWith,setConvWith] = useState(role==="psico"?"admin":(chatOpen||null));
+  function getKey(n){return "chat__"+(n||"").trim().toLowerCase();}
+  function getKeyOld(a,b){return [a,b].sort().join("__");}
+  var k=convWith?getKey(role==="admin"?convWith:user):null;
+  var kOld=convWith?(role==="admin"?getKeyOld(user,convWith):getKeyOld(user,"admin")):null;
+  var msgs=k?mensajes.filter(function(m){return m.conv===k||m.conv===kOld;}):[];
+  function markRead(){
+    if(!k) return;
+    mensajes.filter(function(m){return (m.conv===k||m.conv===kOld)&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
+  }
+  function send(){
+    if(!texto.trim()||!k) return;
+    var para=role==="admin"?convWith:"admin";
+    var id2="msg"+Date.now();
+    saveDoc("mensajes",id2,{id:id2,conv:k,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
+    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    setTexto("");
+  }
+  var wh="#FFFFFF",tx="#1C3A4A",mu="#6B97AA",br="#4BA3C3",lt="#EBF6FA",dk="#2E86AB";
+  if(role==="admin"&&!convWith){
+    return React.createElement("div",null,
+      React.createElement("h2",{style:{color:tx,fontSize:20,fontWeight:800,marginBottom:16}},"Mensajes"),
+      psicos.map(function(p){
+        var k2=getKey(p.nombre),k2old=getKeyOld(user,p.nombre);
+        var unread=mensajes.filter(function(m){return (m.conv===k2||m.conv===k2old)&&!m.leido&&m.de!==user;}).length;
+        var last=mensajes.filter(function(m){return m.conv===k2||m.conv===k2old;}).slice(-1)[0];
+        return React.createElement("button",{key:p.id,onClick:function(){setConvWith(p.nombre);setChatOpen(p.nombre);},
+          style:{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}},
+          React.createElement("div",{style:{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}},(p.nombre||"?")[0].toUpperCase()),
+          React.createElement("div",{style:{flex:1,minWidth:0}},
+            React.createElement("div",{style:{color:tx,fontWeight:600,fontSize:14}},p.nombre),
+            last&&React.createElement("div",{style:{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},(last.de===user?"Yo: ":last.de+": ")+last.texto)
+          ),
+          unread>0&&React.createElement("span",{style:{background:"#C0392B",color:wh,borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}},unread)
+        );
+      })
+    );
+  }
+  return React.createElement("div",{style:{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}},
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
+      role==="admin"&&React.createElement("button",{style:{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0},onClick:function(){setConvWith(null);setChatOpen(null);}},"<"),
+      React.createElement("div",{style:{color:tx,fontSize:17,fontWeight:700}},role==="admin"?convWith:"Admin"),
+      React.createElement("button",{style:{marginLeft:"auto",background:"transparent",border:"none",color:mu,fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"},onClick:markRead},"Marcar leidos")
+    ),
+    React.createElement("div",{style:{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}},
+      msgs.length===0&&React.createElement("div",{style:{color:mu,textAlign:"center",marginTop:60,fontSize:14}},"Sin mensajes aun."),
+      msgs.map(function(m){
+        var isMe=m.de===user;
+        return React.createElement("div",{key:m.id,style:{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}},
+          React.createElement("div",{style:{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}},
+            React.createElement("div",null,m.texto),
+            React.createElement("div",{style:{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}},new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}))
+          )
+        );
+      })
+    ),
+    React.createElement("div",{style:{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}},
+      React.createElement("input",{style:{flex:1,border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px 14px",fontSize:14,fontFamily:"inherit",background:wh,color:tx,outline:"none"},value:texto,onChange:function(e){setTexto(e.target.value);},placeholder:"Escribi un mensaje...",onKeyDown:function(e){if(e.key==="Enter"){e.preventDefault();send();}}}),
+      React.createElement("button",{style:{background:br,color:wh,border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"},onClick:send},"Enviar")
+    )
+  );
+}
+
+function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}
+
 export default function App() {
   const [view,setView] = useState("login");
   const [role,setRole] = useState(null);
@@ -2186,7 +2343,6 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       fecha:new Date().toISOString(),
       leido:false
     });
-    sendPush("Nueva solicitud - Consultorio GV", user+" solicito un cambio de horario", fcmTokensList);
     notify("Solicitud enviada"); setMH(null);
   }
 
@@ -2943,13 +3099,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   );
 }
 
-function gdUrl(url) {
-  if(!url) return url;
-  var m = url.match(/\/d\/([^/?&]+)/);
-  if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
-  return url;
-}
-function ImagePreview({url}) {
+) {
   var src = gdUrl(url);
   return (
     <div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",background:"#F0F8FB",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -2958,7 +3108,7 @@ function ImagePreview({url}) {
     </div>
   );
 }
-function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
+) {
   const [texto,setTexto] = useState("");
   const [convWith,setConvWith] = useState(role==="psico"?"admin":(chatOpen||null));
   function getKey(pName) { return "chat__"+(pName||"").trim().toLowerCase(); }
@@ -3166,7 +3316,7 @@ function CambiarPassBtn({user,psicos,notify}) {
   );
 }
 
-function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
+) {
   const [dia,setDia] = useState(h?h.diaSemana:1);
   const [ini,setIni] = useState(h?h.inicio:"09:00");
   const [fin,setFin] = useState(h?h.fin:"14:00");
