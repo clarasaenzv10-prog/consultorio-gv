@@ -233,10 +233,6 @@ function gdUrl(url) {
   return url;
 }
 
-function ImagePreview({url}
-
-function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}
-
 function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
   const [dia,setDia] = useState(h?Number(h.diaSemana):1);
   const [ini,setIni] = useState(h?h.inicio:"09:00");
@@ -297,13 +293,6 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
       </div>
     </div>
   );
-}
-
-function gdUrl(url) {
-  if(!url) return url;
-  var m = url.match(/\/d\/([^/?&]+)/);
-  if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
-  return url;
 }
 
 function ImagePreview({url}) {
@@ -378,8 +367,6 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
     )
   );
 }
-
-function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}
 
 export default function App() {
   const [view,setView] = useState("login");
@@ -3099,87 +3086,6 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   );
 }
 
-) {
-  var src = gdUrl(url);
-  return (
-    <div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",background:"#F0F8FB",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <img src={src} style={{maxWidth:"100%",maxHeight:160,objectFit:"contain",display:"block"}} onError={function(e){e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
-      <div style={{display:"none",color:"#6B97AA",fontSize:11,padding:8}}>Link no valido o imagen no publica</div>
-    </div>
-  );
-}
-) {
-  const [texto,setTexto] = useState("");
-  const [convWith,setConvWith] = useState(role==="psico"?"admin":(chatOpen||null));
-  function getKey(pName) { return "chat__"+(pName||"").trim().toLowerCase(); }
-  function getKeyOld(a,b) { return [a,b].sort().join("__"); }
-  var psicoName = role==="admin" ? (convWith||"") : user;
-  var key = psicoName ? getKey(psicoName) : null;
-  var keyOld = psicoName ? (role==="admin" ? getKeyOld(user,convWith||"") : getKeyOld(user,"admin")) : null;
-  var msgs = key ? mensajes.filter(function(m){return m.conv===key||m.conv===keyOld;}) : [];
-  function markRead(k) {
-    if(!k) return;
-    var kOld = role==="admin" ? getKeyOld(user,convWith||"") : getKeyOld(user,"admin");
-    mensajes.filter(function(m){return (m.conv===k||m.conv===kOld)&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
-  }
-  function send() {
-    if(!texto.trim()||!key) return;
-    var para=role==="admin"?convWith:"admin";
-    var msgId="msg"+Date.now();
-    saveDoc("mensajes",msgId,{id:msgId,conv:key,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
-    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
-    markRead(key); setTexto("");
-  }
-  if(role==="admin"&&!convWith) {
-    return (
-      <div>
-        <h2 style={{color:"#1C3A4A",fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {psicos.map(function(p){
-            var k2=getKey(p.nombre);var k2old=getKeyOld(user,p.nombre);
-            var u=mensajes.filter(function(m){return (m.conv===k2||m.conv===k2old)&&!m.leido&&m.de!==user;}).length;
-            var last=mensajes.filter(function(m){return m.conv===k2||m.conv===k2old;}).slice(-1)[0];
-            return (
-              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);markRead(k2);}}
-                style={{background:"#FFFFFF",border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:"#FFFFFF",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{color:"#1C3A4A",fontWeight:600,fontSize:14}}>{p.nombre}</div>
-                  {last&&<div style={{color:"#6B97AA",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last.de===user?"Yo: ":last.de+": "}{last.texto}</div>}
-                </div>
-                {u>0&&<span style={{background:"#C0392B",color:"#FFFFFF",borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{u}</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-        {role==="admin"&&<button style={{background:"transparent",border:"none",color:"#4BA3C3",fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
-        <div style={{color:"#1C3A4A",fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
-        <button style={{marginLeft:"auto",background:"transparent",border:"none",color:"#6B97AA",fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}} onClick={function(){markRead(key);}}>Marcar leidos</button>
-      </div>
-      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
-        {msgs.length===0&&<div style={{color:"#6B97AA",textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
-        {msgs.map(function(m){var isMe=m.de===user;return(
-          <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
-            <div style={{background:isMe?"#4BA3C3":"#FFFFFF",color:isMe?"#FFFFFF":"#1C3A4A",borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
-              <div>{m.texto}</div>
-              <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
-            </div>
-          </div>
-        );})}
-      </div>
-      <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
-        <input style={{flex:1,border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px 14px",fontSize:14,fontFamily:"inherit",background:"#FFFFFF",color:"#1C3A4A",outline:"none"}} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
-        <button style={{background:"#4BA3C3",color:"#FFFFFF",border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={send}>Enviar</button>
-      </div>
-    </div>
-  );
-}
 
 
 function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
@@ -3316,97 +3222,3 @@ function CambiarPassBtn({user,psicos,notify}) {
   );
 }
 
-) {
-  const [dia,setDia] = useState(h?h.diaSemana:1);
-  const [ini,setIni] = useState(h?h.inicio:"09:00");
-  const [fin,setFin] = useState(h?h.fin:"14:00");
-  const [cons,setCons] = useState(h?h.consultorio:"C1");
-  const pr = calcPrecio(ini,fin);
-  function checkConflicto() {
-    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
-    const sMin=toMin(ini), eMin=toMin(fin);
-    const c=(horarios||[]).filter(function(x){
-      if(x.consultorio!==cons) return false;
-      if(Number(x.diaSemana)!==Number(dia)) return false;
-      if(h && x.id===h.id) return false; // exclude own horario when editing
-      return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
-    });
-    return c.length ? "Ese horario esta ocupado en "+cons : null;
-  }
-  const conflicto = checkConflicto();
-
-  // Find available consultorios at same time same day
-  function getLibres() {
-    if(!ini||!fin||toMin(fin)<=toMin(ini)) return [];
-    const sMin=toMin(ini),eMin=toMin(fin);
-    return CONS.filter(function(c){
-      if(c.id===cons) return false;
-      const ocupado=(horarios||[]).some(function(x){
-        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
-      });
-      return !ocupado;
-    });
-  }
-  const libres = conflicto ? getLibres() : [];
-  const sedeNombre = function(sede){ return sede==="VL"?"Vicente Lopez":"Uruguay"; };
-
-  return (
-    <div>
-      <div style={sModH}>
-        <h3 style={{margin:0,color:tx}}>{tipo==="add"?"Solicitar horario":"Modificar horario"}</h3>
-        <button style={sXBtn} onClick={onClose}>X</button>
-      </div>
-      <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div>
-            <label style={sLbl}>Dia</label>
-            <select style={sInp} value={dia} onChange={function(e){setDia(Number(e.target.value));}}>
-              {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
-            </select>
-          </div>
-          <div>
-            <label style={sLbl}>Consultorio</label>
-            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
-              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
-            </select>
-          </div>
-          <div>
-            <label style={sLbl}>Desde</label>
-            <input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
-          </div>
-          <div>
-            <label style={sLbl}>Hasta</label>
-            <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
-          </div>
-        </div>
-        {conflicto&&(
-          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"12px 14px",color:er,fontSize:13}}>
-            <div style={{fontWeight:700,marginBottom:6}}>{conflicto}</div>
-            {libres.length>0?(
-              <div>
-                <div style={{color:tx,fontSize:12,fontWeight:600,marginBottom:4}}>Consultorios disponibles en ese horario:</div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {libres.map(function(c){return(
-                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}} onClick={function(){setCons(c.id);}}>
-                      <div>{c.id}</div>
-                      <div style={{fontWeight:400,fontSize:11,color:"#2D8A5E"}}>{sedeNombre(c.sede)}</div>
-                    </button>
-                  );})}
-                </div>
-                <div style={{color:mu,fontSize:11,marginTop:4}}>Toca uno para seleccionarlo</div>
-              </div>
-            ):(
-              <div style={{color:mu,fontSize:12,marginTop:4}}>No hay consultorios disponibles en ese horario ese dia.</div>
-            )}
-          </div>
-        )}
-        {!conflicto&&ini&&fin&&toMin(fin)>toMin(ini)&&<div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>Horario disponible - <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}</div>}
-        <div style={{color:mu,fontSize:11}}>Queda pendiente de aprobacion.</div>
-        <div style={{display:"flex",gap:10}}>
-          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});}}>Enviar solicitud</button>
-          <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
