@@ -304,7 +304,13 @@ export default function App() {
     setNotif({msg:msg,t:t||"ok"});
     setTimeout(function(){setNotif(null);}, 3000);
   }
-  function login(r,n) { setRole(r); setUser(n); setView("app"); setTab("calendario"); }
+  function login(r,n) {
+    setRole(r); setUser(n); setView("app"); setTab("calendario");
+    // Register device for push notifications
+    setTimeout(function(){
+      requestNotifPermission(n).catch(function(){});
+    }, 2000);
+  }
 
   function getP(f) {
     const s = typeof f==="string" ? f : f.toISOString().split("T")[0];
