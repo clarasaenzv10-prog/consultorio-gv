@@ -2,6 +2,18 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
+// ─── Push notifications via Vercel API ────────────────────────
+async function sendPush(title, body, tokens) {
+  if (!tokens || !tokens.length) return;
+  try {
+    await fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, body, tokens })
+    });
+  } catch(e) { console.log("Push error:", e); }
+}
+
 // ─── Colores (hardcoded, no concatenation in JSX) ──────────────
 const br = "#4BA3C3";   // brand teal
 const dk = "#2E86AB";   // brand dark
@@ -233,6 +245,7 @@ export default function App() {
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
   const [mensajes,setMensajesLocal] = useState([]);
   const [chatOpen,setChatOpen] = useState(null);
+  const [fcmTokensList,setFcmTokensList] = useState([]);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -259,6 +272,7 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
+      listenCol("fcmTokens", function(d){ setFcmTokensList(d.map(function(t){return t.token;}).filter(Boolean)); }),
       listenCol("mensajes", function(d){ setMensajesLocal(d.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");})); }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
@@ -1263,12 +1277,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
     });
     const a={id:Date.now(),texto:txt.trim(),fotos:imgFixed,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
-    saveDoc("pendingNotifs","notif_"+a.id,{
-      title:"Consultorio Gloria Videla",
-      body:txt.trim().substring(0,100),
-      created:new Date().toISOString(),
-      sent:false
-    });
+    sendPush("Consultorio Gloria Videla", txt.trim().substring(0,100), fcmTokensList);
     setTxt(""); setImgs(["","",""]); notify("Anuncio publicado");
   }
   function sWA(p,t) {
@@ -1461,7 +1470,34 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
       saveDoc("horarios",h.id,h);
     }
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
-    else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
+    else if(s.accion==="agregar"&&s.tipo==="extra"){
+      // Verificar conflicto antes de aprobar
+      var fecha2 = s.datos&&s.datos.fecha;
+      var cons2 = s.datos&&s.datos.consultorio;
+      var ini2 = s.datos&&s.datos.inicio;
+      var fin2 = s.datos&&s.datos.fin;
+      if(fecha2&&cons2&&ini2&&fin2) {
+        var sMin2=toMin(ini2), eMin2=toMin(fin2);
+        // Conflicto con fijos ese dia
+        var dDate=new Date(fecha2+"T12:00:00");
+        var dDia=dDate.getDay()===0?7:dDate.getDay();
+        var confFijo=(horarios||[]).some(function(h){
+          return h.consultorio===cons2&&Number(h.diaSemana)===dDia&&
+            sMin2<toMin(h.fin)&&eMin2>toMin(h.inicio);
+        });
+        // Conflicto con otros extras ese dia
+        var confExtra=(reservas||[]).some(function(r){
+          return r.consultorio===cons2&&r.fecha===fecha2&&r.estado==="aprobada"&&
+            sMin2<toMin(r.fin)&&eMin2>toMin(r.inicio);
+        });
+        if(confFijo||confExtra){
+          notify("No se puede aprobar: "+cons2+" ya está ocupado en ese horario el "+fecha2,"err");
+          return;
+        }
+      }
+      const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});
+      saveDoc("reservas",r.id,r);
+    }
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
     notify("Aprobado");
   }
@@ -3078,6 +3114,7 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
     var msgId = "msg"+Date.now();
     saveDoc("mensajes",msgId,{id:msgId,conv:key,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
     saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    sendPush("Mensaje de "+user, texto.trim().substring(0,80), fcmTokensList.filter(function(){return true;}));
     markRead(key);
     setTexto("");
   }
