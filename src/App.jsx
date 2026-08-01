@@ -334,10 +334,14 @@ export default function App() {
     var fp=Object.values(fpBest);
     let tf=0; const df=[];
     fp.forEach(function(h) {
-      const sem = mesFechas(mes,anio,Number(h.diaSemana)).length;
+      var todasFechas = mesFechas(mes,anio,Number(h.diaSemana));
+      var fechas = todasFechas;
+      if(h.fechaInicio) fechas = fechas.filter(function(f){return f>=h.fechaInicio;});
+      if(h.fechaFin) fechas = fechas.filter(function(f){return f<=h.fechaFin;});
+      const sem = fechas.length;
       const p = calcPrecio(h.inicio,h.fin,pr);
       tf += p.sub*sem;
-      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
+      df.push({diaSemana:Number(h.diaSemana),sem:sem,cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
@@ -529,7 +533,7 @@ export default function App() {
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
-          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
+          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
@@ -1055,10 +1059,20 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
 }
 
 // ─── Perfiles ─────────────────────────────────────────────────
-function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
+function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,horarios,reservas}) {
   const [eid,setEid] = useState(null);
   const [form,setForm] = useState({});
-  function save() { saveDoc("psicos",eid,Object.assign({},form)); setEid(null); notify("Perfil actualizado"); }
+  function save() {
+    var oldNombre=(psicos.find(function(x){return x.id===eid;})||{}).nombre||"";
+    var newNombre=(form.nombre||"").trim();
+    saveDoc("psicos",eid,Object.assign({},form,{nombre:newNombre}));
+    if(oldNombre&&newNombre&&oldNombre!==newNombre){
+      (horarios||[]).filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===oldNombre.trim().toLowerCase();}).forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:newNombre}));});
+      (reservas||[]).filter(function(r){return r.psico&&r.psico.trim().toLowerCase()===oldNombre.trim().toLowerCase();}).forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:newNombre}));});
+      notify("Perfil y horarios actualizados");
+    } else { notify("Perfil actualizado"); }
+    setEid(null);
+  }
   return (
     <>
     <div>
@@ -1201,9 +1215,18 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
 // ─── Anuncios ─────────────────────────────────────────────────
 function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
   const [txt,setTxt] = useState("");
+  const [imgs,setImgs] = useState(["","",""]);
+  function setImg(i,v){setImgs(function(prev){var n=prev.slice();n[i]=v;return n;});}
+  function renderTexto(t){
+    return (t||"").split("\n").map(function(line,i){
+      var parts=line.split(/\*\*([^*]+)\*\*/g);
+      return React.createElement("div",{key:i,style:{minHeight:"1em"}},parts.map(function(part,j){return j%2===1?React.createElement("strong",{key:j},part):part;}));
+    });
+  }
   function pub() {
     if(!txt.trim()) return;
-    const a={id:Date.now(),texto:txt.trim(),fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
+    var imgList=imgs.map(function(u){return u.trim();}).filter(Boolean);
+    const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
     // Save pending notification to Firestore for cloud function to send
     saveDoc("pendingNotifs","notif_"+a.id,{
@@ -1226,6 +1249,16 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
         <div style={Object.assign({},sPanel,{marginBottom:20})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Nuevo anuncio</div>
           <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical"})} value={txt} onChange={function(e){setTxt(e.target.value);}} placeholder="Ej: Se corto la luz en Uruguay, vuelve en 2 horas..."/>
+          <div style={{color:mu,fontSize:11,marginTop:4}}>Tip: **palabra** = negrita · Enter = nueva línea</div>
+          <div style={{marginTop:10}}>
+            <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Fotos (link Google Drive o imagen)</div>
+            {imgs.map(function(url,i){return(
+              <div key={i} style={{marginBottom:6}}>
+                <input style={Object.assign({},sInp,{fontSize:12,padding:"6px 10px"})} value={url} onChange={function(e){setImg(i,e.target.value);}} placeholder={"Foto "+(i+1)+": pega el link..."}/>
+                {url&&<ImagePreview url={url}/>}
+              </div>
+            );})}
+          </div>
           <div style={{display:"flex",gap:10,marginTop:12,flexWrap:"wrap"}}>
             <button style={btn(br,wh)} onClick={pub}>Publicar en app</button>
             <button style={{background:"#25D366",color:wh,border:"none",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){if(txt.trim())psicos.filter(function(p){return p.wa;}).forEach(function(p,i){setTimeout(function(){sWA(p,txt);},i*700);});}}>WA a todas</button>
@@ -1248,7 +1281,8 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
                 {role==="admin" && <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:11,padding:"3px 8px"})} onClick={function(){delDoc("anuncios",a.id);}}>X</button>}
               </div>
             </div>
-            <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{a.texto}</div>
+            <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{renderTexto(a.texto)}</div>
+              {(a.fotos||[]).length>0&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{(a.fotos||[]).map(function(url,i){return <img key={i} src={gdUrl(url)} style={{maxWidth:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",cursor:"pointer"}} onClick={function(){var a2=document.createElement("a");a2.href=gdUrl(url);a2.target="_blank";document.body.appendChild(a2);a2.click();document.body.removeChild(a2);}} onError={function(e){e.target.style.display="none";}}/>;})}</div>}
           </div>
         );
       })}
@@ -1350,7 +1384,18 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
     else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h)saveDoc("horarios",s.horarioId,Object.assign({},h,s.datos,{sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana)}));}
     else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
-    else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
+    else if(s.accion==="agregar"&&s.tipo==="extra"){
+      var fecha2=s.datos&&s.datos.fecha, cons2=s.datos&&s.datos.consultorio, ini2=s.datos&&s.datos.inicio, fin2=s.datos&&s.datos.fin;
+      if(fecha2&&cons2&&ini2&&fin2){
+        var sMin2=toMin(ini2),eMin2=toMin(fin2);
+        var dDate2=new Date(fecha2+"T12:00:00"),dDia2=dDate2.getDay()===0?7:dDate2.getDay();
+        var confFijo2=(horarios||[]).some(function(h){return h.consultorio===cons2&&Number(h.diaSemana)===dDia2&&sMin2<toMin(h.fin)&&eMin2>toMin(h.inicio);});
+        var confExtra2=(reservas||[]).some(function(r){return r.consultorio===cons2&&r.fecha===fecha2&&r.estado==="aprobada"&&sMin2<toMin(r.fin)&&eMin2>toMin(r.inicio);});
+        if(confFijo2||confExtra2){notify("No se puede aprobar: "+cons2+" ya está ocupado ese horario el "+fecha2,"err");return;}
+      }
+      const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});
+      saveDoc("reservas",r.id,r);
+    }
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
     notify("Aprobado");
   }
@@ -1437,6 +1482,27 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
               <div style={{color:mu,fontSize:12}}>{new Date(s.fechaSol).toLocaleDateString("es-AR")}</div>
             </div>
             <div style={{background:bg,borderRadius:8,padding:10,color:tx,fontSize:13,marginBottom:12,border:"1px solid #C9E4EF"}}>{det(s)}</div>
+            {s.tipo==="fijo"&&(function(){
+              var dia=s.datos&&s.datos.diaSemana!=null?Number(s.datos.diaSemana):null;
+              var cons=s.datos&&s.datos.consultorio;
+              var ini=s.datos&&s.datos.inicio;
+              var fin=s.datos&&s.datos.fin;
+              if(!dia||!cons||!ini||!fin) return null;
+              var confs=reservas.filter(function(r){
+                if(r.estado!=="aprobada"&&r.estado!=="pendiente") return false;
+                if(r.consultorio!==cons) return false;
+                var rDate=r.fecha?new Date(r.fecha+"T12:00:00"):null;
+                if(!rDate) return false;
+                var rDia=rDate.getDay()===0?7:rDate.getDay();
+                if(rDia!==dia) return false;
+                return toMin(ini)<toMin(r.fin)&&toMin(fin)>toMin(r.inicio);
+              });
+              if(!confs.length) return null;
+              return React.createElement("div",{style:{background:"#FEF9C3",border:"1.5px solid #EAB308",borderRadius:10,padding:"10px 14px",marginBottom:12}},
+                React.createElement("div",{style:{color:"#854D0E",fontWeight:700,fontSize:12,marginBottom:6}},"⚠️ Atencion: hay eventuales que se superpondrían con este fijo"),
+                confs.map(function(r){return React.createElement("div",{key:r.id,style:{color:"#713F12",fontSize:12,marginBottom:2}},"• "+r.psico+" — "+r.fecha+" "+r.inicio+"-"+r.fin+" ("+(r.estado==="pendiente"?"pendiente":"aprobada")+")");})
+              );
+            })()}
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
               <button style={Object.assign({},btn(br,wh),{padding:"7px 14px",fontSize:13})} onClick={function(){aprobar(s);}}>Aprobar</button>
               <input style={Object.assign({},sInp,{flex:1,fontSize:12})} placeholder="Motivo de rechazo" value={notas[s.id]||""} onChange={function(e){setNotas(function(n){return Object.assign({},n,{[s.id]:e.target.value});});}}/>
@@ -1472,7 +1538,21 @@ function FactView({psicos,calcFact,genMsg,notify}) {
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
   const [sel,setSel] = useState(null);
-  const [vista,setVista] = useState("mes"); // "mes" | "historial"
+  const [vista,setVista] = useState("mes");
+  const mesKey = mes+"_"+anio;
+  const [enviadas,setEnviadas] = useState({});
+  useEffect(function(){
+    var stored={};
+    try{stored=JSON.parse(localStorage.getItem("enviadas_"+mesKey)||"{}");}catch(e){}
+    setEnviadas(stored);
+  },[mesKey]);
+  function toggleEnviada(nombre){
+    setEnviadas(function(prev){
+      var next=Object.assign({},prev,{[nombre]:!prev[nombre]});
+      try{localStorage.setItem("enviadas_"+mesKey,JSON.stringify(next));}catch(e){}
+      return next;
+    });
+  } // "mes" | "historial"
   const ps = sel ? psicos.find(function(p){return p.nombre===sel;}) : null;
 
   // Generate last 6 months
@@ -1564,7 +1644,10 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                     {r.desc>0 && " - "+r.desc+"% desc."}
                   </div>
                 </div>
-                <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
+                  {r.total>0&&<button onClick={function(e){e.stopPropagation();toggleEnviada(p.nombre);}} style={{background:enviadas[p.nombre]?ok:"transparent",color:enviadas[p.nombre]?wh:mu,border:enviadas[p.nombre]?"1.5px solid #2D8A5E":"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{enviadas[p.nombre]?"✓ Enviada":"Enviar"}</button>}
+                </div>
               </div>
             );
           })}
@@ -1743,10 +1826,24 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
                   <div key={p.id} style={Object.assign({},sCard,{padding:"10px 14px",marginBottom:8})}>
                     <div style={{flex:1,color:tx,fontWeight:600}}>{p.nombre}{!p.wa&&" (sin WA)"}</div>
                     <button style={{background:"#25D366",color:wh,border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={function(){sWA(p);}}>WA</button>
+                    {p.email&&sel&&<button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={function(){
+                      var P=sel.p;
+                      var asunto="Nuevos precios - "+sel.label;
+                      var cuerpo="Hola "+p.nombre+"!\n\nNuevos precios desde "+new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")+".\n\nMODULOS\nM1 Manana (8-14hs): "+ars(P.m1)+"\nM2 Tarde (14-18hs): "+ars(P.m2)+"\nM3 Noche (18-21hs): "+ars(P.m3)+"\nDia completo: "+ars(P.dia)+"\n\nHORAS SUELTAS\nManana: "+ars(P.man)+"/hs\nTarde: "+ars(P.tar)+"/hs\nNoche: "+ars(P.noc)+"/hs\n\nSaludos,\nConsultorio Gloria Videla";
+                      var a2=document.createElement("a");a2.href="mailto:"+p.email+"?subject="+encodeURIComponent(asunto)+"&body="+encodeURIComponent(cuerpo);document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+                    }}>Mail</button>}
                   </div>
                 );
               })}
             </div>
+            {sel&&<button style={Object.assign({},btn(br,wh),{width:"100%",marginTop:12,fontSize:13})} onClick={function(){
+              var P=sel.p;
+              var emails=psicos.filter(function(p){return p.email;}).map(function(p){return p.email;}).join(",");
+              if(!emails){notify("Ninguna profesional tiene mail cargado","err");return;}
+              var asunto="Nuevos precios - "+sel.label;
+              var cuerpo="Hola a todas!\n\nNuevos precios desde "+new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")+".\n\nMODULOS\n+-----------------------+-----------+\n| M1 Manana  (8-14hs)   | "+ars(P.m1).padStart(10)+" |\n| M2 Tarde   (14-18hs)  | "+ars(P.m2).padStart(10)+" |\n| M3 Noche   (18-21hs)  | "+ars(P.m3).padStart(10)+" |\n| Dia completo          | "+ars(P.dia).padStart(10)+" |\n+-----------------------+-----------+\n\nHORAS SUELTAS\nManana: "+ars(P.man)+"/hs\nTarde: "+ars(P.tar)+"/hs\nNoche: "+ars(P.noc)+"/hs\n\nSaludos,\nConsultorio Gloria Videla";
+              var a2=document.createElement("a");a2.href="mailto:"+emails+"?subject="+encodeURIComponent(asunto)+"&body="+encodeURIComponent(cuerpo);document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+            }}>📧 Enviar precios por mail a todas las profesionales</button>}
           </div>
         )}
       </div>
@@ -2658,6 +2755,30 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
+
+  function exportarExcel(ps,m,a) {
+    var mn="Facturacion "+MESES[m]+" "+a;
+    var totalGeneral=0;
+    var csvRows=["sep=,","CUIT,Profesional,Monto a pagar"];
+    ps.forEach(function(p){
+      var r=calcFact(p,m,a);
+      var total=r.total||0;
+      if(total>0){
+        var nombre=p.nombre.indexOf(",")>-1?'"'+p.nombre+'"':p.nombre;
+        var cuit=(p.cuit||"").indexOf(",")>-1?'"'+(p.cuit||"")+'"':(p.cuit||"");
+        csvRows.push(cuit+","+nombre+","+total);
+        totalGeneral+=total;
+      }
+    });
+    csvRows.push(""); csvRows.push(",TOTAL GENERAL,"+totalGeneral);
+    var csv=csvRows.join("\r\n");
+    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+    var url=URL.createObjectURL(blob);
+    var a2=document.createElement("a");
+    a2.href=url;a2.download=mn.replace(/ /g,"_")+".csv";
+    document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+    URL.revokeObjectURL(url);
+  }
 
   // Hours per consultorio per week
   function hrsConsultorio(consId) {
