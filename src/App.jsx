@@ -314,15 +314,24 @@ export default function App() {
   }
   function getPM(mes,anio) { return getP(anio+"-"+String(mes+1).padStart(2,"0")+"-01"); }
 
+  var CF_ALIASES={"agustina mohr":["agus mohr"],"delfina mohr":["delfi mohr"],"magdalena perisse":["magda"],"eugenia eguren":["euge"],"josefina cesareo":["jose cesareo"],"sofia elkin":["sofi"],"marcela fernandez sanchez":["marce"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"angeles rodriguez feito":["angeles"],"milagros vazquez":["milagros"],"dolores torreira":["dolores torreira"]};
+  function matchHorario(pNombre, hPsico) {
+    if(!hPsico) return false;
+    var pn = pNombre.trim().toLowerCase();
+    var hn = hPsico.trim().toLowerCase();
+    if(hn===pn) return true;
+    var aliases = CF_ALIASES[pn]||[];
+    return aliases.some(function(a){return a===hn;});
+  }
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
-    const pn=psico.nombre.trim().toLowerCase();
-    const pnFirst=pn.split(" ")[0]; // first name only for fallback
-    const fp = horarios.filter(function(h){
-      if(!h.psico) return false;
-      const hn=h.psico.trim().toLowerCase();
-      return hn===pn || hn===pnFirst; // match full name OR just first name
+    var fpAll = horarios.filter(function(h){ return matchHorario(psico.nombre, h.psico); });
+    var fpBest={};
+    fpAll.forEach(function(h){
+      var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");
+      if(!fpBest[k]||(h.fechaInicio&&!fpBest[k].fechaInicio)) fpBest[k]=h;
     });
+    var fp=Object.values(fpBest);
     let tf=0; const df=[];
     fp.forEach(function(h) {
       const sem = mesFechas(mes,anio,Number(h.diaSemana)).length;
@@ -333,8 +342,7 @@ export default function App() {
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
-      const rn=r.psico?r.psico.trim().toLowerCase():"";
-      if(!(rn===pn||rn===pnFirst)) return false;
+        if(!matchHorario(psico.nombre, r.psico)) return false;
       if(r.tipo!=="extra") return false;
       if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
       if(parseLocalDate(r.fecha).getFullYear()!==anio) return false;
@@ -594,7 +602,7 @@ export default function App() {
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
-          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
+          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});sendPush("Nueva reserva - Consultorio GV",user+" solicito hora extra: "+d.consultorio+" "+d.fecha,fcmTokensList);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
         )}
       </div>
     </AppRoot>
@@ -2067,6 +2075,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       fecha:new Date().toISOString(),
       leido:false
     });
+    sendPush("Nueva solicitud - Consultorio GV", user+" solicito un cambio de horario", fcmTokensList);
     notify("Solicitud enviada"); setMH(null);
   }
 
