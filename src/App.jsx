@@ -679,7 +679,7 @@ export default function App() {
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
           {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
-          {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
+          {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify} fcmTokensList={fcmTokensList}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
@@ -1358,7 +1358,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
 }
 
 // ─── Anuncios ─────────────────────────────────────────────────
-function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
+function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify,fcmTokensList}) {
   const [txt,setTxt] = useState("");
   const [imgs,setImgs] = useState(["","",""]);
   function setImg(i,v){setImgs(function(prev){var n=prev.slice();n[i]=v;return n;});}
@@ -1374,13 +1374,8 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
     const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
     // Save pending notification to Firestore for cloud function to send
-    saveDoc("pendingNotifs","notif_"+a.id,{
-      title:"Consultorio Gloria Videla",
-      body:txt.trim().substring(0,100),
-      created:new Date().toISOString(),
-      sent:false
-    });
-    setTxt(""); notify("Anuncio publicado");
+    sendPush("Consultorio Gloria Videla", txt.trim().substring(0,100), fcmTokensList||[]);
+    setTxt(""); setImgs(["","",""]); notify("Anuncio publicado");
   }
   function sWA(p,t) {
     if(!p.wa){notify("Sin WA: "+p.nombre,"err");return;}
@@ -1520,7 +1515,7 @@ function confirmarPago(s) {
 
 function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos}) {
   const [notas,setNotas] = useState({});
-  const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";});
+  const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
   const pendInv = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo==="invitada";});
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
@@ -1551,11 +1546,13 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
       saveDoc("reservas",r.id,r);
     }
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
+    sendPush("Solicitud aprobada - Consultorio GV", s.psico+": tu solicitud fue aprobada", fcmTokensList||[]);
     notify("Aprobado");
   }
   function rechazar(id) {
     const s=solicitudes.find(function(x){return x.id===id;});
-    if(s)saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
+    if(s){saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
+      sendPush("Solicitud rechazada - Consultorio GV",(s.psico||"")+" tu solicitud fue rechazada",fcmTokensList||[]);}
     notify("Rechazado");
   }
 
@@ -2324,7 +2321,7 @@ function MisReservasView({reservas,onNew}) {
 }
 
 // ─── Mis Horarios ─────────────────────────────────────────────
-function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,notify}) {
+function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,notify,fcmTokensList}) {
   const [mH,setMH] = useState(null);
   const [vistos,setVistos] = useState([]);
   const [showHist,setShowHist] = useState(false);
@@ -2344,6 +2341,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       fecha:new Date().toISOString(),
       leido:false
     });
+    sendPush("Nueva solicitud - Consultorio GV", user+" solicitó un cambio de horario", fcmTokensList||[]);
     notify("Solicitud enviada"); setMH(null);
   }
 
