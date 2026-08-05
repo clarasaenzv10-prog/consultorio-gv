@@ -2,6 +2,30 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
 
+// ── RESTAURACIÓN AUTOMÁTICA DE DATOS ──────────────────────
+var __RESTORE_DATA = [{"nombre": "Magdalena Perisse", "aliases": ["Magda", "Magdalena"], "cuit": "27-30557935-5", "email": "Magdalenaperisse@gmail.com"}, {"nombre": "Eugenia Eguren", "aliases": ["Euge", "Eugenia"], "cuit": "27-26772955-2", "email": "eugeniaeguren@gmail.com"}, {"nombre": "Dolores Torreira", "aliases": ["Dolores"], "cuit": "27-10130923-7", "email": "dolorestorreira@gmail.com"}, {"nombre": "Josefina Cesareo", "aliases": ["Jose Cesareo", "Josefina"], "cuit": "27-29752229-4", "email": "josefina.cesareo@gmail.com"}, {"nombre": "Belen Bancalari", "aliases": ["Belen"], "cuit": "27-31494800-4", "email": "b.bancalari@gmail.com"}, {"nombre": "Bernadette Houssay", "aliases": ["Bernadette"], "cuit": "27-19084133-8", "email": "bhoussay@gmail.com"}, {"nombre": "Carolina Podversich", "aliases": ["Carolina"], "cuit": "27-29350542-5", "email": "mcpodversich@gmail.com"}, {"nombre": "Agustina Mohr", "aliases": ["Agus Mohr", "Agustina"], "cuit": "27-38067713-5", "email": "agustinamohr@gmail.com"}, {"nombre": "Delfina Mohr", "aliases": ["Delfi Mohr", "Delfina"], "cuit": "27-40829773-2", "email": "delfimohr@gmail.com"}, {"nombre": "Sofia Elkin", "aliases": ["Sofi", "Sofia"], "cuit": "27-40992134-0", "email": "sofi.elkin@gmail.com"}, {"nombre": "Marcela Fernandez Sanchez", "aliases": ["Marce", "Marcela"], "cuit": "27-20573566-1", "email": "marcefernandezsanchez@hotmail.com"}, {"nombre": "Teresa De Aramburu", "aliases": ["Teresa"], "cuit": "", "email": "Terearamburu95@gmail.com"}, {"nombre": "Milagros Vazquez", "aliases": ["Milagros"], "cuit": "", "email": "milagrosvazquezg@gmail.com"}];
+function __restoreContactData(psicos) {
+  var ALIASES = {};
+  __RESTORE_DATA.forEach(function(r) {
+    ALIASES[r.nombre.toLowerCase()] = r;
+    (r.aliases||[]).forEach(function(a) { ALIASES[a.toLowerCase()] = r; });
+  });
+  psicos.forEach(function(p) {
+    var key = (p.nombre||"").trim().toLowerCase();
+    var r = ALIASES[key];
+    if (!r) return;
+    var update = {};
+    if (r.cuit && p.cuit !== r.cuit) update.cuit = r.cuit;
+    if (r.email && p.email !== r.email) update.email = r.email;
+    if (p.nombre !== r.nombre) update.nombre = r.nombre;
+    if (Object.keys(update).length > 0) {
+      saveDoc("psicos", p.id, Object.assign({}, p, update));
+    }
+  });
+}
+// ──────────────────────────────────────────────────────────
+
+
 async function sendPush(title, body, tokens) {
   if (!tokens || !tokens.length) return;
   try { await fetch("/api/notify", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body,tokens})}); } catch(e) {}
@@ -77,19 +101,19 @@ const HBASE = [
 ];
 
 const PBASE = [
-  {id:"p1",nombre:"Magda",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p2",nombre:"Belen",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p3",nombre:"Bernadette",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p4",nombre:"Carolina",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p5",nombre:"Agus Mohr",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p6",nombre:"Delfi Mohr",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p7",nombre:"Sofi",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p8",nombre:"Marce",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p9",nombre:"Angeles",wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p10",nombre:"Euge",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p1",nombre:"Magdalena Perisse",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p2",nombre:"Belen Bancalari",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p3",nombre:"Bernadette Houssay",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p4",nombre:"Carolina Podversich",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p5",nombre:"Agustina Mohr",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p6",nombre:"Delfina Mohr",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p7",nombre:"Sofia Elkin",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p8",nombre:"Marcela Fernandez Sanchez",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p9",nombre:"Angeles Rodriguez Feito",wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p10",nombre:"Eugenia Eguren",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
   {id:"p11",nombre:"Dolores Torreira",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p12",nombre:"Jose Cesareo",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
-  {id:"p14",nombre:"Milagros",wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p12",nombre:"Josefina Cesareo",wa:"",analisis:[],poblacion:[],disponible:true,fijas:true,descuento:0,nota:"",email:"",pass:"psico123"},
+  {id:"p14",nombre:"Milagros Vazquez",wa:"",analisis:[],poblacion:[],disponible:true,fijas:false,descuento:0,nota:"",email:"",pass:"psico123"},
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -416,7 +440,7 @@ export default function App() {
     ]).then(function(){ clearTimeout(fbT); setDbReady(true); })
       .catch(function(){ clearTimeout(fbT); setDbReady(true); });
     const unsubs = [
-      listenCol("psicos", function(d){ setPsicosLocal(d); }),
+      listenCol("psicos", function(d){ setPsicosLocal(d); if(d&&d.length>0) __restoreContactData(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
       listenCol("reservas", function(d){ setReservasLocal(d); }),
       listenCol("bloques", function(d){ setBloquesLocal(d); }),
@@ -438,7 +462,7 @@ export default function App() {
     return function(){ unsubs.forEach(function(u){u();}); };
   }, []);
 
-  function setPsicos(u2) { const n=typeof u2==="function"?u2(psicos):u2; n.forEach(function(p){saveDoc("psicos",p.id,p);}); psicos.forEach(function(p){if(!n.find(function(x){return x.id===p.id;}))delDoc("psicos",p.id);}); }
+  function setPsicos(u2) { /* DESACTIVADO - usar saveDoc individual */ console.warn("setPsicos wrapper called - should not happen"); }
   function setHorarios(u2) { const n=typeof u2==="function"?u2(horarios):u2; n.forEach(function(h){saveDoc("horarios",h.id,h);}); horarios.forEach(function(h){if(!n.find(function(x){return x.id===h.id;}))delDoc("horarios",h.id);}); }
   function setReservas(u2) { const n=typeof u2==="function"?u2(reservas):u2; n.forEach(function(r){saveDoc("reservas",r.id,r);}); reservas.forEach(function(r){if(!n.find(function(x){return x.id===r.id;}))delDoc("reservas",r.id);}); }
   function setBloques(u2) { const n=typeof u2==="function"?u2(bloques):u2; n.forEach(function(b){saveDoc("bloques",b.id,b);}); bloques.forEach(function(b){if(!n.find(function(x){return x.id===b.id;}))delDoc("bloques",b.id);}); }
@@ -2027,7 +2051,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
   }
   function savePass() {
     if(newPass.length < 4) { notify("Minimo 4 caracteres","err"); return; }
-    setPsicos(function(ps){return ps.map(function(x){return x.id===p.id?Object.assign({},x,{pass:newPass}):x;});});
+    saveDoc("psicos",p.id,Object.assign({},p,{pass:newPass}));
     setNewPass(""); setEditPass(false); notify("Contrasena actualizada");
   }
   return (
@@ -3210,14 +3234,12 @@ function CambiarPassBtn({user,psicos,notify}) {
   function cambiar() {
     if(nueva.length<4){notify("Minimo 4 caracteres","err");return;}
     if(nueva!==conf){notify("Las contrasenas no coinciden","err");return;}
-    setPsicos(function(ps){
-      const p = ps.find(function(x){return x.nombre===user;});
-      if(!p){notify("Error","err");return ps;}
-      if((p.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return ps;}
-      notify("Contrasena cambiada");
-      setOpen(false);setActual("");setNueva("");setConf("");
-      return ps.map(function(x){return x.nombre===user?Object.assign({},x,{pass:nueva}):x;});
-    });
+    const pCurrent = psicos.find(function(x){return x.nombre===user;});
+    if(!pCurrent){notify("Error","err");return;}
+    if((pCurrent.pass||"psico123")!==actual){notify("Contrasena actual incorrecta","err");return;}
+    saveDoc("psicos",pCurrent.id,Object.assign({},pCurrent,{pass:nueva}));
+    notify("Contrasena cambiada");
+    setOpen(false);setActual("");setNueva("");setConf("");
   }
   return (
     <div>
