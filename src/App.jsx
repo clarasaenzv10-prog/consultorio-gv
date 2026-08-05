@@ -1432,8 +1432,8 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify,fcmTokensLis
 
 // ─── Solicitudes ──────────────────────────────────────────────
 function SolicitudesView({reservas,setReservas,gc,notify}) {
-  const pend = reservas.filter(function(r){return r.estado==="pendiente";});
-  const hist = reservas.filter(function(r){return r.estado!=="pendiente";});
+  const pend = reservas.filter(function(r){return r.estado==="pendiente";}).sort(function(a,b){return (b.fecha||b.fechaSol||"").localeCompare(a.fecha||a.fechaSol||"");});
+  const hist = reservas.filter(function(r){return r.estado!=="pendiente";}).sort(function(a,b){return (b.fecha||"").localeCompare(a.fecha||"");});
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitudes de reserva</h2>
