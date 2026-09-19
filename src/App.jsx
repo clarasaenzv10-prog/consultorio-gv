@@ -364,7 +364,7 @@ export default function App() {
   const [psicos,setPsicosLocal] = useState([]);
   const [reservas,setReservasLocal] = useState([]);
   const [bloques,setBloquesLocal] = useState([]);
-  const [horarios,setHorariosLocal] = useState([]){return Object.assign({},h,{id:"h"+i});}));
+  const [horarios,setHorariosLocal] = useState([]);
   const [anuncios,setAnunciosLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
@@ -409,7 +409,7 @@ export default function App() {
   function setPsicos(u2) { /* DESACTIVADO */ }
   function setHorarios(u2) { const n=typeof u2==="function"?u2(horarios):u2; n.forEach(function(h){saveDoc("horarios",h.id,h);}); horarios.forEach(function(h){if(!n.find(function(x){return x.id===h.id;}))delDoc("horarios",h.id);}); }
   function setReservas(u2) { const n=typeof u2==="function"?u2(reservas):u2; n.forEach(function(r){saveDoc("reservas",r.id,r);}); reservas.forEach(function(r){if(!n.find(function(x){return x.id===r.id;}))delDoc("reservas",r.id);}); }
-  function setBloques(u2) { const n=typeof u2==="function"?u2(bloques):u2; n.forEach(function(b){saveDoc("bloques",b.id,b);}); bloques.forEach(function(b){if(!n.find(function(x){return x.id===b.id;}))delDoc("bloques",b.id);}); }
+  function setBloques(u2) { /* DESACTIVADO */ }
   function setAnuncios(u2) { const n=typeof u2==="function"?u2(anuncios):u2; n.forEach(function(a){saveDoc("anuncios",a.id,a);}); anuncios.forEach(function(a){if(!n.find(function(x){return x.id===a.id;}))delDoc("anuncios",a.id);}); }
   function setSolHor(u2) { const n=typeof u2==="function"?u2(solHor):u2; n.forEach(function(s){saveDoc("solHor",s.id,s);}); solHor.forEach(function(s){if(!n.find(function(x){return x.id===s.id;}))delDoc("solHor",s.id);}); }
   function setTabP(u2) { const n=typeof u2==="function"?u2(tabP):u2; n.forEach(function(t){saveDoc("tabP",t.id,t);}); tabP.forEach(function(t){if(!n.find(function(x){return x.id===t.id;}))delDoc("tabP",t.id);}); }
@@ -2044,7 +2044,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
         <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
-        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
+        
       </div>
       {gt==="horarios" && (
         <div>
@@ -2144,25 +2144,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
           })}
         </div>
       )}
-      {gt==="bloques" && (
-        <div style={sPanel}>
-          {!bloques.length
-            ? <div style={{color:mu,textAlign:"center",padding:40}}>Sin bloques. Crea uno desde el calendario.</div>
-            : bloques.map(function(b) {
-              return (
-                <div key={b.id} style={sCard}>
-                  <div style={{flex:1}}>
-                    <div style={{color:tx}}>{b.consultorio} - {parseLocalDate(b.fecha).toLocaleDateString("es-AR")}</div>
-                    <div style={{color:mu,fontSize:13}}>{b.inicio}-{b.fin}{b.motivo?" - "+b.motivo:""}</div>
-                  </div>
-                  <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){delDoc("bloques",b.id);notify("Eliminado");}}>Eliminar</button>
-                </div>
-              );
-            })
-          }
-        </div>
-      )}
-    </div>
+          </div>
   );
 }
 
