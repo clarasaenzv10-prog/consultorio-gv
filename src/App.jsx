@@ -1219,6 +1219,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                   {p.profesion && p.profesion!=="Psicologa" && <div style={{color:br,fontSize:11,fontWeight:600}}>{p.profesion}</div>}
                   {role==="admin" && p.wa && <div style={{color:mu,fontSize:12}}>WA: {p.wa}</div>}
                   {role==="admin" && p.email && <div style={{color:mu,fontSize:12}}>Mail: {p.email}</div>}
+                  {role==="admin" && p.cuit && <div style={{color:mu,fontSize:12}}>CUIT: {p.cuit}</div>}
                   {(p.analisis||[]).length>0 && (
                     <div style={{display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginTop:6}}>
                       {(p.analisis||[]).map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:10,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
@@ -1591,8 +1592,14 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
 // ─── Facturacion ──────────────────────────────────────────────
 function FactView({psicos,calcFact,genMsg,notify}) {
-  const [enviadas,setEnviadas] = useState(function(){try{return JSON.parse(localStorage.getItem("enviadas_"+mes+"_"+anio)||"{}");}catch(e){return {};}});
-  function toggleEnviada(nombre){setEnviadas(function(prev){var n=Object.assign({},prev);n[nombre]=!n[nombre];localStorage.setItem("enviadas_"+mes+"_"+anio,JSON.stringify(n));return n;});}
+  const [enviadas,setEnviadas] = useState({});
+  function toggleEnviada(nombre){
+    setEnviadas(function(prev){
+      var n=Object.assign({},prev,{[nombre]:!prev[nombre]});
+      try{localStorage.setItem("enviadas_"+sel+"_"+anio,JSON.stringify(n));}catch(e){}
+      return n;
+    });
+  }
   // Historial: last 6 months data for selected psico
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
