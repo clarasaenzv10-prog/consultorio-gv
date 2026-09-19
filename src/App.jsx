@@ -364,7 +364,7 @@ export default function App() {
   const [psicos,setPsicosLocal] = useState([]);
   const [reservas,setReservasLocal] = useState([]);
   const [bloques,setBloquesLocal] = useState([]);
-  const [horarios,setHorariosLocal] = useState(HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});}));
+  const [horarios,setHorariosLocal] = useState([]){return Object.assign({},h,{id:"h"+i});}));
   const [anuncios,setAnunciosLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
@@ -1188,8 +1188,8 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
         {psicos.map(function(p) {
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
-              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {p.nombre[0].toUpperCase()}
+              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
+                {(p.nombre||"?")[0].toUpperCase()}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
@@ -1260,8 +1260,8 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
               <button style={{background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,fontFamily:"inherit"}} onClick={function(){setPerfilSel(null);}}>X</button>
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
-              <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {perfilSel.nombre[0].toUpperCase()}
+              <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
+                {(perfilSel.nombre||"?")[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1393,7 +1393,7 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
         return (
           <div key={r.id} style={sCard}>
             <div style={{width:36,height:36,borderRadius:"50%",background:gc(r.psico),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>
-              {r.psico && r.psico[0]}
+              {r.psico && (r.psico[0]||"?")}
             </div>
             <div style={{flex:1}}>
               <div style={{color:tx,fontWeight:700}}>{r.psico}</div>
