@@ -1186,7 +1186,9 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Profesionales</h2>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
         {psicos.length===0 && <div style={{gridColumn:"1/-1",color:mu,textAlign:"center",padding:40,fontSize:14}}>Cargando profesionales...</div>}
-        {psicos.filter(function(p){return p&&p.nombre;}).map(function(p) {
+        {(function(){
+          try {
+            return psicos.filter(function(p){return p&&p.nombre;}).map(function(p) {
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
               <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
@@ -1250,7 +1252,11 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
               )}
             </div>
           );
-        })}
+            });
+          } catch(e) {
+            return <div style={{gridColumn:"1/-1",background:"#FFF0F0",color:"#C0392B",padding:14,borderRadius:8,fontSize:13}}>Error al renderizar profesionales: {String(e)}</div>;
+          }
+        })()}
       </div>
     </div>
       {perfilSel && (
