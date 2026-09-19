@@ -1,34 +1,23 @@
 // v2026-05-23-DESC-V2
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { listenCol, saveDoc, delDoc, seedIfEmpty, requestNotifPermission, listenForeground } from "./firebase.js";
-
-// ── RESTAURACIÓN AUTOMÁTICA DE DATOS ──────────────────────
-var __RESTORE_DATA = [{"nombre": "Magdalena Perisse", "aliases": ["Magda", "Magdalena"], "cuit": "27-30557935-5", "email": "Magdalenaperisse@gmail.com"}, {"nombre": "Eugenia Eguren", "aliases": ["Euge", "Eugenia"], "cuit": "27-26772955-2", "email": "eugeniaeguren@gmail.com"}, {"nombre": "Dolores Torreira", "aliases": ["Dolores"], "cuit": "27-10130923-7", "email": "dolorestorreira@gmail.com"}, {"nombre": "Josefina Cesareo", "aliases": ["Jose Cesareo", "Josefina"], "cuit": "27-29752229-4", "email": "josefina.cesareo@gmail.com"}, {"nombre": "Belen Bancalari", "aliases": ["Belen"], "cuit": "27-31494800-4", "email": "b.bancalari@gmail.com"}, {"nombre": "Bernadette Houssay", "aliases": ["Bernadette"], "cuit": "27-19084133-8", "email": "bhoussay@gmail.com"}, {"nombre": "Carolina Podversich", "aliases": ["Carolina"], "cuit": "27-29350542-5", "email": "mcpodversich@gmail.com"}, {"nombre": "Agustina Mohr", "aliases": ["Agus Mohr", "Agustina"], "cuit": "27-38067713-5", "email": "agustinamohr@gmail.com"}, {"nombre": "Delfina Mohr", "aliases": ["Delfi Mohr", "Delfina"], "cuit": "27-40829773-2", "email": "delfimohr@gmail.com"}, {"nombre": "Sofia Elkin", "aliases": ["Sofi", "Sofia"], "cuit": "27-40992134-0", "email": "sofi.elkin@gmail.com"}, {"nombre": "Marcela Fernandez Sanchez", "aliases": ["Marce", "Marcela"], "cuit": "27-20573566-1", "email": "marcefernandezsanchez@hotmail.com"}, {"nombre": "Teresa De Aramburu", "aliases": ["Teresa"], "cuit": "", "email": "Terearamburu95@gmail.com"}, {"nombre": "Milagros Vazquez", "aliases": ["Milagros"], "cuit": "", "email": "milagrosvazquezg@gmail.com"}];
-function __restoreContactData(psicos) {
-  var ALIASES = {};
-  __RESTORE_DATA.forEach(function(r) {
-    ALIASES[r.nombre.toLowerCase()] = r;
-    (r.aliases||[]).forEach(function(a) { ALIASES[a.toLowerCase()] = r; });
+function __restoreContactData(ps) {
+  var D = [{"nombre": "Magdalena Perisse", "aliases": ["Magda", "Magdalena"], "cuit": "27-30557935-5", "email": "Magdalenaperisse@gmail.com", "wa": "+54 9 11 4171-7681"}, {"nombre": "Eugenia Eguren", "aliases": ["Euge", "Eugenia"], "cuit": "27-26772955-2", "email": "eugeniaeguren@gmail.com", "wa": "+54 9 11 3761-1299"}, {"nombre": "Dolores Torreira", "aliases": ["Dolores"], "cuit": "27-10130923-7", "email": "dolorestorreira@gmail.com", "wa": "+54 9 11 6161-4501"}, {"nombre": "Josefina Cesareo", "aliases": ["Jose Cesareo", "Josefina"], "cuit": "27-29752229-4", "email": "josefina.cesareo@gmail.com", "wa": "+54 9 11 6194-2547"}, {"nombre": "Milagros Vazquez", "aliases": ["Milagros"], "cuit": "", "email": "milagrosvazquezg@gmail.com", "wa": "+54 9 11 5059-0005"}, {"nombre": "Belen Bancalari", "aliases": ["Belen"], "cuit": "27-31494800-4", "email": "b.bancalari@gmail.com", "wa": "+54 9 11 2483-3573"}, {"nombre": "Bernadette Houssay", "aliases": ["Bernadette"], "cuit": "27-19084133-8", "email": "bhoussay@gmail.com", "wa": "+54 9 11 2551-2500"}, {"nombre": "Carolina Podversich", "aliases": ["Carolina"], "cuit": "27-29350542-5", "email": "mcpodversich@gmail.com", "wa": "+54 9 11 5347-9855"}, {"nombre": "Agustina Mohr", "aliases": ["Agus Mohr", "Agustina"], "cuit": "27-38067713-5", "email": "agustinamohr@gmail.com", "wa": "+54 9 11 3470-8446"}, {"nombre": "Delfina Mohr", "aliases": ["Delfi Mohr", "Delfina"], "cuit": "27-40829773-2", "email": "delfimohr@gmail.com", "wa": "+54 9 11 6917-1943"}, {"nombre": "Sofia Elkin", "aliases": ["Sofi", "Sofia"], "cuit": "27-40992134-0", "email": "sofi.elkin@gmail.com", "wa": "+54 9 345 432-3498"}, {"nombre": "Marcela Fernandez Sanchez", "aliases": ["Marce", "Marcela"], "cuit": "27-20573566-1", "email": "marcefernandezsanchez@hotmail.com", "wa": "+54 9 11 5622-1734"}, {"nombre": "Teresa De Aramburu", "aliases": ["Teresa"], "cuit": "", "email": "Terearamburu95@gmail.com", "wa": ""}];
+  var X = {};
+  D.forEach(function(r) {
+    X[r.nombre.toLowerCase()] = r;
+    (r.aliases||[]).forEach(function(a) { X[a.toLowerCase()] = r; });
   });
-  psicos.forEach(function(p) {
-    var key = (p.nombre||"").trim().toLowerCase();
-    var r = ALIASES[key];
+  ps.forEach(function(p) {
+    var r = X[(p.nombre||"").trim().toLowerCase()];
     if (!r) return;
-    var update = {};
-    if (r.cuit && p.cuit !== r.cuit) update.cuit = r.cuit;
-    if (r.email && p.email !== r.email) update.email = r.email;
-    if (p.nombre !== r.nombre) update.nombre = r.nombre;
-    if (Object.keys(update).length > 0) {
-      saveDoc("psicos", p.id, Object.assign({}, p, update));
-    }
+    var u = {};
+    if (r.cuit && p.cuit !== r.cuit) u.cuit = r.cuit;
+    if (r.email && p.email !== r.email) u.email = r.email;
+    if (r.wa && p.wa !== r.wa) u.wa = r.wa;
+    if (r.nombre && p.nombre !== r.nombre) u.nombre = r.nombre;
+    if (Object.keys(u).length > 0) saveDoc("psicos", p.id, Object.assign({}, p, u));
   });
-}
-// ──────────────────────────────────────────────────────────
-
-
-async function sendPush(title, body, tokens) {
-  if (!tokens || !tokens.length) return;
-  try { await fetch("/api/notify", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body,tokens})}); } catch(e) {}
 }
 
 // ─── Colores (hardcoded, no concatenation in JSX) ──────────────
@@ -239,16 +228,32 @@ function Logo({size,col}) {
 }
 
 // ─── App ──────────────────────────────────────────────────────
-var CF_ALIASES={"agustina mohr":["agus mohr"],"delfina mohr":["delfi mohr"],"magdalena perisse":["magda"],"eugenia eguren":["euge"],"josefina cesareo":["jose cesareo"],"sofia elkin":["sofi"],"marcela fernandez sanchez":["marce"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"angeles rodriguez feito":["angeles"],"milagros vazquez":["milagros"],"dolores torreira":["dolores torreira"]};
+
+var CF_ALIASES = {
+  "magdalena perisse":["magda","magdalena"],
+  "eugenia eguren":["euge","eugenia"],
+  "josefina cesareo":["jose cesareo","josefina"],
+  "milagros vazquez":["milagros"],
+  "belen bancalari":["belen"],
+  "bernadette houssay":["bernadette"],
+  "carolina podversich":["carolina"],
+  "agustina mohr":["agus mohr","agustina"],
+  "delfina mohr":["delfi mohr","delfina"],
+  "sofia elkin":["sofi","sofia"],
+  "marcela fernandez sanchez":["marce","marcela"],
+  "angeles rodriguez feito":["angeles"],
+  "dolores torreira":["dolores torreira"],
+  "jesica lavia":["jesica"],
+  "marta pitzer":["marta"],
+  "teresa de aramburu":["teresa"],
+};
 function matchHorario(pNombre, hPsico) {
   if(!hPsico||!pNombre) return false;
-  var pn = pNombre.trim().toLowerCase();
-  var hn = hPsico.trim().toLowerCase();
+  var pn=pNombre.trim().toLowerCase(), hn=hPsico.trim().toLowerCase();
   if(hn===pn) return true;
-  return (CF_ALIASES[pn]||[]).some(function(a){return a===hn;});
+  return (CF_ALIASES[pn]||[]).some(function(a){return a===hn;}) ||
+         (CF_ALIASES[hn]||[]).some(function(a){return a===pn;});
 }
-
-
 
 function gdUrl(url) {
   if(!url) return url;
@@ -256,75 +261,17 @@ function gdUrl(url) {
   if(m) return "https://lh3.googleusercontent.com/d/"+m[1];
   return url;
 }
-
-function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
-  const [dia,setDia] = useState(h?Number(h.diaSemana):1);
-  const [ini,setIni] = useState(h?h.inicio:"09:00");
-  const [fin,setFin] = useState(h?h.fin:"13:00");
-  const [cons,setCons] = useState(h?h.consultorio:"C1");
-  var DIAS2=["","Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
-  var CONS2=["C1","C2","C3","C4","C5"];
-  function toMin2(t){var p=(t||"00:00").split(":");return Number(p[0])*60+Number(p[1]);}
-  function conflict(){
-    return (horarios||[]).some(function(hh){
-      if(Number(hh.diaSemana)!==Number(dia)) return false;
-      if(hh.consultorio!==cons) return false;
-      if(h&&hh.id===h.id) return false;
-      return toMin2(ini)<toMin2(hh.fin)&&toMin2(fin)>toMin2(hh.inicio);
-    });
-  }
-  function submit(){
-    if(toMin2(fin)<=toMin2(ini)){notify("Fin debe ser mayor al inicio");return;}
-    onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons});
-  }
-  var sI={border:"1.5px solid #C9E4EF",borderRadius:8,padding:"8px 10px",fontSize:14,fontFamily:"inherit",background:"#FFFFFF",color:"#1C3A4A",outline:"none",width:"100%",boxSizing:"border-box"};
-  var lbl={color:"#6B97AA",fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6};
-  var hasConflict=conflict();
+function ImagePreview({url}) {
+  var src = gdUrl(url);
   return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #C9E4EF"}}>
-        <h3 style={{margin:0,color:"#1C3A4A"}}>Modificar horario</h3>
-        <button style={{background:"transparent",border:"none",fontSize:20,cursor:"pointer",color:"#6B97AA"}} onClick={onClose}>X</button>
-      </div>
-      <div style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
-        <div>
-          <label style={lbl}>Dia</label>
-          <select style={sI} value={dia} onChange={function(e){setDia(Number(e.target.value));}}>
-            {[1,2,3,4,5,6,7].map(function(d){return <option key={d} value={d}>{DIAS2[d]}</option>;})}
-          </select>
-        </div>
-        <div style={{display:"flex",gap:10}}>
-          <div style={{flex:1}}>
-            <label style={lbl}>Inicio</label>
-            <input style={sI} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
-          </div>
-          <div style={{flex:1}}>
-            <label style={lbl}>Fin</label>
-            <input style={sI} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
-          </div>
-        </div>
-        <div>
-          <label style={lbl}>Consultorio</label>
-          <select style={sI} value={cons} onChange={function(e){setCons(e.target.value);}}>
-            {CONS2.map(function(c){return <option key={c} value={c}>{c}</option>;})}
-          </select>
-        </div>
-        {hasConflict&&<div style={{background:"#FFF0F0",border:"1px solid #F5B8B3",borderRadius:8,padding:10,color:"#C0392B",fontSize:12}}>Ese consultorio ya tiene un horario en ese dia y horario</div>}
-        <div style={{display:"flex",gap:10}}>
-          <button style={{flex:1,background:hasConflict?"#ccc":"#4BA3C3",color:"#FFFFFF",border:"none",borderRadius:10,padding:"10px 0",fontSize:14,fontWeight:700,cursor:hasConflict?"not-allowed":"pointer",fontFamily:"inherit"}} onClick={submit} disabled={hasConflict}>Solicitar cambio</button>
-          <button style={{flex:1,background:"transparent",border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px 0",fontSize:14,cursor:"pointer",fontFamily:"inherit",color:"#6B97AA"}} onClick={onClose}>Cancelar</button>
-        </div>
-      </div>
+    <div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",background:"#F0F8FB",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <img src={src} style={{maxWidth:"100%",maxHeight:160,objectFit:"contain",display:"block"}} onError={function(e){e.target.style.display="none";}}/>
     </div>
   );
 }
-
-function ImagePreview({url}) {
-  var src = gdUrl(url);
-  return React.createElement("div",{style:{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #C9E4EF",background:"#F0F8FB",minHeight:40,display:"flex",alignItems:"center",justifyContent:"center"}},
-    React.createElement("img",{src:src,style:{maxWidth:"100%",maxHeight:160,objectFit:"contain",display:"block"},onError:function(e){e.target.style.display="none";}}),
-    React.createElement("div",{style:{display:"none",color:"#6B97AA",fontSize:11,padding:8}},"Link no valido")
-  );
+async function sendPush(title, body, tokens) {
+  if(!tokens||!tokens.length) return;
+  try { await fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body,tokens})}); } catch(e) {}
 }
 
 function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
@@ -347,48 +294,57 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
     saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
     setTexto("");
   }
-  var wh="#FFFFFF",tx="#1C3A4A",mu="#6B97AA",br="#4BA3C3",lt="#EBF6FA",dk="#2E86AB";
   if(role==="admin"&&!convWith){
-    return React.createElement("div",null,
-      React.createElement("h2",{style:{color:tx,fontSize:20,fontWeight:800,marginBottom:16}},"Mensajes"),
-      psicos.map(function(p){
-        var k2=getKey(p.nombre),k2old=getKeyOld(user,p.nombre);
-        var unread=mensajes.filter(function(m){return (m.conv===k2||m.conv===k2old)&&!m.leido&&m.de!==user;}).length;
-        var last=mensajes.filter(function(m){return m.conv===k2||m.conv===k2old;}).slice(-1)[0];
-        return React.createElement("button",{key:p.id,onClick:function(){setConvWith(p.nombre);setChatOpen(p.nombre);},
-          style:{background:wh,border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",marginBottom:8,textAlign:"left"}},
-          React.createElement("div",{style:{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}},(p.nombre||"?")[0].toUpperCase()),
-          React.createElement("div",{style:{flex:1,minWidth:0}},
-            React.createElement("div",{style:{color:tx,fontWeight:600,fontSize:14}},p.nombre),
-            last&&React.createElement("div",{style:{color:mu,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},(last.de===user?"Yo: ":last.de+": ")+last.texto)
-          ),
-          unread>0&&React.createElement("span",{style:{background:"#C0392B",color:wh,borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}},unread)
-        );
-      })
+    return (
+      <div>
+        <h2 style={{color:"#1C3A4A",fontSize:20,fontWeight:800,marginBottom:16}}>Mensajes</h2>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {psicos.map(function(p){
+            var k2=getKey(p.nombre),k2old=getKeyOld(user,p.nombre);
+            var unread=mensajes.filter(function(m){return (m.conv===k2||m.conv===k2old)&&!m.leido&&m.de!==user;}).length;
+            var last=mensajes.filter(function(m){return m.conv===k2||m.conv===k2old;}).slice(-1)[0];
+            return (
+              <button key={p.id} onClick={function(){setConvWith(p.nombre);setChatOpen(p.nombre);}}
+                style={{background:"#FFFFFF",border:"1.5px solid #C9E4EF",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:gc(p.nombre||"?"),color:"#FFFFFF",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:16,flexShrink:0}}>{(p.nombre||"?")[0].toUpperCase()}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:"#1C3A4A",fontWeight:600,fontSize:14}}>{p.nombre}</div>
+                  {last&&<div style={{color:"#6B97AA",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(last.de===user?"Yo: ":last.de+": ")+last.texto}</div>}
+                </div>
+                {unread>0&&<span style={{background:"#C0392B",color:"#FFFFFF",borderRadius:"50%",width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0}}>{unread}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
-  return React.createElement("div",{style:{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}},
-    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:12}},
-      role==="admin"&&React.createElement("button",{style:{background:"transparent",border:"none",color:br,fontSize:22,cursor:"pointer",fontWeight:700,padding:0},onClick:function(){setConvWith(null);setChatOpen(null);}},"<"),
-      React.createElement("div",{style:{color:tx,fontSize:17,fontWeight:700}},role==="admin"?convWith:"Admin"),
-      React.createElement("button",{style:{marginLeft:"auto",background:"transparent",border:"none",color:mu,fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"},onClick:markRead},"Marcar leidos")
-    ),
-    React.createElement("div",{style:{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}},
-      msgs.length===0&&React.createElement("div",{style:{color:mu,textAlign:"center",marginTop:60,fontSize:14}},"Sin mensajes aun."),
-      msgs.map(function(m){
-        var isMe=m.de===user;
-        return React.createElement("div",{key:m.id,style:{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}},
-          React.createElement("div",{style:{background:isMe?br:wh,color:isMe?wh:tx,borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}},
-            React.createElement("div",null,m.texto),
-            React.createElement("div",{style:{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}},new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}))
-          )
-        );
-      })
-    ),
-    React.createElement("div",{style:{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}},
-      React.createElement("input",{style:{flex:1,border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px 14px",fontSize:14,fontFamily:"inherit",background:wh,color:tx,outline:"none"},value:texto,onChange:function(e){setTexto(e.target.value);},placeholder:"Escribi un mensaje...",onKeyDown:function(e){if(e.key==="Enter"){e.preventDefault();send();}}}),
-      React.createElement("button",{style:{background:br,color:wh,border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"},onClick:send},"Enviar")
-    )
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 150px)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+        {role==="admin"&&<button style={{background:"transparent",border:"none",color:"#4BA3C3",fontSize:22,cursor:"pointer",fontWeight:700,padding:0}} onClick={function(){setConvWith(null);setChatOpen(null);}}>{"<"}</button>}
+        <div style={{color:"#1C3A4A",fontSize:17,fontWeight:700}}>{role==="admin"?convWith:"Admin"}</div>
+        <button style={{marginLeft:"auto",background:"transparent",border:"none",color:"#6B97AA",fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}} onClick={markRead}>Marcar leidos</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
+        {msgs.length===0&&<div style={{color:"#6B97AA",textAlign:"center",marginTop:60,fontSize:14}}>Sin mensajes aun.</div>}
+        {msgs.map(function(m){
+          var isMe=m.de===user;
+          return (
+            <div key={m.id} style={{display:"flex",justifyContent:isMe?"flex-end":"flex-start"}}>
+              <div style={{background:isMe?"#4BA3C3":"#FFFFFF",color:isMe?"#FFFFFF":"#1C3A4A",borderRadius:14,padding:"10px 14px",maxWidth:"75%",fontSize:14,border:isMe?"none":"1.5px solid #C9E4EF"}}>
+                <div>{m.texto}</div>
+                <div style={{fontSize:10,opacity:.6,marginTop:3,textAlign:"right"}}>{new Date(m.fecha||0).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid #EBF6FA"}}>
+        <input style={{flex:1,border:"1.5px solid #C9E4EF",borderRadius:10,padding:"10px 14px",fontSize:14,fontFamily:"inherit",background:"#FFFFFF",color:"#1C3A4A",outline:"none"}} value={texto} onChange={function(e){setTexto(e.target.value);}} placeholder="Escribi un mensaje..." onKeyDown={function(e){if(e.key==="Enter"){e.preventDefault();send();}}}/>
+        <button style={{background:"#4BA3C3",color:"#FFFFFF",border:"none",borderRadius:10,padding:"10px 20px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={send}>Enviar</button>
+      </div>
+    </div>
   );
 }
 
@@ -408,14 +364,11 @@ export default function App() {
   const [psicos,setPsicosLocal] = useState([]);
   const [reservas,setReservasLocal] = useState([]);
   const [bloques,setBloquesLocal] = useState([]);
-  const [horarios,setHorariosLocal] = useState([]);
+  const [horarios,setHorariosLocal] = useState(HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});}));
   const [anuncios,setAnunciosLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
-  const [mensajes,setMensajesLocal] = useState([]);
-  const [chatOpen,setChatOpen] = useState(null);
-  const [fcmTokensList,setFcmTokensList] = useState([]);
   const [config,setConfigLocal] = useState({
     invPass:"invitada123",
     transferencia:{alias:"",cbu:"",banco:"",titular:""},
@@ -424,21 +377,14 @@ export default function App() {
   });
   const [dbReady,setDbReady] = useState(false);
 
-  useEffect(function(){
-    if(tab!=="chat"||!user) return;
-    mensajes.filter(function(m){return m.para===user&&!m.leido;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
-  },[tab,mensajes.length,user]);
-
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
     const TAB_INI = [{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}];
-    var fbT = setTimeout(function(){ setDbReady(true); }, 4000);
     Promise.all([
       seedIfEmpty("psicos", PBASE),
       seedIfEmpty("horarios", HORARIOS_WITH_IDS),
       seedIfEmpty("tabP", TAB_INI),
-    ]).then(function(){ clearTimeout(fbT); setDbReady(true); })
-      .catch(function(){ clearTimeout(fbT); setDbReady(true); });
+    ]).then(function(){ setDbReady(true); });
     const unsubs = [
       listenCol("psicos", function(d){ setPsicosLocal(d); if(d&&d.length>0) __restoreContactData(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
@@ -447,8 +393,6 @@ export default function App() {
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
-      listenCol("fcmTokens", function(d){ setFcmTokensList(d.map(function(t){return t.token;}).filter(Boolean)); }),
-      listenCol("mensajes", function(d){ setMensajesLocal(d.sort(function(a,b){return (a.fecha||"").localeCompare(b.fecha||"");})); }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
       }),
@@ -462,7 +406,7 @@ export default function App() {
     return function(){ unsubs.forEach(function(u){u();}); };
   }, []);
 
-  function setPsicos(u2) { /* DESACTIVADO - usar saveDoc individual */ console.warn("setPsicos wrapper called - should not happen"); }
+  function setPsicos(u2) { /* DESACTIVADO */ }
   function setHorarios(u2) { const n=typeof u2==="function"?u2(horarios):u2; n.forEach(function(h){saveDoc("horarios",h.id,h);}); horarios.forEach(function(h){if(!n.find(function(x){return x.id===h.id;}))delDoc("horarios",h.id);}); }
   function setReservas(u2) { const n=typeof u2==="function"?u2(reservas):u2; n.forEach(function(r){saveDoc("reservas",r.id,r);}); reservas.forEach(function(r){if(!n.find(function(x){return x.id===r.id;}))delDoc("reservas",r.id);}); }
   function setBloques(u2) { const n=typeof u2==="function"?u2(bloques):u2; n.forEach(function(b){saveDoc("bloques",b.id,b);}); bloques.forEach(function(b){if(!n.find(function(x){return x.id===b.id;}))delDoc("bloques",b.id);}); }
@@ -479,10 +423,7 @@ export default function App() {
     setNotif({msg:msg,t:t||"ok"});
     setTimeout(function(){setNotif(null);}, 3000);
   }
-  function login(r,n) {
-    setRole(r); setUser(n); setView("app"); setTab("calendario");
-    setTimeout(function(){ requestNotifPermission(n).catch(function(){}); }, 2000);
-  }
+  function login(r,n) { setRole(r); setUser(n); setView("app"); setTab("calendario"); }
 
   function getP(f) {
     const s = typeof f==="string" ? f : f.toISOString().split("T")[0];
@@ -491,31 +432,41 @@ export default function App() {
   }
   function getPM(mes,anio) { return getP(anio+"-"+String(mes+1).padStart(2,"0")+"-01"); }
 
-
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
-    var fpAll = horarios.filter(function(h){ return matchHorario(psico.nombre, h.psico); });
-    var fpBest={};
-    fpAll.forEach(function(h){
-      var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");
-      if(!fpBest[k]||(h.fechaInicio&&!fpBest[k].fechaInicio)) fpBest[k]=h;
+    const pn=psico.nombre.trim().toLowerCase();
+    const pnFirst=pn.split(" ")[0]; // first name only for fallback
+    var mesStart=(anio+"-"+String(mes+1).padStart(2,"0")+"-01");
+    var mesEnd=(function(){var d=new Date(anio,mes+1,0);return d.toISOString().split("T")[0];}());
+    const fp = horarios.filter(function(h){
+      if(!h.psico) return false;
+      const hn=h.psico.trim().toLowerCase();
+      if(!(hn===pn||hn===pnFirst)) return false;
+      // Excluir si el horario terminó antes de que empiece el mes
+      if(h.fechaFin && h.fechaFin < mesStart) return false;
+      // Excluir si el horario empieza después de que termina el mes
+      if(h.fechaInicio && h.fechaInicio > mesEnd) return false;
+      return true;
     });
-    var fp=Object.values(fpBest);
     let tf=0; const df=[];
     fp.forEach(function(h) {
-      var todasFechas = mesFechas(mes,anio,Number(h.diaSemana));
-      var fechas = todasFechas;
-      if(h.fechaInicio) fechas = fechas.filter(function(f){return f>=h.fechaInicio;});
-      if(h.fechaFin) fechas = fechas.filter(function(f){return f<=h.fechaFin;});
-      const sem = fechas.length;
+      var allDates = mesFechas(mes,anio,Number(h.diaSemana));
+      var filteredDates = allDates.filter(function(d){
+        if(h.fechaFin && d > h.fechaFin) return false;
+        if(h.fechaInicio && d < h.fechaInicio) return false;
+        return true;
+      });
+      var sem = filteredDates.length;
+      if(sem === 0) return; // horario no aplica este mes
       const p = calcPrecio(h.inicio,h.fin,pr);
       tf += p.sub*sem;
-      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des});
+      df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des,fechaFin:h.fechaFin||null,fechaInicio:h.fechaInicio||null});
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
       if(r.estado!=="aprobada") return false;
-        if(!matchHorario(psico.nombre, r.psico)) return false;
+      const rn=r.psico?r.psico.trim().toLowerCase():"";
+      if(!(rn===pn||rn===pnFirst)) return false;
       if(r.tipo!=="extra") return false;
       if(parseLocalDate(r.fecha).getMonth()!==mes) return false;
       if(parseLocalDate(r.fecha).getFullYear()!==anio) return false;
@@ -592,13 +543,11 @@ export default function App() {
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
-    {id:"chat",icon:"💬",label:"Mensajes",badge:mensajes.filter(function(m){return m.para===user&&!m.leido;}).length},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
@@ -606,7 +555,7 @@ export default function App() {
 
   const nav5 = nav.slice(0,5);
   const navX = nav.slice(5);
-  const isX = ["facturacion","precios","gestion","mishorarios","chat"].indexOf(tab) >= 0;
+  const isX = ["facturacion","precios","gestion","mishorarios"].indexOf(tab) >= 0;
 
   return (
     <AppRoot>
@@ -646,7 +595,7 @@ export default function App() {
               <div style={{color:mu,fontSize:12}}>{role==="admin"?"Administradora":"Profesional"}</div>
             </div>
             {role==="psico" && <EditarPerfilBtn user={user} psicos={psicos} setPsicos={setPsicos} notify={notify}/>}
-            {role==="psico" && <CambiarPassBtn user={user} psicos={psicos} notify={notify}/>}
+            {role==="psico" && <CambiarPassBtn user={user} setPsicos={setPsicos} notify={notify}/>}
             <button onClick={function(){setView("login");setRole(null);setUser(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:er,fontSize:15,fontWeight:600}}>
               <span style={{fontSize:20}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
@@ -702,19 +651,18 @@ export default function App() {
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
-          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
-          {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify} fcmTokensList={fcmTokensList}/>}
+          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
+          {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
-          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} reservas={reservas} notify={notify}/>}
+          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
-          {tab==="chat" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
-          {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){if(!user)return false;var un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};function match(n){if(!n)return false;var hn=n.trim().toLowerCase();return hn===un||(AL[un]||[]).some(function(a){return a===hn;});}return match(r.psico)||match(r.solicitante);})} onNew={function(){setMod({type:"nueva"});}}/>}
+          {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
         </main>
 
@@ -775,7 +723,7 @@ export default function App() {
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
-          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});sendPush("Nueva reserva - Consultorio GV",user+" solicito hora extra: "+d.consultorio+" "+d.fecha,fcmTokensList);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
+          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
         )}
       </div>
     </AppRoot>
@@ -788,7 +736,7 @@ function LoginView({onLogin,psicos,config}) {
   const [p,setP] = useState("");
   const [err,setErr] = useState("");
   function go() {
-    if(u==="admin" && p===(config.adminPass||"admin123")) { onLogin("admin","Admin"); return; }
+    if(u==="admin" && p==="admin123") { onLogin("admin","Admin"); return; }
     if(u.toLowerCase()==="invitada" && p===((config&&config.invPass)||"invitada123")) { onLogin("invitada","Invitada"); return; }
     const f = psicos.find(function(x){return x.nombre.toLowerCase()===u.toLowerCase();});
     if(f && p===(f.pass||"psico123")) { onLogin("psico",f.nombre); return; }
@@ -1228,20 +1176,10 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
 }
 
 // ─── Perfiles ─────────────────────────────────────────────────
-function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,horarios,reservas}) {
+function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
   const [eid,setEid] = useState(null);
   const [form,setForm] = useState({});
-  function save() {
-    var oldNombre=(psicos.find(function(x){return x.id===eid;})||{}).nombre||"";
-    var newNombre=(form.nombre||"").trim();
-    saveDoc("psicos",eid,Object.assign({},form,{nombre:newNombre}));
-    if(oldNombre&&newNombre&&oldNombre!==newNombre){
-      (horarios||[]).filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===oldNombre.trim().toLowerCase();}).forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:newNombre}));});
-      (reservas||[]).filter(function(r){return r.psico&&r.psico.trim().toLowerCase()===oldNombre.trim().toLowerCase();}).forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:newNombre}));});
-      notify("Perfil y horarios actualizados");
-    } else { notify("Perfil actualizado"); }
-    setEid(null);
-  }
+  function save() { var _p=psicos.find(function(x){return x.id===eid;})||{}; saveDoc("psicos",eid,Object.assign({},_p,form)); setEid(null); notify("Perfil actualizado"); }
   return (
     <>
     <div>
@@ -1250,8 +1188,8 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
         {psicos.map(function(p) {
           return (
             <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
-              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {(p.nombre||'?')[0].toUpperCase()}
+              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
+                {p.nombre[0].toUpperCase()}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
@@ -1322,7 +1260,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
             </div>
             <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {(perfilSel.nombre||"?")[0].toUpperCase()}
+                {perfilSel.nombre[0].toUpperCase()}
               </div>
               <div style={{textAlign:"center"}}>
                 <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
@@ -1382,24 +1320,21 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
 }
 
 // ─── Anuncios ─────────────────────────────────────────────────
-function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify,fcmTokensList}) {
-  const [txt,setTxt] = useState("");
+function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
   const [imgs,setImgs] = useState(["","",""]);
-  function setImg(i,v){setImgs(function(prev){var n=prev.slice();n[i]=v;return n;});}
-  function renderTexto(t){
-    return (t||"").split("\n").map(function(line,i){
-      var parts=line.split(/\*\*([^*]+)\*\*/g);
-      return React.createElement("div",{key:i,style:{minHeight:"1em"}},parts.map(function(part,j){return j%2===1?React.createElement("strong",{key:j},part):part;}));
-    });
-  }
+  const [txt,setTxt] = useState("");
   function pub() {
     if(!txt.trim()) return;
-    var imgList=imgs.map(function(u){return u.trim();}).filter(Boolean);
-    const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
+    var imgList=imgs.map(function(u){return u.trim();}).filter(Boolean);const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
     // Save pending notification to Firestore for cloud function to send
-    sendPush("Consultorio Gloria Videla", txt.trim().substring(0,100), fcmTokensList||[]);
-    setTxt(""); setImgs(["","",""]); notify("Anuncio publicado");
+    saveDoc("pendingNotifs","notif_"+a.id,{
+      title:"Consultorio Gloria Videla",
+      body:txt.trim().substring(0,100),
+      created:new Date().toISOString(),
+      sent:false
+    });
+    setTxt(""); notify("Anuncio publicado");
   }
   function sWA(p,t) {
     if(!p.wa){notify("Sin WA: "+p.nombre,"err");return;}
@@ -1413,16 +1348,6 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify,fcmTokensLis
         <div style={Object.assign({},sPanel,{marginBottom:20})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Nuevo anuncio</div>
           <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical"})} value={txt} onChange={function(e){setTxt(e.target.value);}} placeholder="Ej: Se corto la luz en Uruguay, vuelve en 2 horas..."/>
-          <div style={{color:mu,fontSize:11,marginTop:4}}>Tip: **palabra** = negrita · Enter = nueva línea</div>
-          <div style={{marginTop:10}}>
-            <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Fotos (link Google Drive o imagen)</div>
-            {imgs.map(function(url,i){return(
-              <div key={i} style={{marginBottom:6}}>
-                <input style={Object.assign({},sInp,{fontSize:12,padding:"6px 10px"})} value={url} onChange={function(e){setImg(i,e.target.value);}} placeholder={"Foto "+(i+1)+": pega el link..."}/>
-                {url&&<ImagePreview url={url}/>}
-              </div>
-            );})}
-          </div>
           <div style={{display:"flex",gap:10,marginTop:12,flexWrap:"wrap"}}>
             <button style={btn(br,wh)} onClick={pub}>Publicar en app</button>
             <button style={{background:"#25D366",color:wh,border:"none",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){if(txt.trim())psicos.filter(function(p){return p.wa;}).forEach(function(p,i){setTimeout(function(){sWA(p,txt);},i*700);});}}>WA a todas</button>
@@ -1445,8 +1370,9 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify,fcmTokensLis
                 {role==="admin" && <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:11,padding:"3px 8px"})} onClick={function(){delDoc("anuncios",a.id);}}>X</button>}
               </div>
             </div>
-            <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{renderTexto(a.texto)}</div>
-              {(a.fotos||[]).length>0&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{(a.fotos||[]).map(function(url,i){return <img key={i} src={gdUrl(url)} style={{maxWidth:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",cursor:"pointer"}} onClick={function(){var a2=document.createElement("a");a2.href=gdUrl(url);a2.target="_blank";document.body.appendChild(a2);a2.click();document.body.removeChild(a2);}} onError={function(e){e.target.style.display="none";}}/>;})}</div>}
+            <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{a.texto}
+              {(a.fotos||[]).filter(Boolean).map(function(url,fi){return <div key={fi} style={{marginTop:6}}><img src={url} style={{maxWidth:"100%",borderRadius:8,maxHeight:180,objectFit:"contain"}} onError={function(e){e.target.style.display="none";}}/></div>;})}
+</div>
           </div>
         );
       })}
@@ -1544,39 +1470,17 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});delDoc("horarios",s.horarioId);if(h){const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
-    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h)saveDoc("horarios",s.horarioId,Object.assign({},h,s.datos,{sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana)}));}
-    else if(s.accion==="agregar"&&s.tipo==="fijo"){
-      var diaF=s.datos&&Number(s.datos.diaSemana),consF=s.datos&&s.datos.consultorio,iniF=s.datos&&s.datos.inicio,finF=s.datos&&s.datos.fin;
-      if(diaF&&consF&&iniF&&finF){
-        var confF=(horarios||[]).some(function(hx){return hx.consultorio===consF&&Number(hx.diaSemana)===diaF&&toMin(iniF)<toMin(hx.fin)&&toMin(finF)>toMin(hx.inicio);});
-        if(confF){notify("No se puede aprobar: "+consF+" ya tiene un horario fijo ese dia en ese horario","err");return;}
-      }
-      const c=CONS.find(function(x){return x.id===s.datos.consultorio;});
-      const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});
-      saveDoc("horarios",h.id,h);
-    }
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoy=new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoy,activo:false}));const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
+    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);}}
+    else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
-    else if(s.accion==="agregar"&&s.tipo==="extra"){
-      var fecha2=s.datos&&s.datos.fecha, cons2=s.datos&&s.datos.consultorio, ini2=s.datos&&s.datos.inicio, fin2=s.datos&&s.datos.fin;
-      if(fecha2&&cons2&&ini2&&fin2){
-        var sMin2=toMin(ini2),eMin2=toMin(fin2);
-        var dDate2=new Date(fecha2+"T12:00:00"),dDia2=dDate2.getDay()===0?7:dDate2.getDay();
-        var confFijo2=(horarios||[]).some(function(h){return h.consultorio===cons2&&Number(h.diaSemana)===dDia2&&sMin2<toMin(h.fin)&&eMin2>toMin(h.inicio);});
-        var confExtra2=(reservas||[]).some(function(r){return r.consultorio===cons2&&r.fecha===fecha2&&r.estado==="aprobada"&&sMin2<toMin(r.fin)&&eMin2>toMin(r.inicio);});
-        if(confFijo2||confExtra2){notify("No se puede aprobar: "+cons2+" ya está ocupado ese horario el "+fecha2,"err");return;}
-      }
-      const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});
-      saveDoc("reservas",r.id,r);
-    }
+    else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
-    sendPush("Solicitud aprobada - Consultorio GV", s.psico+": tu solicitud fue aprobada", fcmTokensList||[]);
     notify("Aprobado");
   }
   function rechazar(id) {
     const s=solicitudes.find(function(x){return x.id===id;});
-    if(s){saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
-      sendPush("Solicitud rechazada - Consultorio GV",(s.psico||"")+" tu solicitud fue rechazada",fcmTokensList||[]);}
+    if(s)saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
     notify("Rechazado");
   }
 
@@ -1657,27 +1561,6 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
               <div style={{color:mu,fontSize:12}}>{new Date(s.fechaSol).toLocaleDateString("es-AR")}</div>
             </div>
             <div style={{background:bg,borderRadius:8,padding:10,color:tx,fontSize:13,marginBottom:12,border:"1px solid #C9E4EF"}}>{det(s)}</div>
-            {s.tipo==="fijo"&&(function(){
-              var dia=s.datos&&s.datos.diaSemana!=null?Number(s.datos.diaSemana):null;
-              var cons=s.datos&&s.datos.consultorio;
-              var ini=s.datos&&s.datos.inicio;
-              var fin=s.datos&&s.datos.fin;
-              if(!dia||!cons||!ini||!fin) return null;
-              var confs=reservas.filter(function(r){
-                if(r.estado!=="aprobada"&&r.estado!=="pendiente") return false;
-                if(r.consultorio!==cons) return false;
-                var rDate=r.fecha?new Date(r.fecha+"T12:00:00"):null;
-                if(!rDate) return false;
-                var rDia=rDate.getDay()===0?7:rDate.getDay();
-                if(rDia!==dia) return false;
-                return toMin(ini)<toMin(r.fin)&&toMin(fin)>toMin(r.inicio);
-              });
-              if(!confs.length) return null;
-              return React.createElement("div",{style:{background:"#FEF9C3",border:"1.5px solid #EAB308",borderRadius:10,padding:"10px 14px",marginBottom:12}},
-                React.createElement("div",{style:{color:"#854D0E",fontWeight:700,fontSize:12,marginBottom:6}},"⚠️ Atencion: hay eventuales que se superpondrían con este fijo"),
-                confs.map(function(r){return React.createElement("div",{key:r.id,style:{color:"#713F12",fontSize:12,marginBottom:2}},"• "+r.psico+" — "+r.fecha+" "+r.inicio+"-"+r.fin+" ("+(r.estado==="pendiente"?"pendiente":"aprobada")+")");})
-              );
-            })()}
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
               <button style={Object.assign({},btn(br,wh),{padding:"7px 14px",fontSize:13})} onClick={function(){aprobar(s);}}>Aprobar</button>
               <input style={Object.assign({},sInp,{flex:1,fontSize:12})} placeholder="Motivo de rechazo" value={notas[s.id]||""} onChange={function(e){setNotas(function(n){return Object.assign({},n,{[s.id]:e.target.value});});}}/>
@@ -1708,26 +1591,14 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
 // ─── Facturacion ──────────────────────────────────────────────
 function FactView({psicos,calcFact,genMsg,notify}) {
+  const [enviadas,setEnviadas] = useState(function(){try{return JSON.parse(localStorage.getItem("enviadas_"+mes+"_"+anio)||"{}");}catch(e){return {};}});
+  function toggleEnviada(nombre){setEnviadas(function(prev){var n=Object.assign({},prev);n[nombre]=!n[nombre];localStorage.setItem("enviadas_"+mes+"_"+anio,JSON.stringify(n));return n;});}
   // Historial: last 6 months data for selected psico
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
   const [sel,setSel] = useState(null);
-  const [vista,setVista] = useState("mes");
-  const mesKey = mes+"_"+anio;
-  const [enviadas,setEnviadas] = useState({});
-  useEffect(function(){
-    var stored={};
-    try{stored=JSON.parse(localStorage.getItem("enviadas_"+mesKey)||"{}");}catch(e){}
-    setEnviadas(stored);
-  },[mesKey]);
-  function toggleEnviada(nombre){
-    setEnviadas(function(prev){
-      var next=Object.assign({},prev,{[nombre]:!prev[nombre]});
-      try{localStorage.setItem("enviadas_"+mesKey,JSON.stringify(next));}catch(e){}
-      return next;
-    });
-  } // "mes" | "historial"
+  const [vista,setVista] = useState("mes"); // "mes" | "historial"
   const ps = sel ? psicos.find(function(p){return p.nombre===sel;}) : null;
 
   // Generate last 6 months
@@ -1819,10 +1690,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                     {r.desc>0 && " - "+r.desc+"% desc."}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
-                  {r.total>0&&<button onClick={function(e){e.stopPropagation();toggleEnviada(p.nombre);}} style={{background:enviadas[p.nombre]?ok:"transparent",color:enviadas[p.nombre]?wh:mu,border:enviadas[p.nombre]?"1.5px solid #2D8A5E":"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{enviadas[p.nombre]?"✓ Enviada":"Enviar"}</button>}
-                </div>
+                <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
               </div>
             );
           })}
@@ -1974,7 +1842,9 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
             <div style={{display:"flex",gap:10,marginTop:14}}>
               <button style={btn(br,wh)} onClick={saveNew}>Guardar</button>
               <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={function(){setShowNew(false);}}>Cancelar</button>
-            </div>
+            
+          <button style={{background:"#EBF6FA",color:"#4BA3C3",border:"1.5px solid #4BA3C3",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginTop:8,width:"100%"}} onClick={function(){psicos.filter(function(p){return p.email&&sel&&calcFact(p,mes,anio).total>0;}).forEach(function(ps){var sub=encodeURIComponent("Precios "+MESES[mes]+" "+anio);var bod=encodeURIComponent(genMsg(ps,mes,anio));window.open("mailto:"+ps.email+"?subject="+sub+"&body="+bod);});}}>Enviar precios por mail</button>
+</div>
           </div>
         )}
         {sel && !showNew && (
@@ -2001,24 +1871,10 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
                   <div key={p.id} style={Object.assign({},sCard,{padding:"10px 14px",marginBottom:8})}>
                     <div style={{flex:1,color:tx,fontWeight:600}}>{p.nombre}{!p.wa&&" (sin WA)"}</div>
                     <button style={{background:"#25D366",color:wh,border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={function(){sWA(p);}}>WA</button>
-                    {p.email&&sel&&<button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:7,padding:"5px 12px",fontSize:12,cursor:"pointer",fontWeight:600}} onClick={function(){
-                      var P=sel.p;
-                      var asunto="Nuevos precios - "+sel.label;
-                      var cuerpo="Hola "+p.nombre+"!\n\nNuevos precios desde "+new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")+".\n\nMODULOS\nM1 Manana (8-14hs): "+ars(P.m1)+"\nM2 Tarde (14-18hs): "+ars(P.m2)+"\nM3 Noche (18-21hs): "+ars(P.m3)+"\nDia completo: "+ars(P.dia)+"\n\nHORAS SUELTAS\nManana: "+ars(P.man)+"/hs\nTarde: "+ars(P.tar)+"/hs\nNoche: "+ars(P.noc)+"/hs\n\nSaludos,\nConsultorio Gloria Videla";
-                      var a2=document.createElement("a");a2.href="mailto:"+p.email+"?subject="+encodeURIComponent(asunto)+"&body="+encodeURIComponent(cuerpo);document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
-                    }}>Mail</button>}
                   </div>
                 );
               })}
             </div>
-            {sel&&<button style={Object.assign({},btn(br,wh),{width:"100%",marginTop:12,fontSize:13})} onClick={function(){
-              var P=sel.p;
-              var emails=psicos.filter(function(p){return p.email;}).map(function(p){return p.email;}).join(",");
-              if(!emails){notify("Ninguna profesional tiene mail cargado","err");return;}
-              var asunto="Nuevos precios - "+sel.label;
-              var cuerpo="Hola a todas!\n\nNuevos precios desde "+new Date(sel.vigencia+"T12:00:00").toLocaleDateString("es-AR")+".\n\nMODULOS\n+-----------------------+-----------+\n| M1 Manana  (8-14hs)   | "+ars(P.m1).padStart(10)+" |\n| M2 Tarde   (14-18hs)  | "+ars(P.m2).padStart(10)+" |\n| M3 Noche   (18-21hs)  | "+ars(P.m3).padStart(10)+" |\n| Dia completo          | "+ars(P.dia).padStart(10)+" |\n+-----------------------+-----------+\n\nHORAS SUELTAS\nManana: "+ars(P.man)+"/hs\nTarde: "+ars(P.tar)+"/hs\nNoche: "+ars(P.noc)+"/hs\n\nSaludos,\nConsultorio Gloria Videla";
-              var a2=document.createElement("a");a2.href="mailto:"+emails+"?subject="+encodeURIComponent(asunto)+"&body="+encodeURIComponent(cuerpo);document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
-            }}>📧 Enviar precios por mail a todas las profesionales</button>}
           </div>
         )}
       </div>
@@ -2028,13 +1884,13 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
 
 // ─── Gestion ──────────────────────────────────────────────────
 function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
-  var ALIASES = {"Magdalena Perisse":["Magda","Magdalena"],"Eugenia Eguren":["Euge","Eugenia"],"Josefina Cesareo":["Jose Cesareo","Josefina"],"Milagros Vazquez":["Milagros"],"Belen Bancalari":["Belen"],"Bernadette Houssay":["Bernadette"],"Carolina Podversich":["Carolina"],"Agustina Mohr":["Agus Mohr","Agustina"],"Delfina Mohr":["Delfi Mohr","Delfina"],"Sofia Elkin":["Sofi","Sofia"],"Marcela Fernandez Sanchez":["Marce","Marcela"],"Angeles Rodriguez Feito":["Angeles"],"Dolores Torreira":["Dolores Torreira"],"Jesica Lavia":["Jesica"],"Marta Pitzer":["Marta"]};
-  function matchesPsico(n){if(!n)return false;var hn=n.trim().toLowerCase();if(hn===p.nombre.trim().toLowerCase())return true;return (ALIASES[p.nombre]||[]).some(function(a){return a.toLowerCase()===hn;});}
+  var ALIASES = {"Magdalena Perisse":["Magda","Magdalena"],"Eugenia Eguren":["Euge","Eugenia"],"Josefina Cesareo":["Jose Cesareo","Josefina"],"Milagros Vazquez":["Milagros"],"Belen Bancalari":["Belen"],"Bernadette Houssay":["Bernadette"],"Carolina Podversich":["Carolina"],"Agustina Mohr":["Agus Mohr","Agustina"],"Delfina Mohr":["Delfi Mohr","Delfina"],"Sofia Elkin":["Sofi","Sofia"],"Marcela Fernandez Sanchez":["Marce","Marcela"],"Angeles Rodriguez Feito":["Angeles"],"Dolores Torreira":["Dolores Torreira"],"Jesica Lavia":["Jesica"],"Marta Pitzer":["Marta"],"Teresa De Aramburu":["Teresa"]};
+  function matchesPsico(n){if(!n)return false;var hn=n.trim().toLowerCase(),pn=(p.nombre||"").trim().toLowerCase();if(hn===pn)return true;return (ALIASES[p.nombre]||[]).some(function(a){return a.toLowerCase()===hn;});}
+  const [editCuit,setEditCuit] = useState(false);
+  const [cuitVal,setCuitVal] = useState(p.cuit||"");
+  function saveCuit(){saveDoc("psicos",p.id,Object.assign({},p,{cuit:cuitVal}));setEditCuit(false);}
   const [editPass,setEditPass] = useState(false);
   const [newPass,setNewPass] = useState("");
-  const [editCuit,setEditCuit] = useState(false);
-  const [newCuit,setNewCuit] = useState(p.cuit||"");
-  function saveCuit(){saveDoc("psicos",p.id,Object.assign({},p,{cuit:newCuit.trim()}));setEditCuit(false);notify("CUIT guardado");}
   const [editNombre,setEditNombre] = useState(false);
   const [newNombre,setNewNombre] = useState(p.nombre);
   function saveNombre() {
@@ -2042,10 +1898,10 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
     const oldNombre=p.nombre; const nn=newNombre.trim();
     saveDoc("psicos",p.id,Object.assign({},p,{nombre:nn}));
     // Update all horarios with old name
-    (horarios||[]).filter(function(h){return matchesPsico(h.psico);})
+    (horarios||[]).filter(function(h){return h.psico&&h.psico.toLowerCase()===oldNombre.toLowerCase();})
       .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:nn}));});
     // Also update reservas
-    (reservas||[]).filter(function(r){return r.psico&&matchesPsico(r.psico);})
+    (reservas||[]).filter(function(r){return r.psico&&r.psico.toLowerCase()===oldNombre.toLowerCase();})
       .forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:nn}));});
     setEditNombre(false); notify("Nombre actualizado en perfil, horarios y reservas");
   }
@@ -2069,16 +1925,6 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
             <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditNombre(true);setNewNombre(p.nombre);}}>editar nombre</button>
           </div>
         )}
-        <div style={{marginTop:4,marginBottom:4}}>
-          {editCuit?(<div style={{display:"flex",gap:6}}>
-            <input style={Object.assign({},sInp,{flex:1,padding:"4px 8px",fontSize:12})} value={newCuit} onChange={function(e){setNewCuit(e.target.value);}} placeholder="XX-XXXXXXXX-X" autoFocus/>
-            <button style={Object.assign({},btn(ok,wh),{padding:"4px 10px",fontSize:12})} onClick={saveCuit}>OK</button>
-            <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"4px 8px",fontSize:12})} onClick={function(){setEditCuit(false);}}>X</button>
-          </div>):(<div style={{display:"flex",alignItems:"center",gap:6}}>
-            <span style={{color:mu,fontSize:11}}>CUIT: {p.cuit||<span style={{color:er}}>sin cargar</span>}</span>
-            <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setEditCuit(true);setNewCuit(p.cuit||"");}}>editar</button>
-          </div>)}
-        </div>
         <button
           style={{background:p.fijas?lt:bg,color:p.fijas?dk:mu,border:"1.5px solid #C9E4EF",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}
           onClick={function(){
@@ -2101,7 +1947,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
         <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){
               if(!window.confirm("Eliminar a "+p.nombre+"?\nTambien se eliminaran sus horarios fijos.")) return;
               delDoc("psicos",p.id);
-              horarios.filter(function(h){return matchesPsico(h.psico);})
+              horarios.filter(function(h){return h.psico&&h.psico.toLowerCase()===p.nombre.toLowerCase();})
                 .forEach(function(h){delDoc("horarios",h.id);});
               notify("Profesional y horarios eliminados");
             }}>X</button>
@@ -2147,7 +1993,7 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
   );
 }
 
-function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,reservas,notify}) {
+function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,notify}) {
   const [gt,setGt] = useState("horarios");
   const [selP,setSelP] = useState(null);
   const [eid,setEid] = useState(null);
@@ -2156,7 +2002,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
-  const misHAll = selP ? horarios.filter(function(h){return matchHorario(selP,h.psico);}) : [];var misHBest={};misHAll.forEach(function(h){var k=(h.diaSemana||"")+"_"+(h.consultorio||"")+"_"+(h.inicio||"")+"_"+(h.fin||"");if(!misHBest[k]||(!misHBest[k].fechaInicio&&h.fechaInicio))misHBest[k]=h;});const misH = Object.values(misHBest).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  const misH = selP ? horarios.filter(function(h){return h.psico.toLowerCase()===selP.toLowerCase()&&!h.fechaFin;}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);}) : [];
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
@@ -2190,8 +2036,8 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Gestion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
-        <button style={tabBtn(gt==="psicologas")} onClick={function(){setGt("psicologas");}}>Profesionales</button>
-        
+        <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
+        <button style={tabBtn(gt==="bloques")} onClick={function(){setGt("bloques");}}>Bloques</button>
       </div>
       {gt==="horarios" && (
         <div>
@@ -2246,7 +2092,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,r
           )}
         </div>
       )}
-      {gt==="psicologas" && (
+      {gt==="profesionals" && (
         <div style={sPanel}>
           <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
             {showNewP?"Cancelar":"+ Agregar nuevo profesional"}
@@ -2333,9 +2179,7 @@ function MisReservasView({reservas,onNew}) {
               {r.estado==="aprobada"?"Aprobada":r.estado==="rechazada"?"Rechazada":"Pendiente"}
             </span>
             {r.estado==="pendiente"&&(
-              <button style={{background:"transparent",border:"1.5px solid #F5B8B3",borderRadius:8,padding:"4px 10px",fontSize:12,color:"#C0392B",cursor:"pointer",fontFamily:"inherit",fontWeight:600,marginLeft:8}} onClick={function(){
-                delDoc("reservas",r.id);
-              }}>Cancelar</button>
+              <button style={{background:"transparent",border:"1.5px solid #F5B8B3",borderRadius:8,padding:"4px 10px",fontSize:12,color:"#C0392B",cursor:"pointer",fontFamily:"inherit",fontWeight:600,marginLeft:8}} onClick={function(){delDoc("reservas",r.id);}}>Cancelar</button>
             )}
           </div>
         );
@@ -2345,13 +2189,15 @@ function MisReservasView({reservas,onNew}) {
 }
 
 // ─── Mis Horarios ─────────────────────────────────────────────
-function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,notify,fcmTokensList}) {
+function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,notify}) {
   const [mH,setMH] = useState(null);
+  
   const [vistos,setVistos] = useState([]);
   const [showHist,setShowHist] = useState(false);
-  const AL_MF={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};const mF = horarios.filter(function(h){if(!h.psico||!user)return false;var hn=h.psico.trim().toLowerCase(),un=user.trim().toLowerCase();return hn===un||(AL_MF[un]||[]).some(function(a){return a===hn;})||(AL_MF[hn]||[]).some(function(a){return a===un;});}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
-  const mE = reservas.filter(function(r){if(!r.psico||!user)return false;var hn=r.psico.trim().toLowerCase(),un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};var match=hn===un||(AL[un]||[]).some(function(a){return a===hn;});return match&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
-  const mS = solicitudes.filter(function(s){if(!s.psico||!user)return false;var hn=s.psico.trim().toLowerCase(),un=user.trim().toLowerCase();var AL={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"]};return hn===un||(AL[un]||[]).some(function(a){return a===hn;});}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
+  var AL_MF={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"teresa de aramburu":["teresa"]};
+  const mF = horarios.filter(function(h){return h.psico&&user&&h.psico.trim().toLowerCase()===user.trim().toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  const mE = reservas.filter(function(r){return r.psico===user&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
+  const mS = solicitudes.filter(function(s){return s.psico===user;}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
 
   function sol(tipo,accion,datos,hId,rId) {
     const s={id:Date.now(),psico:user,tipo:tipo,accion:accion,datos:datos,horarioId:hId||null,reservaId:rId||null,estado:"pendiente",fechaSol:new Date().toISOString()};
@@ -2365,7 +2211,6 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       fecha:new Date().toISOString(),
       leido:false
     });
-    sendPush("Nueva solicitud - Consultorio GV", user+" solicitó un cambio de horario", fcmTokensList||[]);
     notify("Solicitud enviada"); setMH(null);
   }
 
@@ -2391,7 +2236,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
                 </div>
                 <button
                   style={{background:"transparent",border:"none",color:er,fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"2px 8px",fontWeight:600}}
-                  onClick={function(){setMH({type:"cancelSol",id:s.id});}}>
+                  onClick={function(){if(window.confirm("Cancelar esta solicitud?"))delDoc("solHor",s.id);}}>
                   Cancelar
                 </button>
               </div>
@@ -2474,21 +2319,6 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
       {mH && (
         <div style={sOverlay} onClick={function(){setMH(null);}}>
           <div style={Object.assign({},sModal,{maxWidth:480})} onClick={function(e){e.stopPropagation();}}>
-            {mH.type==="cancelSol" && (
-              <div>
-                <div style={sModH}>
-                  <h3 style={{margin:0,color:tx}}>Cancelar solicitud</h3>
-                  <button style={sXBtn} onClick={function(){setMH(null);}}>X</button>
-                </div>
-                <div style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
-                  <div style={{color:mu,fontSize:14}}>Cancelar esta solicitud pendiente?</div>
-                  <div style={{display:"flex",gap:10}}>
-                    <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1})} onClick={function(){delDoc("solHor",mH.id);setMH(null);notify("Solicitud cancelada");}}>Si, cancelar</button>
-                    <button style={Object.assign({},btn(br,wh),{flex:1})} onClick={function(){setMH(null);}}>No</button>
-                  </div>
-                </div>
-              </div>
-            )}
             {mH.type==="del" && (
               <div>
                 <div style={sModH}>
@@ -2538,11 +2368,10 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   );
 }
 
-
 // ─── Configuracion (Admin) ────────────────────────────────────
 function ConfigView({config,setConfig,notify}) {
-  const [invPass,setInvPass] = useState(config.invPass||"invitada123");
   const [adminPass,setAdminPass] = useState(config.adminPass||"admin123");
+  const [invPass,setInvPass] = useState(config.invPass||"invitada123");
   const [alias,setAlias] = useState((config.transferencia&&config.transferencia.alias)||"");
   const [cbu,setCbu] = useState((config.transferencia&&config.transferencia.cbu)||"");
   const [banco,setBanco] = useState((config.transferencia&&config.transferencia.banco)||"");
@@ -2555,7 +2384,6 @@ function ConfigView({config,setConfig,notify}) {
 
   useEffect(function() {
     setInvPass(config.invPass||"invitada123");
-    setAdminPass(config.adminPass||"admin123");
     setAlias((config.transferencia&&config.transferencia.alias)||"");
     setCbu((config.transferencia&&config.transferencia.cbu)||"");
     setBanco((config.transferencia&&config.transferencia.banco)||"");
@@ -2566,7 +2394,7 @@ function ConfigView({config,setConfig,notify}) {
   }, [config]);
 
   function save() {
-    setConfig({id:"main",invPass:invPass,adminPass:adminPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
+    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
     notify("Configuracion guardada");
   }
   function fixUrl(url) {
@@ -2596,14 +2424,6 @@ function ConfigView({config,setConfig,notify}) {
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
-        <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:8,marginTop:4}}>Contrasena Admin</div>
-        <label style={sLbl}>Nueva contrasena para admin</label>
-        <div style={{display:"flex",gap:8,marginBottom:4}}>
-          <input style={Object.assign({},sInp,{flex:1})} value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
-          <button style={{background:"#4BA3C3",color:"#FFFFFF",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){saveDoc("config","main",Object.assign({},config,{adminPass:adminPass}));notify("Contrasena guardada");}}>Guardar</button>
-        </div>
-        <div style={{color:mu,fontSize:11,marginTop:4,marginBottom:16}}>Ingresá con usuario "admin" y esta contrasena</div>
-        <div style={{color:tx,fontWeight:700,fontSize:14,marginBottom:8}}>Contrasena Invitadas</div>
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
@@ -2891,7 +2711,6 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
   );
 }
 
-
 // ─── Estadisticas ─────────────────────────────────────────────
 function exportarExcel(psicos,mes,anio) {
   var lines = [];
@@ -2957,30 +2776,6 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
 
-  function exportarExcel(ps,m,a) {
-    var mn="Facturacion "+MESES[m]+" "+a;
-    var totalGeneral=0;
-    var csvRows=["sep=,","CUIT,Profesional,Monto a pagar"];
-    ps.forEach(function(p){
-      var r=calcFact(p,m,a);
-      var total=r.total||0;
-      if(total>0){
-        var nombre=p.nombre.indexOf(",")>-1?'"'+p.nombre+'"':p.nombre;
-        var cuit=(p.cuit||"").indexOf(",")>-1?'"'+(p.cuit||"")+'"':(p.cuit||"");
-        csvRows.push(cuit+","+nombre+","+total);
-        totalGeneral+=total;
-      }
-    });
-    csvRows.push(""); csvRows.push(",TOTAL GENERAL,"+totalGeneral);
-    var csv=csvRows.join("\r\n");
-    var blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
-    var url=URL.createObjectURL(blob);
-    var a2=document.createElement("a");
-    a2.href=url;a2.download=mn.replace(/ /g,"_")+".csv";
-    document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
-    URL.revokeObjectURL(url);
-  }
-
   // Hours per consultorio per week
   function hrsConsultorio(consId) {
     return horarios.filter(function(h){return h.consultorio===consId;}).reduce(function(acc,h){return acc+(toMin(h.fin)-toMin(h.inicio))/60;},0);
@@ -3009,6 +2804,14 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   const maxHrsVL = 13*6*3; // 3 consultorios
   const maxHrsUY = 13*6*2; // 2 consultorios
 
+
+  function exportarExcel(ps,m,a){
+    var header="CUIT,Profesional,Monto a pagar\n";
+    var rows=ps.map(function(p){var r=calcFact(p,m,a);return (p.cuit||"")+","+(p.nombre||"")+","+(r.total||0);}).join("\n");
+    var blob=new Blob([header+rows],{type:"text/csv;charset=utf-8;"});
+    var url=URL.createObjectURL(blob);
+    var a2=document.createElement("a");a2.href=url;a2.download="facturacion_"+MESES[m]+"_"+a+".csv";a2.click();
+  }
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Estadisticas</h2>
@@ -3125,8 +2928,6 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
   );
 }
 
-
-
 function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   const [open,setOpen] = useState(false);
   const p = psicos.find(function(x){return x.nombre===user;});
@@ -3226,7 +3027,7 @@ function EditarPerfilBtn({user,psicos,setPsicos,notify}) {
   );
 }
 
-function CambiarPassBtn({user,psicos,notify}) {
+function CambiarPassBtn({user,setPsicos,notify}) {
   const [open,setOpen] = useState(false);
   const [actual,setActual] = useState("");
   const [nueva,setNueva] = useState("");
@@ -3259,3 +3060,97 @@ function CambiarPassBtn({user,psicos,notify}) {
   );
 }
 
+function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
+  const [dia,setDia] = useState(h?h.diaSemana:1);
+  const [ini,setIni] = useState(h?h.inicio:"09:00");
+  const [fin,setFin] = useState(h?h.fin:"14:00");
+  const [cons,setCons] = useState(h?h.consultorio:"C1");
+  const pr = calcPrecio(ini,fin);
+  function checkConflicto() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
+    const sMin=toMin(ini), eMin=toMin(fin);
+    const c=(horarios||[]).filter(function(x){
+      if(x.consultorio!==cons) return false;
+      if(Number(x.diaSemana)!==Number(dia)) return false;
+      if(h && x.id===h.id) return false; // exclude own horario when editing
+      return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
+    });
+    return c.length ? "Ese horario esta ocupado en "+cons : null;
+  }
+  const conflicto = checkConflicto();
+
+  // Find available consultorios at same time same day
+  function getLibres() {
+    if(!ini||!fin||toMin(fin)<=toMin(ini)) return [];
+    const sMin=toMin(ini),eMin=toMin(fin);
+    return CONS.filter(function(c){
+      if(c.id===cons) return false;
+      const ocupado=(horarios||[]).some(function(x){
+        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      });
+      return !ocupado;
+    });
+  }
+  const libres = conflicto ? getLibres() : [];
+  const sedeNombre = function(sede){ return sede==="VL"?"Vicente Lopez":"Uruguay"; };
+
+  return (
+    <div>
+      <div style={sModH}>
+        <h3 style={{margin:0,color:tx}}>{tipo==="add"?"Solicitar horario":"Modificar horario"}</h3>
+        <button style={sXBtn} onClick={onClose}>X</button>
+      </div>
+      <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div>
+            <label style={sLbl}>Dia</label>
+            <select style={sInp} value={dia} onChange={function(e){setDia(Number(e.target.value));}}>
+              {[1,2,3,4,5,6].map(function(d){return <option key={d} value={d}>{DIAS[d]}</option>;})}
+            </select>
+          </div>
+          <div>
+            <label style={sLbl}>Consultorio</label>
+            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
+              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
+            </select>
+          </div>
+          <div>
+            <label style={sLbl}>Desde</label>
+            <input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/>
+          </div>
+          <div>
+            <label style={sLbl}>Hasta</label>
+            <input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/>
+          </div>
+        </div>
+        {conflicto&&(
+          <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"12px 14px",color:er,fontSize:13}}>
+            <div style={{fontWeight:700,marginBottom:6}}>{conflicto}</div>
+            {libres.length>0?(
+              <div>
+                <div style={{color:tx,fontSize:12,fontWeight:600,marginBottom:4}}>Consultorios disponibles en ese horario:</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {libres.map(function(c){return(
+                    <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:10,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}} onClick={function(){setCons(c.id);}}>
+                      <div>{c.id}</div>
+                      <div style={{fontWeight:400,fontSize:11,color:"#2D8A5E"}}>{sedeNombre(c.sede)}</div>
+                    </button>
+                  );})}
+                </div>
+                <div style={{color:mu,fontSize:11,marginTop:4}}>Toca uno para seleccionarlo</div>
+              </div>
+            ):(
+              <div style={{color:mu,fontSize:12,marginTop:4}}>No hay consultorios disponibles en ese horario ese dia.</div>
+            )}
+          </div>
+        )}
+        {!conflicto&&ini&&fin&&toMin(fin)>toMin(ini)&&<div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:8,padding:"8px 12px",color:ok,fontSize:13}}>Horario disponible - <b>{ars(pr.sub)}/semana</b>{pr.ley&&" - "+pr.ley}</div>}
+        <div style={{color:mu,fontSize:11}}>Queda pendiente de aprobacion.</div>
+        <div style={{display:"flex",gap:10}}>
+          <button style={Object.assign({},btn(br,wh),{opacity:conflicto?0.4:1})} disabled={!!conflicto} onClick={function(){onSol({diaSemana:Number(dia),inicio:ini,fin:fin,consultorio:cons,sede:(CONS.find(function(c){return c.id===cons;})||{sede:"VL"}).sede});}}>Enviar solicitud</button>
+          <button style={btnO(wh,tx,"1.5px solid #C9E4EF")} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
