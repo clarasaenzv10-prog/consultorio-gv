@@ -1179,36 +1179,46 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
 function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
   const [eid,setEid] = useState(null);
   const [form,setForm] = useState({});
-  function save() { var _p=psicos.find(function(x){return x.id===eid;})||{}; saveDoc("psicos",eid,Object.assign({},_p,form)); setEid(null); notify("Perfil actualizado"); }
+  function save() {
+    var _p = (psicos||[]).find(function(x){return x.id===eid;}) || {};
+    saveDoc("psicos", eid, Object.assign({}, _p, form));
+    setEid(null); notify("Perfil actualizado");
+  }
+  var lista = (psicos||[]).filter(function(p){ return p && (p.nombre||p.id); });
   return (
     <>
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Profesionales</h2>
+      {lista.length === 0 && (
+        <div style={{color:mu,textAlign:"center",padding:40,fontSize:14}}>
+          {(psicos||[]).length === 0 ? "Cargando profesionales..." : "Sin profesionales cargadas"}
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
-        {psicos.length===0 && <div style={{gridColumn:"1/-1",color:mu,textAlign:"center",padding:40,fontSize:14}}>Cargando profesionales...</div>}
-        {(function(){
-          try {
-            return psicos.filter(function(p){return p&&p.nombre;}).map(function(p) {
+        {lista.map(function(p) {
+          var nombre = p.nombre || "Sin nombre";
+          var inicial = nombre[0].toUpperCase();
+          var color = gc ? gc(nombre) : br;
           return (
-            <div key={p.id} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center",cursor:role==="psico"?"pointer":"default"}} onClick={function(){if(role==="psico"&&eid!==p.id)setPerfilSel(p);}}>
-              <div style={{width:48,height:48,borderRadius:"50%",background:gc(p.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
-                {(p.nombre||"?")[0].toUpperCase()}
+            <div key={p.id || nombre} style={{background:wh,borderRadius:14,padding:16,display:"flex",flexDirection:"column",alignItems:"center",gap:8,border:"1.5px solid #C9E4EF",textAlign:"center"}}>
+              <div style={{width:48,height:48,borderRadius:"50%",background:color,color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:20}}>
+                {inicial}
               </div>
               {eid===p.id ? (
                 <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
                   <input style={sInp} value={form.nombre||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nombre:e.target.value});});}} placeholder="Nombre"/>
-                  <input style={sInp} value={form.wa||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{wa:e.target.value});});}} placeholder="WhatsApp (549...)"/>
+                  <input style={sInp} value={form.wa||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{wa:e.target.value});});}} placeholder="WhatsApp"/>
                   <input style={sInp} value={form.email||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{email:e.target.value});});}} placeholder="Email"/>
                   <div>
                     <label style={sLbl}>Descuento %</label>
                     <input style={sInp} type="number" min="0" max="100" value={form.descuento||0} onChange={function(e){setForm(function(f){return Object.assign({},f,{descuento:Number(e.target.value)});});}}/>
                   </div>
                   <div>
-                    <label style={sLbl}>Nota privada (solo vos la ves)</label>
-                    <textarea style={Object.assign({},sInp,{minHeight:60,resize:"vertical",fontSize:13})} value={form.nota||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nota:e.target.value});});}} placeholder="Anotaciones internas sobre esta profesional..."/>
+                    <label style={sLbl}>Nota privada</label>
+                    <textarea style={Object.assign({},sInp,{minHeight:60,resize:"vertical",fontSize:13})} value={form.nota||""} onChange={function(e){setForm(function(f){return Object.assign({},f,{nota:e.target.value});});}} placeholder="Anotaciones internas..."/>
                   </div>
                   <label style={{display:"flex",alignItems:"center",gap:6,color:tx,fontSize:13}}>
-                    <input type="checkbox" checked={form.disponible||false} onChange={function(e){setForm(function(f){return Object.assign({},f,{disponible:e.target.checked});});}}/>
+                    <input type="checkbox" checked={!!form.disponible} onChange={function(e){setForm(function(f){return Object.assign({},f,{disponible:e.target.checked});});}}/>
                     Disponible para derivaciones
                   </label>
                   <div style={{display:"flex",gap:8}}>
@@ -1218,7 +1228,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                 </div>
               ) : (
                 <div style={{width:"100%"}}>
-                  <div style={{color:tx,fontWeight:700,fontSize:14}}>{p.nombre}</div>
+                  <div style={{color:tx,fontWeight:700,fontSize:14}}>{nombre}</div>
                   {p.profesion && p.profesion!=="Psicologa" && <div style={{color:br,fontSize:11,fontWeight:600}}>{p.profesion}</div>}
                   {role==="admin" && p.wa && <div style={{color:mu,fontSize:12}}>WA: {p.wa}</div>}
                   {role==="admin" && p.email && <div style={{color:mu,fontSize:12}}>Mail: {p.email}</div>}
@@ -1241,9 +1251,7 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
                     </div>
                   )}
                   {role==="admin" && p.nota && (
-                    <div style={{background:bg,borderRadius:8,padding:"8px 10px",fontSize:12,color:mu,textAlign:"left",width:"100%",marginTop:4,border:"1px solid #C9E4EF"}}>
-                      {p.nota}
-                    </div>
+                    <div style={{background:bg,borderRadius:8,padding:"8px 10px",fontSize:12,color:mu,textAlign:"left",width:"100%",marginTop:4,border:"1px solid #C9E4EF"}}>{p.nota}</div>
                   )}
                   {role==="admin" && (
                     <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,marginTop:8})} onClick={function(){setEid(p.id);setForm(Object.assign({},p));}}>Editar</button>
@@ -1252,82 +1260,32 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
               )}
             </div>
           );
-            });
-          } catch(e) {
-            return <div style={{gridColumn:"1/-1",background:"#FFF0F0",color:"#C0392B",padding:14,borderRadius:8,fontSize:13}}>Error al renderizar profesionales: {String(e)}</div>;
-          }
-        })()}
+        })}
       </div>
     </div>
-      {perfilSel && (
-        <div style={{position:"fixed",inset:0,background:"rgba(28,58,74,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}} onClick={function(){setPerfilSel(null);}}>
-          <div style={{background:wh,borderRadius:18,width:"min(420px,95vw)",border:"1.5px solid #C9E4EF",boxShadow:"0 24px 60px rgba(75,163,195,.18)",maxHeight:"90vh",overflowY:"auto"}} onClick={function(e){e.stopPropagation();}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 22px",borderBottom:"1px solid #EBF6FA"}}>
-              <h3 style={{margin:0,color:tx}}>Perfil</h3>
-              <button style={{background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,fontFamily:"inherit"}} onClick={function(){setPerfilSel(null);}}>X</button>
+    {perfilSel && (
+      <div style={{position:"fixed",inset:0,background:"rgba(28,58,74,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}} onClick={function(){setPerfilSel(null);}}>
+        <div style={{background:wh,borderRadius:18,width:"min(420px,95vw)",border:"1.5px solid #C9E4EF",maxHeight:"90vh",overflowY:"auto"}} onClick={function(e){e.stopPropagation();}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 22px",borderBottom:"1px solid #EBF6FA"}}>
+            <h3 style={{margin:0,color:tx}}>Perfil</h3>
+            <button style={{background:bg,border:"none",color:mu,fontSize:18,cursor:"pointer",borderRadius:8,width:30,height:30,fontFamily:"inherit"}} onClick={function(){setPerfilSel(null);}}>X</button>
+          </div>
+          <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
+            <div style={{width:72,height:72,borderRadius:"50%",background:gc?(gc(perfilSel.nombre||"?")):br,color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
+              {(perfilSel.nombre||"?")[0].toUpperCase()}
             </div>
-            <div style={{padding:24,display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
-              <div style={{width:72,height:72,borderRadius:"50%",background:gc(perfilSel.nombre||"?"),color:wh,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30}}>
-                {(perfilSel.nombre||"?")[0].toUpperCase()}
-              </div>
-              <div style={{textAlign:"center"}}>
-                <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
-                <span style={{background:perfilSel.disponible?ob:eb,color:perfilSel.disponible?ok:er,fontSize:12,padding:"3px 12px",borderRadius:20,fontWeight:600,marginTop:6,display:"inline-block"}}>{perfilSel.disponible?"Disponible para derivaciones":"No disponible"}</span>
-              </div>
-              {(perfilSel.analisis||[]).length>0 && (
-                <div style={{width:"100%"}}>
-                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Tipo de analisis</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {perfilSel.analisis.map(function(a){return <span key={a} style={{background:lt,color:dk,fontSize:12,padding:"4px 12px",borderRadius:20,fontWeight:600}}>{a}</span>;})}
-                  </div>
-                </div>
-              )}
-              {(perfilSel.poblacion||[]).length>0 && (
-                <div style={{width:"100%"}}>
-                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Poblacion</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {perfilSel.poblacion.map(function(p){return <span key={p} style={{background:bg,color:tx,fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #C9E4EF"}}>{p}</span>;})}
-                  </div>
-                </div>
-              )}
-              {(perfilSel.wa||perfilSel.email) && (
-                <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8}}>
-                  <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase"}}>Contacto</div>
-                  {perfilSel.wa && (
-                    <button style={{background:"#25D366",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={function(){
-                      const wa = perfilSel.wa||"";
-                      const tel = wa.startsWith("+") ? wa : (wa ? "+"+wa : "");
-                      const msg = perfilSel.nombre+" - Consultorio Gloria Videla"+(tel?"\nTel: "+tel:"")+(perfilSel.email?"\nEmail: "+perfilSel.email:"");
-                      const a = document.createElement("a");
-                      a.href = "https://wa.me/?text="+encodeURIComponent(msg);
-                      a.target = "_blank";
-                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    }}>
-                      Compartir por WhatsApp
-                    </button>
-                  )}
-                  {perfilSel.email && (
-                    <button style={{background:"#3b82f6",color:wh,border:"none",borderRadius:12,padding:"12px 16px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                      const a=document.createElement("a");a.href="mailto:"+perfilSel.email;document.body.appendChild(a);a.click();document.body.removeChild(a);
-                    }}>
-                      Enviar email
-                    </button>
-                  )}
-                  {!perfilSel.wa && !perfilSel.email && <div style={{color:mu,fontSize:13}}>Sin datos de contacto cargados.</div>}
-                </div>
-              )}
-              {!perfilSel.wa && !perfilSel.email && (
-                <div style={{color:mu,fontSize:13,textAlign:"center"}}>Sin datos de contacto cargados aun.</div>
-              )}
-            </div>
+            <div style={{color:tx,fontWeight:800,fontSize:20}}>{perfilSel.nombre}</div>
+            {perfilSel.wa && <div style={{color:mu,fontSize:14}}>WA: {perfilSel.wa}</div>}
+            {perfilSel.email && <div style={{color:mu,fontSize:14}}>Mail: {perfilSel.email}</div>}
+            {perfilSel.cuit && <div style={{color:mu,fontSize:14}}>CUIT: {perfilSel.cuit}</div>}
           </div>
         </div>
-      )}
+      </div>
+    )}
     </>
   );
 }
 
-// ─── Anuncios ─────────────────────────────────────────────────
 function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
   const [imgs,setImgs] = useState(["","",""]);
   const [txt,setTxt] = useState("");
