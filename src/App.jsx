@@ -502,7 +502,7 @@ export default function App() {
 
   function getEvts(date) {
     const ds = date.getDay()===0?7:date.getDay(), str = localDateStr(date);
-    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
+    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(!h.fechaFin||str<=h.fechaFin)&&(!h.fechaInicio||str>=h.fechaInicio)&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
     const ex = reservas.filter(function(r){return r.fecha===str&&r.estado==="aprobada"&&(fCons==="todos"||r.consultorio===fCons)&&(fPsico==="todas"||r.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(r){return Object.assign({},r,{tipo:"extra"});});
     const bl = bloques.filter(function(b){return b.fecha===str;}).map(function(b){return Object.assign({},b,{tipo:"bloqueado"});});
     return fj.concat(ex).concat(bl);
@@ -1442,8 +1442,22 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoy=new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoy,activo:false}));const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
-    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);}}
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+" disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
+    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
+        // Announce freed hours
+        var textoLibre="A partir del "+hoyM+": ";
+        if(h.diaSemana===Number(s.datos.diaSemana)){
+          var partes=[];
+          if(h.inicio<s.datos.inicio) partes.push(h.inicio+"-"+s.datos.inicio);
+          if(s.datos.fin<h.fin) partes.push(s.datos.fin+"-"+h.fin);
+          if(partes.length>0){textoLibre+=DIAS[h.diaSemana]+" "+partes.join(" y ")+" en "+h.consultorio+" disponible.";}
+          else{textoLibre+=DIAS[h.diaSemana]+" horario modificado en "+h.consultorio+".";}
+        } else {
+          textoLibre+=DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+" disponible.";
+        }
+        const anMod={id:Date.now()+1,texto:textoLibre,fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
+        saveDoc("anuncios",anMod.id,anMod);
+        }}
     else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
     else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
@@ -2319,8 +2333,15 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
                   <div style={{background:bg,borderRadius:8,padding:12,color:tx,fontWeight:600,border:"1px solid #C9E4EF"}}>
                     {DIAS[mH.h.diaSemana]} - {mH.h.inicio}-{mH.h.fin} - {mH.h.consultorio}
                   </div>
+                                    <div style={{marginBottom:8}}>
+                    <label style={sLbl}>¿Desde cuándo aplica la liberación?</label>
+                    <input type="date" style={sInp} 
+                      value={mH.fechaDesde||(new Date().toISOString().split("T")[0])} 
+                      onChange={function(e){setMH(function(prev){return Object.assign({},prev,{fechaDesde:e.target.value});});}}/>
+                    <div style={{color:mu,fontSize:11,marginTop:3}}>La facturación se cortará desde esta fecha</div>
+                  </div>
                   <div style={{display:"flex",gap:10}}>
-                    <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1})} onClick={function(){sol("fijo","eliminar",{},mH.h.id);}}>Si, liberar</button>
+                    <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1})} onClick={function(){sol("fijo","eliminar",{fechaDesde:mH.fechaDesde||(new Date().toISOString().split("T")[0])},mH.h.id);}}>Si, liberar</button>
                     <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{flex:1})} onClick={function(){setMH(null);}}>Cancelar</button>
                   </div>
                 </div>
