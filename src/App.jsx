@@ -2059,6 +2059,10 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                         </div>
                         <div style={{display:"flex",gap:6}}>
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setEid(h.id);setEf(Object.assign({},h));}}>Editar</button>
+                          <button style={Object.assign({},btnO(wh,mu,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){
+                            var desde=window.prompt("Facturar este horario solo hasta qué fecha? (AAAA-MM-DD)\nEsto registra una modificación mid-mes para la facturación.");
+                            if(desde&&desde.match(/^\d{4}-\d{2}-\d{2}$/)){saveDoc("horarios",h.id,Object.assign({},h,{fechaFin:desde}));notify("Fecha de fin guardada: "+desde);}
+                          }}>📅</button>
                           <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){delDoc("horarios",h.id);notify("Eliminado");}}>X</button>
                         </div>
                       </div>
@@ -2354,7 +2358,7 @@ function ConfigView({config,setConfig,notify}) {
   }, [config]);
 
   function save() {
-    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
+    setConfig({id:"main",adminPass:adminPass,invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
     notify("Configuracion guardada");
   }
   function fixUrl(url) {
@@ -2384,6 +2388,9 @@ function ConfigView({config,setConfig,notify}) {
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
+        <label style={sLbl}>Contrasena admin</label>
+        <input style={sInp} type="password" value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
+        <div style={{color:mu,fontSize:11,marginTop:4,marginBottom:12}}>Contraseña con la que ingresa el admin</div>
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
