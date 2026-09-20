@@ -454,7 +454,7 @@ export default function App() {
     fp.forEach(function(h) {
       var allDates = mesFechas(mes,anio,Number(h.diaSemana));
       var filteredDates = allDates.filter(function(d){
-        if(h.fechaFin && d > h.fechaFin) return false;
+        if(h.fechaFin && d >= h.fechaFin) return false;
         if(h.fechaInicio && d < h.fechaInicio) return false;
         return true;
       });
@@ -502,7 +502,7 @@ export default function App() {
 
   function getEvts(date) {
     const ds = date.getDay()===0?7:date.getDay(), str = localDateStr(date);
-    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(!h.fechaFin||str<=h.fechaFin)&&(!h.fechaInicio||str>=h.fechaInicio)&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
+    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(!h.fechaFin||str<h.fechaFin)&&(!h.fechaInicio||str>=h.fechaInicio)&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
     const ex = reservas.filter(function(r){return r.fecha===str&&r.estado==="aprobada"&&(fCons==="todos"||r.consultorio===fCons)&&(fPsico==="todas"||r.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(r){return Object.assign({},r,{tipo:"extra"});});
     const bl = bloques.filter(function(b){return b.fecha===str;}).map(function(b){return Object.assign({},b,{tipo:"bloqueado"});});
     return fj.concat(ex).concat(bl);
@@ -658,7 +658,7 @@ export default function App() {
           {tab==="chat" && role==="admin" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
-          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
+          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos} fcmTokensList={fcmTokensList}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} bloques={bloques} setBloques={setBloques} notify={notify}/>}
@@ -1435,14 +1435,14 @@ function confirmarPago(s) {
   saveDoc("solHor", s.id, Object.assign({}, s, {estado:"completada", fechaRes:new Date().toISOString()}));
 }
 
-function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos}) {
+function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos,fcmTokensList}) {
   const [notas,setNotas] = useState({});
   const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
   const pendInv = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo==="invitada";});
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+" disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,(fcmTokensList||[]).filter(function(t){return t.psico!==s.psico;}).map(function(t){return t.token;}));}}
     else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
         // Announce freed hours
         var textoLibre="A partir del "+hoyM+": ";
@@ -1455,8 +1455,9 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
         } else {
           textoLibre+=DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+" disponible.";
         }
-        const anMod={id:Date.now()+1,texto:textoLibre,fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
+        var sedeNomM=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");if(sedeNomM) textoLibre=textoLibre.replace(" disponible"," ("+sedeNomM+") disponible");const anMod={id:Date.now()+1,texto:textoLibre,fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
         saveDoc("anuncios",anMod.id,anMod);
+        sendPush("Horario disponible",anMod.texto,(fcmTokensList||[]).filter(function(t){return t.psico!==s.psico;}).map(function(t){return t.token;}));
         }}
     else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
@@ -1472,9 +1473,10 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
   function lbl(s) { return (s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Eliminar")+" horario "+s.tipo; }
   function det(s) {
-    if(s.datos && s.datos.diaSemana) return DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin+" "+s.datos.consultorio;
-    if(s.horarioId) { const h=horarios.find(function(x){return x.id===s.horarioId;}); if(h) return DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio; }
-    return "";
+    var fecha = (s.datos&&s.datos.fechaDesde) ? " — desde "+s.datos.fechaDesde : "";
+    if(s.datos && s.datos.diaSemana) return DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin+" "+s.datos.consultorio+fecha;
+    if(s.horarioId) { const h=horarios.find(function(x){return x.id===s.horarioId;}); if(h) return DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+fecha; }
+    return fecha?"(horario) "+fecha:"";
   }
 
   return (
