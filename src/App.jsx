@@ -354,6 +354,7 @@ export default function App() {
   const [user,setUser] = useState(null);
   const [tab,setTab] = useState("calendario");
   const [perfilSel,setPerfilSel] = useState(null);
+  const [chatOpen,setChatOpen] = useState(null);
   const [notifMsg,setNotifMsg] = useState(null);
   const [wk,setWk] = useState(new Date());
   const [fSede,setFSede] = useState("todas");
@@ -366,6 +367,7 @@ export default function App() {
   const [bloques,setBloquesLocal] = useState([]);
   const [horarios,setHorariosLocal] = useState([]);
   const [anuncios,setAnunciosLocal] = useState([]);
+  const [mensajes,setMensajesLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
@@ -386,6 +388,7 @@ export default function App() {
       seedIfEmpty("tabP", TAB_INI),
     ]).then(function(){ setDbReady(true); });
     const unsubs = [
+      listenCol("mensajes", function(d){ setMensajesLocal(d); }),
       listenCol("psicos", function(d){ setPsicosLocal(d); if(d&&d.length>0) __restoreContactData(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
       listenCol("reservas", function(d){ setReservasLocal(d); }),
@@ -416,7 +419,7 @@ export default function App() {
   function setConfig(u2) { const n=typeof u2==="function"?u2(config):u2; saveDoc("config","main",n); }
 
   const cmap = {};
-  psicos.forEach(function(p,i){ cmap[p.nombre.toLowerCase()] = PCOLS[i%PCOLS.length]; });
+  psicos.forEach(function(p,i){ if(p&&p.nombre) cmap[p.nombre.toLowerCase()] = PCOLS[i%PCOLS.length]; });
   function gc(n) { return cmap[n&&n.toLowerCase()] || br; }
 
   function notify(msg,t) {
@@ -652,6 +655,7 @@ export default function App() {
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
           {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
+          {tab==="chat" && role==="admin" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
@@ -1181,7 +1185,8 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) 
   const [form,setForm] = useState({});
   function save() {
     var _p = (psicos||[]).find(function(x){return x.id===eid;}) || {};
-    saveDoc("psicos", eid, Object.assign({}, _p, form));
+    var newNombre = (form.nombre||_p.nombre||"").trim();
+    saveDoc("psicos", eid, Object.assign({}, _p, form, {nombre:newNombre}));
     setEid(null); notify("Perfil actualizado");
   }
   var lista = (psicos||[]).filter(function(p){ return p && (p.nombre||p.id); });
@@ -1294,13 +1299,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
     var imgList=imgs.map(function(u){return u.trim();}).filter(Boolean);const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
     // Save pending notification to Firestore for cloud function to send
-    saveDoc("pendingNotifs","notif_"+a.id,{
-      title:"Consultorio Gloria Videla",
-      body:txt.trim().substring(0,100),
-      created:new Date().toISOString(),
-      sent:false
-    });
-    setTxt(""); notify("Anuncio publicado");
+        setTxt(""); notify("Anuncio publicado");
   }
   function sWA(p,t) {
     if(!p.wa){notify("Sin WA: "+p.nombre,"err");return;}
@@ -1919,7 +1918,7 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
         <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"4px 10px"})} onClick={function(){
               if(!window.confirm("Eliminar a "+p.nombre+"?\nTambien se eliminaran sus horarios fijos.")) return;
               delDoc("psicos",p.id);
-              horarios.filter(function(h){return h.psico&&h.psico.toLowerCase()===p.nombre.toLowerCase();})
+              horarios.filter(function(h){return h.psico&&h.psico.toLowerCase()===((p.nombre||"").toLowerCase());})
                 .forEach(function(h){delDoc("horarios",h.id);});
               notify("Profesional y horarios eliminados");
             }}>X</button>
