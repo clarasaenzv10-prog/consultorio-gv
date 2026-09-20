@@ -1912,6 +1912,20 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
           }}>
           {p.fijas?"Fijos (tocar para cambiar a extras)":"Solo extras (tocar para cambiar a fijos)"}
         </button>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6}}>
+          <span style={{color:mu,fontSize:12}}>CUIT: </span>
+          {editCuit?(
+            <div style={{display:"flex",gap:6,flex:1}}>
+              <input style={Object.assign({},sInp,{flex:1,padding:"3px 8px",fontSize:12})} value={cuitVal} onChange={function(e){setCuitVal(e.target.value);}} placeholder="27-XXXXXXXX-X" autoFocus onKeyDown={function(e){if(e.key==="Enter")saveCuit();}}/>
+              <button style={Object.assign({},btn(ok,wh),{padding:"3px 10px",fontSize:12})} onClick={saveCuit}>OK</button>
+              <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"3px 8px",fontSize:12})} onClick={function(){setEditCuit(false);}}>X</button>
+            </div>
+          ):(
+            <span style={{color:tx,fontSize:12,cursor:"pointer",textDecoration:"underline"}} onClick={function(){setEditCuit(true);}}>
+              {p.cuit||"(sin CUIT — tocar para agregar)"}
+            </span>
+          )}
+        </div>
         {editPass && (
           <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
             <input style={Object.assign({},sInp,{flex:1,fontSize:12})} type="password" value={newPass} onChange={function(e){setNewPass(e.target.value);}} placeholder="Nueva contrasena..." onKeyDown={function(e){if(e.key==="Enter")savePass();}}/>
@@ -1977,6 +1991,8 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
   const [eid,setEid] = useState(null);
   const [ef,setEf] = useState({});
   const [showAdd,setShowAdd] = useState(false);
+  const [setFinId,setSetFinId] = useState(null);
+  const [finDate,setFinDate] = useState("");
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
@@ -2059,10 +2075,16 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                         </div>
                         <div style={{display:"flex",gap:6}}>
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setEid(h.id);setEf(Object.assign({},h));}}>Editar</button>
-                          <button style={Object.assign({},btnO(wh,mu,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){
-                            var desde=window.prompt("Facturar este horario solo hasta qué fecha? (AAAA-MM-DD)\nEsto registra una modificación mid-mes para la facturación.");
-                            if(desde&&desde.match(/^\d{4}-\d{2}-\d{2}$/)){saveDoc("horarios",h.id,Object.assign({},h,{fechaFin:desde}));notify("Fecha de fin guardada: "+desde);}
-                          }}>📅</button>
+                          <button style={Object.assign({},btnO(wh,mu,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setSetFinId(function(prev){return prev===h.id?null:h.id;});setFinDate(h.fechaFin||"");}}>
+                            {setFinId===h.id ? "✓" : "📅 Hasta"}
+                          </button>
+                          {setFinId===h.id && (
+                            <div style={{display:"flex",gap:6,alignItems:"center",marginTop:6,width:"100%"}}>
+                              <input type="date" style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"4px 8px"})} value={finDate} onChange={function(e){setFinDate(e.target.value);}} max={new Date().toISOString().split("T")[0]}/>
+                              <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"4px 10px"})} onClick={function(){if(finDate){saveDoc("horarios",h.id,Object.assign({},h,{fechaFin:finDate}));setSetFinId(null);setFinDate("");notify("Guardado: factura hasta "+finDate);}}}>Guardar</button>
+                              <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{fontSize:12,padding:"4px 8px"})} onClick={function(){setSetFinId(null);setFinDate("");}}>X</button>
+                            </div>
+                          )}
                           <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){delDoc("horarios",h.id);notify("Eliminado");}}>X</button>
                         </div>
                       </div>
