@@ -454,7 +454,7 @@ export default function App() {
     fp.forEach(function(h) {
       var allDates = mesFechas(mes,anio,Number(h.diaSemana));
       var filteredDates = allDates.filter(function(d){
-        if(h.fechaFin && d >= h.fechaFin) return false;
+        if(h.fechaFin && d > h.fechaFin) return false;
         if(h.fechaInicio && d < h.fechaInicio) return false;
         return true;
       });
@@ -502,7 +502,7 @@ export default function App() {
 
   function getEvts(date) {
     const ds = date.getDay()===0?7:date.getDay(), str = localDateStr(date);
-    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(!h.fechaFin||str<h.fechaFin)&&(!h.fechaInicio||str>=h.fechaInicio)&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
+    const fj = horarios.filter(function(h){return Number(h.diaSemana)===ds&&(fSede==="todas"||h.sede===fSede)&&(fCons==="todos"||h.consultorio===fCons)&&(fPsico==="todas"||h.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(h){return Object.assign({},h,{tipo:"fijo"});});
     const ex = reservas.filter(function(r){return r.fecha===str&&r.estado==="aprobada"&&(fCons==="todos"||r.consultorio===fCons)&&(fPsico==="todas"||r.psico.toLowerCase()===fPsico.toLowerCase());}).map(function(r){return Object.assign({},r,{tipo:"extra"});});
     const bl = bloques.filter(function(b){return b.fecha===str;}).map(function(b){return Object.assign({},b,{tipo:"bloqueado"});});
     return fj.concat(ex).concat(bl);
@@ -658,10 +658,10 @@ export default function App() {
           {tab==="chat" && role==="admin" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
-          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos} fcmTokensList={fcmTokensList}/>}
+          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
-          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} bloques={bloques} setBloques={setBloques} notify={notify}/>}
+          {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
@@ -1435,30 +1435,15 @@ function confirmarPago(s) {
   saveDoc("solHor", s.id, Object.assign({}, s, {estado:"completada", fechaRes:new Date().toISOString()}));
 }
 
-function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos,fcmTokensList}) {
+function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos}) {
   const [notas,setNotas] = useState({});
   const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
   const pendInv = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo==="invitada";});
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,(fcmTokensList||[]).filter(function(t){return t.psico!==s.psico;}).map(function(t){return t.token;}));}}
-    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
-        // Announce freed hours
-        var textoLibre="A partir del "+hoyM+": ";
-        if(h.diaSemana===Number(s.datos.diaSemana)){
-          var partes=[];
-          if(h.inicio<s.datos.inicio) partes.push(h.inicio+"-"+s.datos.inicio);
-          if(s.datos.fin<h.fin) partes.push(s.datos.fin+"-"+h.fin);
-          if(partes.length>0){textoLibre+=DIAS[h.diaSemana]+" "+partes.join(" y ")+" en "+h.consultorio+" disponible.";}
-          else{textoLibre+=DIAS[h.diaSemana]+" horario modificado en "+h.consultorio+".";}
-        } else {
-          textoLibre+=DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+" disponible.";
-        }
-        var sedeNomM=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");if(sedeNomM) textoLibre=textoLibre.replace(" disponible"," ("+sedeNomM+") disponible");const anMod={id:Date.now()+1,texto:textoLibre,fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
-        saveDoc("anuncios",anMod.id,anMod);
-        sendPush("Horario disponible",anMod.texto,(fcmTokensList||[]).filter(function(t){return t.psico!==s.psico;}).map(function(t){return t.token;}));
-        }}
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoy=new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoy,activo:false}));const an={id:Date.now(),texto:"Se libero: "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+". Puede estar disponible!",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);}}
+    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);}}
     else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
     else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
@@ -1473,10 +1458,9 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
   function lbl(s) { return (s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Eliminar")+" horario "+s.tipo; }
   function det(s) {
-    var fecha = (s.datos&&s.datos.fechaDesde) ? " — desde "+s.datos.fechaDesde : "";
-    if(s.datos && s.datos.diaSemana) return DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin+" "+s.datos.consultorio+fecha;
-    if(s.horarioId) { const h=horarios.find(function(x){return x.id===s.horarioId;}); if(h) return DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+fecha; }
-    return fecha?"(horario) "+fecha:"";
+    if(s.datos && s.datos.diaSemana) return DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin+" "+s.datos.consultorio;
+    if(s.horarioId) { const h=horarios.find(function(x){return x.id===s.horarioId;}); if(h) return DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio; }
+    return "";
   }
 
   return (
@@ -1928,20 +1912,6 @@ function GestionPsicoRow({p,setPsicos,horarios,setHorarios,reservas,notify}) {
           }}>
           {p.fijas?"Fijos (tocar para cambiar a extras)":"Solo extras (tocar para cambiar a fijos)"}
         </button>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6}}>
-          <span style={{color:mu,fontSize:12}}>CUIT: </span>
-          {editCuit?(
-            <div style={{display:"flex",gap:6,flex:1}}>
-              <input style={Object.assign({},sInp,{flex:1,padding:"3px 8px",fontSize:12})} value={cuitVal} onChange={function(e){setCuitVal(e.target.value);}} placeholder="27-XXXXXXXX-X" autoFocus onKeyDown={function(e){if(e.key==="Enter")saveCuit();}}/>
-              <button style={Object.assign({},btn(ok,wh),{padding:"3px 10px",fontSize:12})} onClick={saveCuit}>OK</button>
-              <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{padding:"3px 8px",fontSize:12})} onClick={function(){setEditCuit(false);}}>X</button>
-            </div>
-          ):(
-            <span style={{color:tx,fontSize:12,cursor:"pointer",textDecoration:"underline"}} onClick={function(){setEditCuit(true);}}>
-              {p.cuit||"(sin CUIT — tocar para agregar)"}
-            </span>
-          )}
-        </div>
         {editPass && (
           <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
             <input style={Object.assign({},sInp,{flex:1,fontSize:12})} type="password" value={newPass} onChange={function(e){setNewPass(e.target.value);}} placeholder="Nueva contrasena..." onKeyDown={function(e){if(e.key==="Enter")savePass();}}/>
@@ -2001,14 +1971,12 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
   );
 }
 
-function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,setBloques,notify}) {
+function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,notify}) {
   const [gt,setGt] = useState("horarios");
   const [selP,setSelP] = useState(null);
   const [eid,setEid] = useState(null);
   const [ef,setEf] = useState({});
   const [showAdd,setShowAdd] = useState(false);
-  const [setFinId,setSetFinId] = useState(null);
-  const [finDate,setFinDate] = useState("");
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
@@ -2091,16 +2059,6 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                         </div>
                         <div style={{display:"flex",gap:6}}>
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setEid(h.id);setEf(Object.assign({},h));}}>Editar</button>
-                          <button style={Object.assign({},btnO(wh,mu,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setSetFinId(function(prev){return prev===h.id?null:h.id;});setFinDate(h.fechaFin||"");}}>
-                            {setFinId===h.id ? "✓" : "📅 Hasta"}
-                          </button>
-                          {setFinId===h.id && (
-                            <div style={{display:"flex",gap:6,alignItems:"center",marginTop:6,width:"100%"}}>
-                              <input type="date" style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"4px 8px"})} value={finDate} onChange={function(e){setFinDate(e.target.value);}} max={new Date().toISOString().split("T")[0]}/>
-                              <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"4px 10px"})} onClick={function(){if(finDate){saveDoc("horarios",h.id,Object.assign({},h,{fechaFin:finDate}));setSetFinId(null);setFinDate("");notify("Guardado: factura hasta "+finDate);}}}>Guardar</button>
-                              <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{fontSize:12,padding:"4px 8px"})} onClick={function(){setSetFinId(null);setFinDate("");}}>X</button>
-                            </div>
-                          )}
                           <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){delDoc("horarios",h.id);notify("Eliminado");}}>X</button>
                         </div>
                       </div>
@@ -2335,15 +2293,8 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
                   <div style={{background:bg,borderRadius:8,padding:12,color:tx,fontWeight:600,border:"1px solid #C9E4EF"}}>
                     {DIAS[mH.h.diaSemana]} - {mH.h.inicio}-{mH.h.fin} - {mH.h.consultorio}
                   </div>
-                                    <div style={{marginBottom:8}}>
-                    <label style={sLbl}>¿Desde cuándo aplica la liberación?</label>
-                    <input type="date" style={sInp} 
-                      value={mH.fechaDesde||(new Date().toISOString().split("T")[0])} 
-                      onChange={function(e){setMH(function(prev){return Object.assign({},prev,{fechaDesde:e.target.value});});}}/>
-                    <div style={{color:mu,fontSize:11,marginTop:3}}>La facturación se cortará desde esta fecha</div>
-                  </div>
                   <div style={{display:"flex",gap:10}}>
-                    <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1})} onClick={function(){sol("fijo","eliminar",{fechaDesde:mH.fechaDesde||(new Date().toISOString().split("T")[0])},mH.h.id);}}>Si, liberar</button>
+                    <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{flex:1})} onClick={function(){sol("fijo","eliminar",{},mH.h.id);}}>Si, liberar</button>
                     <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{flex:1})} onClick={function(){setMH(null);}}>Cancelar</button>
                   </div>
                 </div>
@@ -2403,7 +2354,7 @@ function ConfigView({config,setConfig,notify}) {
   }, [config]);
 
   function save() {
-    setConfig({id:"main",adminPass:adminPass,invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
+    setConfig({id:"main",invPass:invPass,transferencia:{alias:alias,cbu:cbu,banco:banco,titular:titular},flyer:flyer,fotos:fotos,descripciones:descripciones});
     notify("Configuracion guardada");
   }
   function fixUrl(url) {
@@ -2433,9 +2384,6 @@ function ConfigView({config,setConfig,notify}) {
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Configuracion</h2>
       <div style={Object.assign({},sPanel,{marginBottom:16})}>
         <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Acceso invitadas</div>
-        <label style={sLbl}>Contrasena admin</label>
-        <input style={sInp} type="password" value={adminPass} onChange={function(e){setAdminPass(e.target.value);}} placeholder="admin123"/>
-        <div style={{color:mu,fontSize:11,marginTop:4,marginBottom:12}}>Contraseña con la que ingresa el admin</div>
         <label style={sLbl}>Contrasena para invitadas</label>
         <input style={sInp} value={invPass} onChange={function(e){setInvPass(e.target.value);}} placeholder="invitada123"/>
         <div style={{color:mu,fontSize:11,marginTop:4}}>Las invitadas ingresan con usuario "invitada" y esta contrasena</div>
