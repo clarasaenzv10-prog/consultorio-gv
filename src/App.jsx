@@ -547,6 +547,7 @@ export default function App() {
     {id:"estadisticas",icon:"📊",label:"Estadisticas",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"configuracion",icon:"🔧",label:"Configuracion",badge:0},
+    {id:"chat",icon:"💬",label:"Chat",badge:0},
   ] : [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
@@ -1973,7 +1974,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
 
-  const misH = selP ? horarios.filter(function(h){return h.psico.toLowerCase()===selP.toLowerCase()&&!h.fechaFin;}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);}) : [];
+  const misH = selP ? horarios.filter(function(h){return matchHorario(h.psico,selP)&&!h.fechaFin;}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);}) : [];
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
