@@ -443,8 +443,7 @@ export default function App() {
     var mesEnd=(function(){var d=new Date(anio,mes+1,0);return d.toISOString().split("T")[0];}());
     const fp = horarios.filter(function(h){
       if(!h.psico) return false;
-      const hn=h.psico.trim().toLowerCase();
-      if(!(hn===pn||hn===pnFirst)) return false;
+      if(!matchHorario(psico.nombre, h.psico)) return false;
       // Excluir si el horario terminó antes de que empiece el mes
       if(h.fechaFin && h.fechaFin < mesStart) return false;
       // Excluir si el horario empieza después de que termina el mes
@@ -2015,7 +2014,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Gestion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={tabBtn(gt==="horarios")} onClick={function(){setGt("horarios");}}>Horarios</button>
-        <button style={tabBtn(gt==="profesionals")} onClick={function(){setGt("profesionals");}}>Profesionales</button>
+        <button style={tabBtn(gt==="profesionales")} onClick={function(){setGt("profesionales");}}>Profesionales</button>
         
       </div>
       {gt==="horarios" && (
@@ -2071,7 +2070,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,bloques,setBloques,n
           )}
         </div>
       )}
-      {gt==="profesionals" && (
+      {gt==="profesionales" && (
         <div style={sPanel}>
           <button style={Object.assign({},btn(br,wh),{width:"100%",marginBottom:16})} onClick={function(){setShowNewP(function(v){return !v;});}}>
             {showNewP?"Cancelar":"+ Agregar nuevo profesional"}
@@ -2156,7 +2155,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   const [vistos,setVistos] = useState([]);
   const [showHist,setShowHist] = useState(false);
   var AL_MF={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"teresa de aramburu":["teresa"]};
-  const mF = horarios.filter(function(h){return h.psico&&user&&h.psico.trim().toLowerCase()===user.trim().toLowerCase();}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  const mF = horarios.filter(function(h){return h.psico&&user&&matchHorario(user,h.psico);}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
   const mE = reservas.filter(function(r){return r.psico===user&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
   const mS = solicitudes.filter(function(s){return s.psico===user;}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
 
@@ -2413,7 +2412,7 @@ function ConfigView({config,setConfig,notify}) {
           );})}
         </div>
         <div style={{marginBottom:14,background:lt,borderRadius:10,padding:12,border:"1.5px solid #4BA3C3"}}>
-          <label style={{color:br,fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6}}>Descripcion de {selCons} (visible para profesionals e invitadas)</label>
+          <label style={{color:br,fontSize:12,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:6}}>Descripcion de {selCons} (visible para profesionales e invitadas)</label>
           <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical",fontSize:13,background:wh})}
             value={descripciones[selCons]||""}
             onChange={function(e){setDescripciones(function(d){return Object.assign({},d,{[selCons]:e.target.value});});}}
@@ -2880,7 +2879,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
       </div>
       <div style={Object.assign({},sPanel,{marginTop:24,background:ob,border:"1px solid #A7E3C0"})}>
         <div style={{color:ok,fontWeight:700,fontSize:13,marginBottom:8}}>Exportar para el contador</div>
-        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionals del mes en formato Excel.</div>
+        <div style={{color:mu,fontSize:12,marginBottom:12}}>Descarga la facturacion detallada de todas las profesionales del mes en formato Excel.</div>
         <button style={Object.assign({},btn(ok,wh),{width:"100%",padding:"12px",fontSize:14,fontWeight:700})} onClick={function(){exportarExcel(psicos,mes,anio);}}>
           Descargar Excel - Facturacion {MESES[mes]} {anio}
         </button>
