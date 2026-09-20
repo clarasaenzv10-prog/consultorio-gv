@@ -437,7 +437,7 @@ export default function App() {
 
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
-    const pn=psico.nombre.trim().toLowerCase();
+    const pn=(psico.nombre||"").trim().toLowerCase();
     const pnFirst=pn.split(" ")[0]; // first name only for fallback
     var mesStart=(anio+"-"+String(mes+1).padStart(2,"0")+"-01");
     var mesEnd=(function(){var d=new Date(anio,mes+1,0);return d.toISOString().split("T")[0];}());
@@ -655,7 +655,7 @@ export default function App() {
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
-          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel}/>}
+          {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
           {tab==="chat" && role==="admin" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
@@ -1181,13 +1181,20 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
 }
 
 // ─── Perfiles ─────────────────────────────────────────────────
-function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel}) {
+function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,horarios,reservas}) {
   const [eid,setEid] = useState(null);
   const [form,setForm] = useState({});
   function save() {
     var _p = (psicos||[]).find(function(x){return x.id===eid;}) || {};
-    var newNombre = (form.nombre||_p.nombre||"").trim();
+    var oldNombre = (_p.nombre||"").trim();
+    var newNombre = (form.nombre||oldNombre).trim();
     saveDoc("psicos", eid, Object.assign({}, _p, form, {nombre:newNombre}));
+    if(oldNombre && newNombre && oldNombre !== newNombre) {
+      (horarios||[]).filter(function(h){return h.psico&&h.psico.trim().toLowerCase()===oldNombre.toLowerCase();})
+        .forEach(function(h){saveDoc("horarios",h.id,Object.assign({},h,{psico:newNombre}));});
+      (reservas||[]).filter(function(r){return r.psico&&r.psico.trim().toLowerCase()===oldNombre.toLowerCase();})
+        .forEach(function(r){saveDoc("reservas",r.id,Object.assign({},r,{psico:newNombre}));});
+    }
     setEid(null); notify("Perfil actualizado");
   }
   var lista = (psicos||[]).filter(function(p){ return p && (p.nombre||p.id); });
