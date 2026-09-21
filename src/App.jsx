@@ -658,7 +658,7 @@ export default function App() {
           {tab==="chat" && role==="admin" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
-          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos} fcmTokensList={fcmTokensList}/>}
+          {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} bloques={bloques} setBloques={setBloques} notify={notify}/>}
@@ -1435,14 +1435,14 @@ function confirmarPago(s) {
   saveDoc("solHor", s.id, Object.assign({}, s, {estado:"completada", fechaRes:new Date().toISOString()}));
 }
 
-function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos,fcmTokensList}) {
+function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,setReservas,setAnuncios,notify,config,psicos,setPsicos}) {
   const [notas,setNotas] = useState({});
   const pend = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo!=="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
   const pendInv = solicitudes.filter(function(s){return s.estado==="pendiente"&&s.tipo==="invitada";});
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,(fcmTokensList||[]).filter(function(t){return t.psico!==s.psico;}).map(function(t){return t.token;}));}}
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,[]);}}
     else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
         // Announce freed hours
         var textoLibre="A partir del "+hoyM+": ";
@@ -1457,7 +1457,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
         }
         var sedeNomM=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");if(sedeNomM) textoLibre=textoLibre.replace(" disponible"," ("+sedeNomM+") disponible");const anMod={id:Date.now()+1,texto:textoLibre,fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
         saveDoc("anuncios",anMod.id,anMod);
-        sendPush("Horario disponible",anMod.texto,(fcmTokensList||[]).filter(function(t){return t.psico!==s.psico;}).map(function(t){return t.token;}));
+        sendPush("Horario disponible",anMod.texto,[]);
         }}
     else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
@@ -1474,8 +1474,17 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   function lbl(s) { return (s.accion==="agregar"?"Agregar":s.accion==="modificar"?"Modificar":"Eliminar")+" horario "+s.tipo; }
   function det(s) {
     var fecha = (s.datos&&s.datos.fechaDesde) ? " — desde "+s.datos.fechaDesde : "";
+    var orig = s.horarioId ? horarios.find(function(x){return x.id===s.horarioId;}) : null;
+    var origTxt = orig ? DIAS[orig.diaSemana]+" "+orig.inicio+"-"+orig.fin+" "+orig.consultorio : "";
+    if(s.accion==="modificar" && s.datos && s.datos.diaSemana){
+      var nuevoTxt = DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin+" "+s.datos.consultorio;
+      return origTxt ? ("Antes: "+origTxt+"  →  Ahora: "+nuevoTxt+fecha) : (nuevoTxt+fecha);
+    }
+    if(s.accion==="eliminar" && orig){
+      return "Se libera: "+origTxt+fecha;
+    }
     if(s.datos && s.datos.diaSemana) return DIAS[s.datos.diaSemana]+" "+s.datos.inicio+"-"+s.datos.fin+" "+s.datos.consultorio+fecha;
-    if(s.horarioId) { const h=horarios.find(function(x){return x.id===s.horarioId;}); if(h) return DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+fecha; }
+    if(orig) return origTxt+fecha;
     return fecha?"(horario) "+fecha:"";
   }
 
@@ -2197,7 +2206,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
   const [vistos,setVistos] = useState([]);
   const [showHist,setShowHist] = useState(false);
   var AL_MF={"magdalena perisse":["magda","magdalena"],"eugenia eguren":["euge","eugenia"],"josefina cesareo":["jose cesareo","josefina"],"milagros vazquez":["milagros"],"belen bancalari":["belen"],"bernadette houssay":["bernadette"],"carolina podversich":["carolina"],"agustina mohr":["agus mohr","agustina"],"delfina mohr":["delfi mohr","delfina"],"sofia elkin":["sofi","sofia"],"marcela fernandez sanchez":["marce","marcela"],"angeles rodriguez feito":["angeles"],"dolores torreira":["dolores torreira"],"jesica lavia":["jesica"],"marta pitzer":["marta"],"teresa de aramburu":["teresa"]};
-  const mF = horarios.filter(function(h){return h.psico&&user&&matchHorario(user,h.psico);}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
+  var _hoy=new Date().toISOString().split("T")[0];const mF = horarios.filter(function(h){return h.psico&&user&&matchHorario(user,h.psico)&&(!h.fechaFin||h.fechaFin>=_hoy);}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);});
   const mE = reservas.filter(function(r){return r.psico===user&&r.estado==="aprobada"&&r.tipo==="extra"&&r.fecha>=new Date().toISOString().split("T")[0];});
   const mS = solicitudes.filter(function(s){return s.psico===user;}).sort(function(a,b){return b.fechaSol.localeCompare(a.fechaSol);});
 
@@ -3082,10 +3091,12 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
   function checkConflicto() {
     if(!ini||!fin||toMin(fin)<=toMin(ini)) return "El horario de fin debe ser mayor al inicio.";
     const sMin=toMin(ini), eMin=toMin(fin);
+    var _ccHoy=new Date().toISOString().split("T")[0];
     const c=(horarios||[]).filter(function(x){
       if(x.consultorio!==cons) return false;
       if(Number(x.diaSemana)!==Number(dia)) return false;
       if(h && x.id===h.id) return false; // exclude own horario when editing
+      if(x.fechaFin && x.fechaFin<_ccHoy) return false; // exclude already-ended horarios
       return sMin<toMin(x.fin) && eMin>toMin(x.inicio);
     });
     return c.length ? "Ese horario esta ocupado en "+cons : null;
