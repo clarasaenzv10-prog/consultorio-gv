@@ -2039,11 +2039,14 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
     setEid(null); notify("Actualizado");
   }
   function reactivar(h,fechaDesde) {
-    // Reactiva un horario terminado: le saca fechaFin y, si se indico, le pone fechaInicio a esa fecha
-    var actualizado = Object.assign({},h);
-    delete actualizado.fechaFin;
-    delete actualizado.reemplazadoPor;
-    if(fechaDesde) actualizado.fechaInicio = fechaDesde; else delete actualizado.fechaInicio;
+    // Reactiva un horario terminado: le saca fechaFin y, si se indico, le pone fechaInicio a esa fecha.
+    // IMPORTANTE: se pone null explicito (no se borra la key) porque saveDoc puede guardar con merge,
+    // y un merge no borra campos que simplemente no estan en el objeto nuevo - hay que pisarlos con null.
+    var actualizado = Object.assign({},h,{
+      fechaFin: null,
+      reemplazadoPor: null,
+      fechaInicio: fechaDesde || null
+    });
     saveDoc("horarios",h.id,actualizado);
     setReactId(null); setReactDesde("");
     notify("Horario reactivado");
