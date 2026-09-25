@@ -740,7 +740,7 @@ function LoginView({onLogin,psicos,config}) {
   const [p,setP] = useState("");
   const [err,setErr] = useState("");
   function go() {
-    if(u==="admin" && p==="admin123") { onLogin("admin","Admin"); return; }
+    if(u==="admin" && p===((config&&config.adminPass)||"admin123")) { onLogin("admin","Admin"); return; }
     if(u.toLowerCase()==="invitada" && p===((config&&config.invPass)||"invitada123")) { onLogin("invitada","Invitada"); return; }
     const f = psicos.find(function(x){return x.nombre.toLowerCase()===u.toLowerCase();});
     if(f && p===(f.pass||"psico123")) { onLogin("psico",f.nombre); return; }
@@ -950,7 +950,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
                   // Check availability at the CLICKED hour (slot.hour to slot.hour+1)
                   const clickMin=slot.hour*60;
                   const clickMinEnd=(slot.hour+1)*60;
-                  
+
                   // For each consultorio, find what free time they have around the clicked hour
                   const resultados=CONS.filter(function(c){
                     if(c.id===ev.consultorio) return false;
@@ -974,7 +974,7 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
                     const finStr=win?String(Math.floor(win.fin/60)).padStart(2,"0")+":"+String(win.fin%60).padStart(2,"0"):"21:00";
                     return {c:c, iniStr:iniStr, finStr:finStr};
                   });
-                  
+
                   if(!resultados.length) return <div style={{color:mu,fontSize:13,padding:"8px 0"}}>No hay consultorios disponibles a esa hora.</div>;
                   return resultados.map(function(r){
                     const sedeNombre=r.c.sede==="VL"?"Vicente Lopez":"Uruguay";
@@ -1368,7 +1368,7 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
             </div>
             <div style={{flex:1}}>
               <div style={{color:tx,fontWeight:700}}>{r.psico}</div>
-              <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")} - {r.consultorio} - {r.inicio}-{r.fin}</div>
+              <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha).toLocaleDateString("es-AR")} - {r.consultorio} - {r.inicio}-{r.fin}</div>
               <div style={{color:mu,fontSize:12}}>{calcHrs(r.inicio,r.fin)}hs - {ars(calcPrecio(r.inicio,r.fin).sub)}</div>
             </div>
             <div style={{display:"flex",gap:8}}>
@@ -1386,7 +1386,7 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
               <div key={r.id} style={Object.assign({},sCard,{opacity:.65})}>
                 <div style={{flex:1}}>
                   <div style={{color:tx,fontWeight:700}}>{r.psico} - {r.consultorio}</div>
-                  <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
+                  <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
                 </div>
                 <span style={bge(r.estado==="aprobada"?ob:eb,r.estado==="aprobada"?ok:er)}>{r.estado==="aprobada"?"Aprobada":"Rechazada"}</span>
               </div>
@@ -1443,7 +1443,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
   function aprobar(s) {
     if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,[]);}}
-    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false}));var hNuevo=Object.assign({},h,s.datos,{id:"h"+Date.now(),sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
+    else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];var hNuevoId="h"+Date.now();saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false,reemplazadoPor:hNuevoId}));var hNuevo=Object.assign({},h,s.datos,{id:hNuevoId,sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true,reemplazaA:s.horarioId});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
         // Announce freed hours
         var textoLibre="A partir del "+hoyM+": ";
         if(h.diaSemana===Number(s.datos.diaSemana)){
@@ -2020,8 +2020,12 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
   const [finDate,setFinDate] = useState("");
   const [nh,setNh] = useState({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL"});
   const [nn,setNn] = useState("");
+  const [showFin,setShowFin] = useState(false);
+  const [reactId,setReactId] = useState(null);
+  const [reactDesde,setReactDesde] = useState("");
 
   const misH = selP ? horarios.filter(function(h){return matchHorario(h.psico,selP)&&!h.fechaFin;}).sort(function(a,b){return a.diaSemana-b.diaSemana||a.inicio.localeCompare(b.inicio);}) : [];
+  const misHFin = selP ? horarios.filter(function(h){return matchHorario(h.psico,selP)&&h.fechaFin;}).sort(function(a,b){return (b.fechaFin||"").localeCompare(a.fechaFin||"");}) : [];
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
@@ -2033,6 +2037,16 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
     const c=CONS.find(function(x){return x.id===ef.consultorio;});
     saveDoc("horarios",eid,Object.assign({},ef,{sede:c?c.sede:ef.sede,diaSemana:Number(ef.diaSemana)}));
     setEid(null); notify("Actualizado");
+  }
+  function reactivar(h,fechaDesde) {
+    // Reactiva un horario terminado: le saca fechaFin y, si se indico, le pone fechaInicio a esa fecha
+    var actualizado = Object.assign({},h);
+    delete actualizado.fechaFin;
+    delete actualizado.reemplazadoPor;
+    if(fechaDesde) actualizado.fechaInicio = fechaDesde; else delete actualizado.fechaInicio;
+    saveDoc("horarios",h.id,actualizado);
+    setReactId(null); setReactDesde("");
+    notify("Horario reactivado");
   }
   const [newP,setNewP] = useState({nombre:"",profesion:"Psicologa",wa:"",email:"",fijas:false,descuento:0,nota:"",pass:"psico123"});
   const [showNewP,setShowNewP] = useState(false);
@@ -2064,11 +2078,14 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
             <div>
               <div style={{color:mu,fontSize:12,marginBottom:12}}>Selecciona una profesional</div>
               {psicos.map(function(p) {
+                var todosH = horarios.filter(function(h){return matchHorario(p.nombre,h.psico);});
+                var activosH = todosH.filter(function(h){return !h.fechaFin;});
+                var finH = todosH.filter(function(h){return h.fechaFin;});
                 return (
-                  <div key={p.id} style={Object.assign({},sCard,{cursor:"pointer"})} onClick={function(){setSelP(p.nombre);setEid(null);setShowAdd(false);}}>
+                  <div key={p.id} style={Object.assign({},sCard,{cursor:"pointer"})} onClick={function(){setSelP(p.nombre);setEid(null);setShowAdd(false);setShowFin(false);}}>
                     <div style={{flex:1}}>
                       <div style={{color:tx,fontWeight:700}}>{p.nombre}</div>
-                      <div style={{color:mu,fontSize:12}}>{horarios.filter(function(h){return matchHorario(p.nombre,h.psico);}).length} horarios fijos</div>
+                      <div style={{color:mu,fontSize:12}}>{activosH.length} horarios fijos activos{finH.length>0?" · "+finH.length+" terminados":""}</div>
                     </div>
                     <span style={{color:mu,fontSize:18}}>›</span>
                   </div>
@@ -2086,7 +2103,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                 <button style={Object.assign({},btn(br,wh),{fontSize:12,padding:"6px 12px"})} onClick={function(){setShowAdd(true);setEid(null);}}>+ Agregar</button>
               </div>
               {showAdd && <HorarioFormInline data={nh} setData={setNh} onSave={addH} onCancel={function(){setShowAdd(false);}}/>}
-              {!misH.length && !showAdd && <div style={{color:mu,textAlign:"center",padding:40}}>Sin horarios fijos.</div>}
+              {!misH.length && !showAdd && <div style={{color:mu,textAlign:"center",padding:40}}>Sin horarios fijos activos.</div>}
               {misH.map(function(h) {
                 return (
                   <div key={h.id} style={{background:bg,borderRadius:10,padding:"12px 14px",marginBottom:8,border:"1px solid #C9E4EF"}}>
@@ -2097,6 +2114,10 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                         <div style={{flex:1}}>
                           <div style={{color:tx,fontWeight:600,fontSize:14}}>{DIAS[h.diaSemana]} - {h.inicio}-{h.fin}</div>
                           <div style={{color:mu,fontSize:12}}>{h.consultorio} - {ars(calcPrecio(h.inicio,h.fin).sub)}/sem</div>
+                          {h.reemplazaA && (function(){
+                            var viejo = horarios.find(function(x){return x.id===h.reemplazaA;});
+                            return <div style={{color:dk,fontSize:11,marginTop:2}}>← Modificado desde {viejo?(DIAS[viejo.diaSemana]+" "+viejo.inicio+"-"+viejo.fin+" "+viejo.consultorio):"un horario anterior"} (desde {h.fechaInicio})</div>;
+                          })()}
                         </div>
                         <div style={{display:"flex",gap:6}}>
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setEid(h.id);setEf(Object.assign({},h));}}>Editar</button>
@@ -2117,6 +2138,61 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                   </div>
                 );
               })}
+
+              <div style={{marginTop:20,marginBottom:10}}>
+                <button style={{background:"transparent",border:"none",color:mu,fontSize:13,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline",padding:0}} onClick={function(){setShowFin(function(v){return !v;});}}>
+                  {showFin?"Ocultar":"Ver"} horarios terminados{misHFin.length>0?" ("+misHFin.length+")":""}
+                </button>
+              </div>
+              {showFin && (
+                <div>
+                  {!misHFin.length && <div style={{color:mu,fontSize:13,padding:"10px 0"}}>Sin horarios terminados.</div>}
+                  {misHFin.map(function(h) {
+                    return (
+                      <div key={h.id} style={{background:eb,borderRadius:10,padding:"12px 14px",marginBottom:8,border:"1px solid #F5B8B3"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:12}}>
+                          <div style={{flex:1}}>
+                            <div style={{color:tx,fontWeight:600,fontSize:14}}>{DIAS[h.diaSemana]} - {h.inicio}-{h.fin}</div>
+                            <div style={{color:mu,fontSize:12}}>{h.consultorio} - {ars(calcPrecio(h.inicio,h.fin).sub)}/sem</div>
+                            <div style={{color:er,fontSize:12,fontWeight:600,marginTop:2}}>Terminado desde: {h.fechaFin}</div>
+                            {h.reemplazadoPor && (function(){
+                              var nuevo = horarios.find(function(x){return x.id===h.reemplazadoPor;});
+                              if(!nuevo) return <div style={{color:mu,fontSize:11,marginTop:2}}>Reemplazado (el horario nuevo ya no existe)</div>;
+                              return <div style={{color:ok,fontSize:12,fontWeight:600,marginTop:2}}>→ Ahora: {DIAS[nuevo.diaSemana]} {nuevo.inicio}-{nuevo.fin} {nuevo.consultorio} (desde {nuevo.fechaInicio||h.fechaFin})</div>;
+                            })()}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                          <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"5px 10px"})} onClick={function(){setReactId(function(prev){return prev===h.id?null:h.id;});setReactDesde("");}}>
+                            {reactId===h.id ? "✓" : "↻ Reactivar"}
+                          </button>
+                          <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setSetFinId(function(prev){return prev===h.id?null:h.id;});setFinDate(h.fechaFin||"");}}>
+                            {setFinId===h.id ? "✓" : "📅 Editar fecha fin"}
+                          </button>
+                          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){if(window.confirm("Eliminar definitivamente este horario terminado?"))delDoc("horarios",h.id);}}>Eliminar</button>
+                        </div>
+                        {reactId===h.id && (
+                          <div style={{display:"flex",gap:6,alignItems:"center",marginTop:8}}>
+                            <div style={{flex:1}}>
+                              <label style={sLbl}>Reactivar desde (opcional)</label>
+                              <input type="date" style={sInp} value={reactDesde} onChange={function(e){setReactDesde(e.target.value);}}/>
+                              <div style={{color:mu,fontSize:11,marginTop:3}}>Si la dejas vacia, el horario queda activo sin fecha de inicio.</div>
+                            </div>
+                            <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"6px 12px",alignSelf:"flex-end"})} onClick={function(){reactivar(h,reactDesde||null);}}>Confirmar</button>
+                          </div>
+                        )}
+                        {setFinId===h.id && (
+                          <div style={{display:"flex",gap:6,alignItems:"center",marginTop:8}}>
+                            <input type="date" style={Object.assign({},sInp,{flex:1,fontSize:12,padding:"4px 8px"})} value={finDate} onChange={function(e){setFinDate(e.target.value);}}/>
+                            <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"4px 10px"})} onClick={function(){if(finDate){saveDoc("horarios",h.id,Object.assign({},h,{fechaFin:finDate}));setSetFinId(null);setFinDate("");notify("Fecha fin actualizada: "+finDate);}}}>Guardar</button>
+                            <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{fontSize:12,padding:"4px 8px"})} onClick={function(){setSetFinId(null);setFinDate("");}}>X</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2183,7 +2259,7 @@ function MisReservasView({reservas,onNew}) {
         return (
           <div key={r.id} style={sCard}>
             <div style={{flex:1}}>
-              <div style={{color:tx,fontWeight:700}}>{r.consultorio} - {parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")}</div>
+              <div style={{color:tx,fontWeight:700}}>{r.consultorio} - {parseLocalDate(r.fecha).toLocaleDateString("es-AR")}</div>
               <div style={{color:mu,fontSize:13}}>{r.inicio}-{r.fin} - {calcHrs(r.inicio,r.fin)}hs</div>
             </div>
             <span style={bge(r.estado==="aprobada"?ob:r.estado==="rechazada"?eb:lt,r.estado==="aprobada"?ok:r.estado==="rechazada"?er:dk)}>
@@ -2319,7 +2395,7 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
           return (
             <div key={r.id} style={sCard}>
               <div style={{flex:1}}>
-                <div style={{color:tx,fontWeight:600}}>{parseLocalDate(r.fecha||slot_date_fallback).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
+                <div style={{color:tx,fontWeight:600}}>{parseLocalDate(r.fecha).toLocaleDateString("es-AR")} - {r.inicio}-{r.fin}</div>
                 <div style={{color:mu,fontSize:12}}>{r.consultorio}</div>
               </div>
               <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setMH({type:"delExtra",r:r});}}>Cancelar</button>
@@ -2780,7 +2856,7 @@ function exportarExcel(psicos,mes,anio) {
   }).join("\n");
 
   // Add BOM for Excel UTF-8
-  var bom = "\uFEFF";
+  var bom = "﻿";
   var blob = new Blob([bom+csv],{type:"text/csv;charset=utf-8;"});
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
