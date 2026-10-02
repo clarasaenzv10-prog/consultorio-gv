@@ -1595,19 +1595,29 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
 // ─── Facturacion ──────────────────────────────────────────────
 function FactView({psicos,calcFact,genMsg,notify}) {
-  const [enviadas,setEnviadas] = useState({});
-  function toggleEnviada(nombre){
-    setEnviadas(function(prev){
-      var n=Object.assign({},prev,{[nombre]:!prev[nombre]});
-      try{localStorage.setItem("enviadas_"+sel+"_"+anio,JSON.stringify(n));}catch(e){}
-      return n;
-    });
-  }
   // Historial: last 6 months data for selected psico
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
   const [sel,setSel] = useState(null);
+  const [enviadas,setEnviadas] = useState({});
+
+  // "Enviadas" es un check por profesional, por mes/anio (ej: ya le mande la factura de Septiembre a Marcela).
+  // Se guarda en localStorage con una key por mes+anio para no mezclar meses distintos.
+  useEffect(function() {
+    try {
+      var raw = localStorage.getItem("enviadas_"+mes+"_"+anio);
+      setEnviadas(raw ? JSON.parse(raw) : {});
+    } catch(e) { setEnviadas({}); }
+  }, [mes,anio]);
+
+  function toggleEnviada(nombre){
+    setEnviadas(function(prev){
+      var n=Object.assign({},prev,{[nombre]:!prev[nombre]});
+      try{localStorage.setItem("enviadas_"+mes+"_"+anio,JSON.stringify(n));}catch(e){}
+      return n;
+    });
+  }
   const [vista,setVista] = useState("mes"); // "mes" | "historial"
   const ps = sel ? psicos.find(function(p){return p.nombre===sel;}) : null;
 
@@ -1691,16 +1701,20 @@ function FactView({psicos,calcFact,genMsg,notify}) {
           {psicos.map(function(p) {
             const r = calcFact(p,mes,anio);
             const act = sel===p.nombre;
+            const env = !!enviadas[p.nombre];
             return (
-              <div key={p.id} style={{padding:"10px 12px",borderRadius:8,cursor:"pointer",marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center",background:act?lt:"transparent"}} onClick={function(){setSel(p.nombre);}}>
-                <div>
-                  <div style={{color:tx,fontWeight:600,fontSize:13}}>{p.nombre}</div>
+              <div key={p.id} style={{padding:"10px 12px",borderRadius:8,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center",background:act?lt:"transparent"}}>
+                <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",flexShrink:0}} onClick={function(e){e.stopPropagation();}}>
+                  <input type="checkbox" checked={env} onChange={function(){toggleEnviada(p.nombre);}} style={{width:16,height:16,cursor:"pointer"}}/>
+                </label>
+                <div style={{flex:1,cursor:"pointer",marginLeft:8}} onClick={function(){setSel(p.nombre);}}>
+                  <div style={{color:tx,fontWeight:600,fontSize:13}}>{p.nombre}{env && <span style={{color:ok,fontSize:11,fontWeight:700,marginLeft:6}}>✓ Enviado</span>}</div>
                   <div style={{color:mu,fontSize:11}}>
                     {p.fijas?"Fijos: "+ars(r.tf):"Solo extras"}
                     {r.desc>0 && " - "+r.desc+"% desc."}
                   </div>
                 </div>
-                <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13}}>{ars(r.total)}</div>
+                <div style={{color:r.total>0?ok:mu,fontWeight:700,fontSize:13,cursor:"pointer"}} onClick={function(){setSel(p.nombre);}}>{ars(r.total)}</div>
               </div>
             );
           })}
@@ -1718,6 +1732,11 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                 {res.desc>0 && <div style={{color:er,fontSize:12}}>Desc {res.desc}%: <b>-{ars(res.montoDesc)}</b></div>}
                 <div style={{color:ok,fontSize:20,fontWeight:700}}>{ars(res.total)}</div>
               </div>
+            </div>
+            <div style={{marginBottom:14}}>
+              <button style={{background:enviadas[ps.nombre]?ob:bg,color:enviadas[ps.nombre]?ok:mu,border:"1.5px solid "+(enviadas[ps.nombre]?"#A7E3C0":"#C9E4EF"),borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){toggleEnviada(ps.nombre);}}>
+                {enviadas[ps.nombre]?"✓ Enviada":"Marcar enviada"}
+              </button>
             </div>
             {ps.fijas && res.df.length>0 && (
               <div style={{marginBottom:16}}>
@@ -2014,6 +2033,11 @@ function HorarioFormInline({data,setData,onSave,onCancel}) {
       <div style={{background:wh,borderRadius:6,padding:"6px 10px",marginBottom:10,fontSize:12,color:mu,border:"1px solid #C9E4EF"}}>
         {pr.ley||pr.des||pr.horas+"hs"} - {ars(pr.sub)}/sem
       </div>
+      <div style={{marginBottom:10}}>
+        <label style={sLbl}>Vigente desde (opcional)</label>
+        <input style={sInp} type="date" value={data.fechaInicio||""} onChange={function(e){setData(function(d){return Object.assign({},d,{fechaInicio:e.target.value||null});});}}/>
+        <div style={{color:mu,fontSize:11,marginTop:3}}>Si este horario reemplaza a uno que cortaste con una fecha, poné desde cuando arranca este para que la facturación lo divida bien. Dejalo vacío si no corresponde.</div>
+      </div>
       <div style={{display:"flex",gap:8}}>
         <button style={Object.assign({},btn(br,wh),{fontSize:13,padding:"7px 14px"})} onClick={onSave}>Guardar</button>
         <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:13,padding:"7px 14px"})} onClick={onCancel}>Cancelar</button>
@@ -2041,9 +2065,11 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
 
   function addH() {
     const c=CONS.find(function(x){return x.id===nh.consultorio;});
-    const h=Object.assign({},nh,{id:"h"+Date.now(),psico:selP,sede:c?c.sede:"VL",diaSemana:Number(nh.diaSemana)});
+    const h=Object.assign({},nh,{id:"h"+Date.now(),psico:selP,sede:c?c.sede:"VL",diaSemana:Number(nh.diaSemana),fechaInicio:nh.fechaInicio||null});
     saveDoc("horarios",h.id,h);
-    setShowAdd(false); notify("Horario fijo agregado");
+    setShowAdd(false);
+    setNh({diaSemana:1,inicio:"09:00",fin:"14:00",consultorio:"C1",sede:"VL",fechaInicio:null});
+    notify("Horario fijo agregado");
   }
   function saveEdit() {
     const c=CONS.find(function(x){return x.id===ef.consultorio;});
