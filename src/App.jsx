@@ -2137,7 +2137,7 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                             <div style={{color:er,fontSize:11,fontWeight:700,marginTop:2}}>⚠ Hay otro horario activo idéntico (mismo día/horario/consultorio) — revisar si es un duplicado</div>
                           )}
                         </div>
-                        <div style={{display:"flex",gap:6}}>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setEid(h.id);setEf(Object.assign({},h));}}>Editar</button>
                           <button style={Object.assign({},btnO(wh,mu,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setSetFinId(function(prev){return prev===h.id?null:h.id;});setFinDate(h.fechaFin||"");}}>
                             {setFinId===h.id ? "✓" : "📅 Hasta"}
