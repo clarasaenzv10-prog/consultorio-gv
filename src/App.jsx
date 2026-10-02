@@ -715,7 +715,7 @@ export default function App() {
               if(ev.tipo==="bloqueado") { delDoc("bloques",ev.id); notify("Eliminado"); }
               else if(ev.tipo==="extra") { delDoc("reservas",ev.id); notify("Hora extra cancelada"); }
               else if(ev.tipo==="fijo") {
-                if(role==="admin") { delDoc("horarios",ev.id); notify("Horario eliminado"); }
+                if(role==="admin") { delDoc("horarios",ev.id); notify("Horario eliminado: "+DIAS[ev.diaSemana]+" "+ev.inicio+"-"+ev.fin+" "+ev.consultorio+" ("+ev.psico+")"); }
                 else {
                   const s={id:Date.now(),psico:user,tipo:"fijo",accion:"eliminar",datos:{},horarioId:ev.id,reservaId:null,estado:"pendiente",fechaSol:new Date().toISOString()};
                   saveDoc("solHor",s.id,s);
@@ -2175,7 +2175,12 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                               <button style={Object.assign({},btnO(wh,mu,"1px solid #C9E4EF"),{fontSize:12,padding:"4px 8px"})} onClick={function(){setSetFinId(null);setFinDate("");}}>X</button>
                             </div>
                           )}
-                          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){delDoc("horarios",h.id);notify("Eliminado");}}>X</button>
+                          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){
+                            var det=DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+" ("+h.psico+")";
+                            if(!window.confirm("Eliminar este horario fijo?\n"+det))return;
+                            delDoc("horarios",h.id);
+                            notify("Horario fijo eliminado: "+det);
+                          }}>X</button>
                         </div>
                       </div>
                     )}
@@ -2213,7 +2218,12 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setSetFinId(function(prev){return prev===h.id?null:h.id;});setFinDate(h.fechaFin||"");}}>
                             {setFinId===h.id ? "✓" : "📅 Editar fecha fin"}
                           </button>
-                          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){if(window.confirm("Eliminar definitivamente este horario terminado?"))delDoc("horarios",h.id);}}>Eliminar</button>
+                          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"5px 10px"})} onClick={function(){
+                            var det=DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+" ("+h.psico+") - terminado desde "+h.fechaFin;
+                            if(!window.confirm("Eliminar definitivamente este horario terminado?\n"+det))return;
+                            delDoc("horarios",h.id);
+                            notify("Horario fijo eliminado: "+det);
+                          }}>Eliminar</button>
                         </div>
                         {reactId===h.id && (
                           <div style={{display:"flex",gap:6,alignItems:"center",marginTop:8}}>
