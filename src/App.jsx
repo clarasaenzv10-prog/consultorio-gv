@@ -1570,13 +1570,20 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
         <div>
           <h3 style={{color:mu,margin:"20px 0 10px"}}>Historial</h3>
           {hist.map(function(s) {
+            var fPedido = s.fechaSol ? new Date(s.fechaSol).toLocaleDateString("es-AR") : "fecha de pedido desconocida";
+            var fResuelto = s.fechaRes ? new Date(s.fechaRes).toLocaleDateString("es-AR") : null;
             return (
-              <div key={s.id} style={Object.assign({},sCard,{opacity:.65})}>
-                <div style={{flex:1}}>
-                  <span style={{color:tx,fontWeight:600}}>{s.psico}</span>
-                  <span style={{color:mu,fontSize:12}}> - {lbl(s)} - {det(s)}</span>
+              <div key={s.id} style={Object.assign({},sCard,{opacity:.65,flexDirection:"column",alignItems:"flex-start",gap:4})}>
+                <div style={{display:"flex",width:"100%",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1}}>
+                    <span style={{color:tx,fontWeight:600}}>{s.psico}</span>
+                    <span style={{color:mu,fontSize:12}}> - {lbl(s)} - {det(s)}</span>
+                  </div>
+                  <span style={bge(s.estado==="aprobada"?ob:eb,s.estado==="aprobada"?ok:er)}>{s.estado==="aprobada"?"OK":"X"}</span>
                 </div>
-                <span style={bge(s.estado==="aprobada"?ob:eb,s.estado==="aprobada"?ok:er)}>{s.estado==="aprobada"?"OK":"X"}</span>
+                <div style={{color:s.fechaSol?mu:er,fontSize:11}}>
+                  Pedido: {fPedido}{fResuelto?" · Resuelto: "+fResuelto:""}
+                </div>
               </div>
             );
           })}
@@ -1725,6 +1732,11 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                           {d.ley && <div style={{color:dk,fontSize:12,fontWeight:600}}>{d.ley}</div>}
                           {d.des && <div style={{color:mu,fontSize:11}}>{d.des}</div>}
                           <div style={{color:mu,fontSize:11}}>x {d.sem} {DIAS[d.diaSemana]}s en {MESES[mes]} = {ars(d.sub)}</div>
+                          {(d.fechaFin||d.fechaInicio) && (
+                            <div style={{color:er,fontSize:11,fontWeight:600,marginTop:2}}>
+                              {d.fechaInicio?"Vigente desde "+d.fechaInicio+" ":""}{d.fechaFin?"Corte desde "+d.fechaFin:""}
+                            </div>
+                          )}
                         </div>
                         <div style={{color:ok,fontWeight:700,fontSize:15,flexShrink:0}}>{ars(d.sub)}</div>
                       </div>
@@ -2121,6 +2133,9 @@ function GestionView({psicos,setPsicos,horarios,setHorarios,reservas,bloques,set
                             var viejo = horarios.find(function(x){return x.id===h.reemplazaA;});
                             return <div style={{color:dk,fontSize:11,marginTop:2}}>← Modificado desde {viejo?(DIAS[viejo.diaSemana]+" "+viejo.inicio+"-"+viejo.fin+" "+viejo.consultorio):"un horario anterior"} (desde {h.fechaInicio})</div>;
                           })()}
+                          {misH.filter(function(x){return x.id!==h.id&&x.diaSemana===h.diaSemana&&x.inicio===h.inicio&&x.fin===h.fin&&x.consultorio===h.consultorio;}).length>0 && (
+                            <div style={{color:er,fontSize:11,fontWeight:700,marginTop:2}}>⚠ Hay otro horario activo idéntico (mismo día/horario/consultorio) — revisar si es un duplicado</div>
+                          )}
                         </div>
                         <div style={{display:"flex",gap:6}}>
                           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"5px 10px"})} onClick={function(){setEid(h.id);setEf(Object.assign({},h));}}>Editar</button>
