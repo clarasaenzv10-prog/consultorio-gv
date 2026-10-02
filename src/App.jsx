@@ -1442,7 +1442,10 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
   const hist = solicitudes.filter(function(s){return s.estado!=="pendiente";}).sort(function(a,b){return (b.fechaRes||b.fechaSol||"").localeCompare(a.fechaRes||a.fechaSol||"");});
 
   function aprobar(s) {
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,[]);}}
+    var msgAprobado = "Aprobado";
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,[]);
+      msgAprobado = "Aprobado: se eliminó el horario de "+s.psico+" - "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+", desde "+fechaD+". Ya impacta en Facturación.";
+    }}
     else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];var hNuevoId="h"+Date.now();saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false,reemplazadoPor:hNuevoId}));var hNuevo=Object.assign({},h,s.datos,{id:hNuevoId,sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true,reemplazaA:s.horarioId});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
         // Announce freed hours
         var textoLibre="A partir del "+hoyM+": ";
@@ -1463,7 +1466,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
     else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
-    notify("Aprobado");
+    notify(msgAprobado);
   }
   function rechazar(id) {
     const s=solicitudes.find(function(x){return x.id===id;});
