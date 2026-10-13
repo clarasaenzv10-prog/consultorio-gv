@@ -297,6 +297,22 @@ function pushPsicos(title, body, excluirNombre) {
   var ex=(excluirNombre||"").trim().toLowerCase();
   sendPush(title, body, tokensDe(function(t){return t.role==="psico"&&(!ex||(t.user||"").trim().toLowerCase()!==ex);}));
 }
+// Avisa a UNA psicologa puntual (por nombre, como esta guardado en fcmTokens.user).
+function pushPsico(nombre, title, body) {
+  var n=(nombre||"").trim().toLowerCase();
+  if(!n) return;
+  sendPush(title, body, tokensDe(function(t){return t.role==="psico"&&(t.user||"").trim().toLowerCase()===n;}));
+}
+// Texto corto de un pedido de cambio de horario (para los avisos de aprobado/rechazado)
+function descSolPush(s, horarios) {
+  var d=s.datos||{};
+  var h=s.horarioId?(horarios||[]).find(function(x){return x.id===s.horarioId;}):null;
+  var base=h?h:d;
+  var que=s.accion==="agregar"?"agregar":s.accion==="modificar"?"modificar":"liberar";
+  var det=base&&base.diaSemana?" "+DIAS[Number(base.diaSemana)]+(base.inicio?" "+base.inicio+"-"+base.fin:""):"";
+  if(s.tipo==="extra"&&d.fecha) det=" hora extra "+d.fecha+(d.inicio?" "+d.inicio+"-"+d.fin:"");
+  return que+det;
+}
 // Numero rojo en el icono de la app (iPhone: solo anda con la app instalada y notificaciones permitidas)
 function setBadge(n) {
   try {
@@ -1456,8 +1472,8 @@ function SolicitudesView({reservas,setReservas,gc,notify}) {
               <div style={{color:mu,fontSize:12}}>{calcHrs(r.inicio,r.fin)}hs - {ars(calcPrecio(r.inicio,r.fin).sub)}</div>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button style={Object.assign({},btn(br,wh),{fontSize:12,padding:"6px 12px"})} onClick={function(){saveDoc("reservas",r.id,Object.assign({},r,{estado:"aprobada"}));notify("Aprobada");}}>OK</button>
-              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"6px 12px"})} onClick={function(){saveDoc("reservas",r.id,Object.assign({},r,{estado:"rechazada"}));notify("Rechazada");}}>X</button>
+              <button style={Object.assign({},btn(br,wh),{fontSize:12,padding:"6px 12px"})} onClick={function(){saveDoc("reservas",r.id,Object.assign({},r,{estado:"aprobada"}));pushPsico(r.solicitante||r.psico,"Hora extra aprobada","Se aprobo tu hora extra: "+r.consultorio+" "+r.fecha+" "+r.inicio+"-"+r.fin);notify("Aprobada");}}>OK</button>
+              <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"6px 12px"})} onClick={function(){saveDoc("reservas",r.id,Object.assign({},r,{estado:"rechazada"}));pushPsico(r.solicitante||r.psico,"Hora extra rechazada","No se pudo aprobar tu hora extra: "+r.consultorio+" "+r.fecha+" "+r.inicio+"-"+r.fin);notify("Rechazada");}}>X</button>
             </div>
           </div>
         );
@@ -1550,11 +1566,12 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
     else if(s.accion==="agregar"&&s.tipo==="extra"){const r=Object.assign({},s.datos,{id:Date.now(),psico:s.psico,estado:"aprobada",solicitante:s.psico,tipo:"extra"});saveDoc("reservas",r.id,r);}
     saveDoc("solHor",s.id,Object.assign({},s,{estado:"aprobada",fechaRes:new Date().toISOString()}));
+    pushPsico(s.psico,"Pedido aprobado","Se aprobo tu pedido de "+descSolPush(s,horarios)+(s.datos&&s.datos.fechaDesde?" (desde "+s.datos.fechaDesde+")":""));
     notify(msgAprobado);
   }
   function rechazar(id) {
     const s=solicitudes.find(function(x){return x.id===id;});
-    if(s)saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));
+    if(s){saveDoc("solHor",id,Object.assign({},s,{estado:"rechazada",nota:notas[id]||"",fechaRes:new Date().toISOString()}));pushPsico(s.psico,"Pedido rechazado","No se aprobo tu pedido de "+descSolPush(s,horarios)+(notas[id]?". Motivo: "+notas[id]:""));}
     notify("Rechazado");
   }
 
