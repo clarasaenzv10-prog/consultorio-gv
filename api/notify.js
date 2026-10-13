@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { title, body, tokens } = req.body;
+  const { title, body, tokens, badge } = req.body || {};
   if (!title || !body || !tokens || !tokens.length) {
     return res.status(400).json({ error: "Faltan datos" });
   }
@@ -61,9 +61,17 @@ export default async function handler(req, res) {
     const accessToken = await getAccessToken();
     const projectId = process.env.FIREBASE_PROJECT_ID;
 
-    // Send to each token (FCM V1 sends one at a time)
+    // Mensaje "data-only": lo muestra el service worker (public/firebase-messaging-sw.js),
+    // que ademas actualiza el numero rojo del icono. Los valores de data deben ser strings.
+    const data = { title: String(title), body: String(body) };
+    const badgeNum = parseInt(badge, 10);
+    if (!isNaN(badgeNum) && badgeNum >= 0) data.badge = String(badgeNum);
+
+    const lista = tokens.slice(0, 20);
+
+    // FCM V1 envia de a un token
     const results = await Promise.all(
-      tokens.slice(0, 20).map(async (token) => {
+      lista.map(async (token) => {
         const r = await fetch(
           `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
           {
@@ -75,18 +83,35 @@ export default async function handler(req, res) {
             body: JSON.stringify({
               message: {
                 token,
-                notification: { title, body },
+                data,
                 android: { priority: "high" },
-                apns: { payload: { aps: { sound: "default" } } },
+                webpush: { headers: { Urgency: "high", TTL: "86400" } },
               },
             }),
           }
         );
-        return r.ok;
+        if (r.ok) return { token, ok: true };
+        let detalle = "";
+        let invalido = false;
+        try {
+          const j = await r.json();
+          detalle = (j.error && j.error.message) || "";
+          const st = j.error && j.error.status;
+          const codigos = ((j.error && j.error.details) || []).map((x) => x.errorCode);
+          invalido = st === "NOT_FOUND" || codigos.includes("UNREGISTERED");
+        } catch (e) {}
+        return { token, ok: false, invalido, detalle };
       })
     );
 
-    return res.status(200).json({ ok: true, sent: results.filter(Boolean).length });
+    return res.status(200).json({
+      ok: true,
+      sent: results.filter((x) => x.ok).length,
+      failed: results.filter((x) => !x.ok).length,
+      // tokens que FCM dice que ya no existen (app desinstalada / ícono reinstalado): la app los borra
+      invalid: results.filter((x) => x.invalido).map((x) => x.token),
+      errors: results.filter((x) => !x.ok && !x.invalido).map((x) => x.detalle).slice(0, 3),
+    });
   } catch (e) {
     console.error("Push error:", e.message);
     return res.status(500).json({ error: e.message });

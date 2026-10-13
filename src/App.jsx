@@ -269,9 +269,43 @@ function ImagePreview({url}) {
     </div>
   );
 }
-async function sendPush(title, body, tokens) {
+// ─── Push notifications (FCM) ─────────────────────────────────
+// FCM_TOKENS y PEND_ADMIN son variables de modulo (no props) a proposito: las usan
+// funciones sueltas fuera de App() y asi nunca quedan "no definidas" en un render.
+var FCM_TOKENS = [];   // docs de la coleccion fcmTokens: {token,user,role}
+var PEND_ADMIN = 0;    // pendientes del admin (reservas + cambios + mensajes sin leer)
+function tokensDe(pred) {
+  var out = [];
+  FCM_TOKENS.forEach(function(t){ if(t&&t.token&&pred(t)&&out.indexOf(t.token)===-1) out.push(t.token); });
+  return out;
+}
+async function sendPush(title, body, tokens, badge) {
   if(!tokens||!tokens.length) return;
-  try { await fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body,tokens})}); } catch(e) {}
+  try {
+    var res = await fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:title,body:body,tokens:tokens,badge:badge})});
+    var j = await res.json();
+    // tokens que FCM ya no reconoce (app desinstalada / icono reinstalado): se borran
+    if(j&&j.invalid&&j.invalid.length) j.invalid.forEach(function(tk){ delDoc("fcmTokens",String(tk).substring(0,100)); });
+  } catch(e) {}
+}
+// Avisa al admin (sus dispositivos). El numero rojo = pendientes actuales + 1 (este nuevo).
+function pushAdmin(title, body) {
+  sendPush(title, body, tokensDe(function(t){return t.role==="admin";}), PEND_ADMIN+1);
+}
+// Avisa a las psicologas (todas, menos la indicada en excluirNombre).
+function pushPsicos(title, body, excluirNombre) {
+  var ex=(excluirNombre||"").trim().toLowerCase();
+  sendPush(title, body, tokensDe(function(t){return t.role==="psico"&&(!ex||(t.user||"").trim().toLowerCase()!==ex);}));
+}
+// Numero rojo en el icono de la app (iPhone: solo anda con la app instalada y notificaciones permitidas)
+function setBadge(n) {
+  try {
+    if(typeof navigator==="undefined") return;
+    var pr = null;
+    if(n>0&&navigator.setAppBadge) pr = navigator.setAppBadge(n);
+    else if(n===0&&navigator.clearAppBadge) pr = navigator.clearAppBadge();
+    if(pr&&pr.catch) pr.catch(function(){});
+  } catch(e) {}
 }
 
 function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
@@ -292,6 +326,7 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
     var id2="msg"+Date.now();
     saveDoc("mensajes",id2,{id:id2,conv:k,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
     saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+    if(role!=="admin") pushAdmin("Mensaje de "+user,texto.trim().substring(0,100));
     setTexto("");
   }
   if(role==="admin"&&!convWith){
@@ -378,6 +413,8 @@ export default function App() {
     fotos:{C1:[],C2:[],C3:[],C4:[],C5:[]}
   });
   const [dbReady,setDbReady] = useState(false);
+  const [notifPerm,setNotifPerm] = useState(typeof Notification!=="undefined"?Notification.permission:"unsupported");
+  const [pushBusy,setPushBusy] = useState(false);
 
   useEffect(function() {
     const HORARIOS_WITH_IDS = HBASE.map(function(h,i){return Object.assign({},h,{id:"h"+i});});
@@ -389,6 +426,7 @@ export default function App() {
     ]).then(function(){ setDbReady(true); });
     const unsubs = [
       listenCol("mensajes", function(d){ setMensajesLocal(d); }),
+      listenCol("fcmTokens", function(d){ FCM_TOKENS = d||[]; }),
       listenCol("psicos", function(d){ setPsicosLocal(d); if(d&&d.length>0) __restoreContactData(d); }),
       listenCol("horarios", function(d){ setHorariosLocal(d); }),
       listenCol("reservas", function(d){ setReservasLocal(d); }),
@@ -516,6 +554,35 @@ export default function App() {
   const pendH = solHor.filter(function(s){return s.estado==="pendiente";});
   const nc = notifCnt();
   const wkD = wkDates(wk);
+  const adminPend = pendR.length + pendH.length + (mensajes||[]).filter(function(m){return m&&m.para==="admin"&&!m.leido;}).length;
+
+  // Numero rojo en el icono: admin = reservas + cambios + mensajes pendientes; psicologa = anuncios sin leer
+  useEffect(function(){
+    PEND_ADMIN = adminPend;
+    if(!role||role==="invitada") return;
+    setBadge(role==="admin"?adminPend:nc);
+  }, [role,adminPend,nc]);
+
+  // Si ya dio permiso, refresca el token del dispositivo al entrar (sin pedir nada de nuevo)
+  useEffect(function(){
+    if(view==="app"&&(role==="admin"||role==="psico")&&user&&typeof Notification!=="undefined"&&Notification.permission==="granted") {
+      requestNotifPermission(user,role);
+    }
+  }, [view,role,user]);
+
+  function activarNotifs() {
+    if(!user||!role||pushBusy) return;
+    setPushBusy(true);
+    requestNotifPermission(user,role).then(function(r){
+      setPushBusy(false);
+      setNotifPerm(typeof Notification!=="undefined"?Notification.permission:"unsupported");
+      var st=r&&r.status;
+      if(st==="granted") notify("Notificaciones activadas");
+      else if(st==="denied") notify("Estan bloqueadas. Activalas en Ajustes > Notificaciones del telefono","err");
+      else if(st==="unsupported") notify("Abri la app desde el icono de la pantalla de inicio para activarlas","err");
+      else if(st==="error") notify("No se pudo activar: "+((r&&r.error)||""),"err");
+    });
+  }
 
   if(!dbReady) return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#EBF6FA,#F0F8FB)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"DM Sans,sans-serif"}}>
@@ -599,6 +666,12 @@ export default function App() {
             </div>
             {role==="psico" && <EditarPerfilBtn user={user} psicos={psicos} setPsicos={setPsicos} notify={notify}/>}
             {role==="psico" && <CambiarPassBtn user={user} setPsicos={setPsicos} notify={notify}/>}
+            {(role==="admin"||role==="psico") && (
+              <button onClick={activarNotifs} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",borderBottom:"1px solid #C9E4EF",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:notifPerm==="granted"?ok:tx,fontSize:15,fontWeight:600}}>
+                <span style={{fontSize:20}}>&#x1F514;</span>
+                <span>{pushBusy?"Activando...":notifPerm==="granted"?"Notificaciones activadas":"Activar notificaciones"}</span>
+              </button>
+            )}
             <button onClick={function(){setView("login");setRole(null);setUser(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"14px 20px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",color:er,fontSize:15,fontWeight:600}}>
               <span style={{fontSize:20}}>&#x23FB;</span>
               <span>Cerrar sesion</span>
@@ -650,6 +723,16 @@ export default function App() {
               <div style={{color:"#B45309",fontSize:12}}>Quedan pocos dias para cerrar {MESES[new Date().getMonth()]}. Acordate de enviar la facturacion.</div>
             </div>
             <button style={{background:"#F59E0B",color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setTab("facturacion");}}>Ver</button>
+          </div>
+        )}
+        {(role==="admin"||role==="psico") && notifPerm!=="granted" && (
+          <div style={{background:"linear-gradient(135deg,#EBF6FA,#F0F8FB)",borderBottom:"1px solid #C9E4EF",padding:"10px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+            <span style={{fontSize:18}}>&#x1F514;</span>
+            <div style={{flex:1}}>
+              <div style={{color:tx,fontWeight:700,fontSize:13}}>Activa las notificaciones</div>
+              <div style={{color:mu,fontSize:12}}>{notifPerm==="unsupported"?"Abri la app desde el icono de la pantalla de inicio para poder activarlas.":notifPerm==="denied"?"Estan bloqueadas: activalas en Ajustes > Notificaciones del telefono.":(role==="admin"?"Para que te avisemos cuando te pidan un horario, aunque la app este cerrada.":"Para enterarte de los anuncios aunque la app este cerrada.")}</div>
+            </div>
+            {notifPerm==="default" && <button style={{background:br,color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={activarNotifs}>{pushBusy?"...":"Activar"}</button>}
           </div>
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
@@ -707,7 +790,7 @@ export default function App() {
       )}
       {mod && mod.type==="slot" && (
           <SlotModal key={mod.slot.date+(mod.slot.preCons||"")+(mod.slot.evento?mod.slot.evento.id:"")} slot={mod.slot} role={role} user={user} psicos={psicos} horarios={horarios} reservas={reservas}
-            onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
+            onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:role==="admin"?"aprobada":"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);if(role!=="admin")pushAdmin("Nueva solicitud de hora extra",user+" pidio "+(d.consultorio||"")+" "+(d.fecha||"")+" "+(d.inicio||"")+"-"+(d.fin||""));notify(role==="admin"?"Hora extra creada":"Solicitud enviada");setMod(null);}}
             onBloquear={function(d){const b=Object.assign({id:Date.now()},d);saveDoc("bloques",b.id,b);notify("Bloqueado");setMod(null);}}
             onAgregarFijo={function(d){const h=Object.assign({id:"h"+Date.now()},d);saveDoc("horarios",h.id,h);notify("Horario fijo agregado");setMod(null);}}
             onSelectAlternativo={function(d){setMod({type:"slot",slot:{date:d.date,hour:d.hour,preIni:d.ini,preFin:d.fin,preCons:d.cons,confirmedFree:true}});}}
@@ -719,6 +802,7 @@ export default function App() {
                 else {
                   const s={id:Date.now(),psico:user,tipo:"fijo",accion:"eliminar",datos:{},horarioId:ev.id,reservaId:null,estado:"pendiente",fechaSol:new Date().toISOString()};
                   saveDoc("solHor",s.id,s);
+                  pushAdmin("Pedido de cambio de horario",user+" pidio liberar "+DIAS[ev.diaSemana]+" "+ev.inicio+"-"+ev.fin+" ("+ev.consultorio+")");
                   notify("Solicitud enviada - pendiente de aprobacion");
                 }
               }
@@ -727,7 +811,7 @@ export default function App() {
             onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
-          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
+          <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});pushAdmin("Nueva solicitud de hora extra",user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
         )}
       </div>
     </AppRoot>
@@ -1305,7 +1389,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
     if(!txt.trim()) return;
     var imgList=imgs.map(function(u){return u.trim();}).filter(Boolean);const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
-    // Save pending notification to Firestore for cloud function to send
+    pushPsicos("Anuncio - Consultorio GV",a.texto.substring(0,120),null);
         setTxt(""); notify("Anuncio publicado");
   }
   function sWA(p,t) {
@@ -1443,7 +1527,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 
   function aprobar(s) {
     var msgAprobado = "Aprobado";
-    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);sendPush("Horario disponible",an.texto,[]);
+    if(s.accion==="eliminar"&&s.tipo==="fijo"){const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var fechaD=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:fechaD,activo:false}));var sedeNomE=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");const an={id:Date.now(),texto:"A partir del "+fechaD+": "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" en "+h.consultorio+(sedeNomE?" ("+sedeNomE+")":"")+". Horario disponible para reservar.",fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};saveDoc("anuncios",an.id,an);pushPsicos("Horario disponible",an.texto,s.psico);
       msgAprobado = "Aprobado: se eliminó el horario de "+s.psico+" - "+DIAS[h.diaSemana]+" "+h.inicio+"-"+h.fin+" "+h.consultorio+", desde "+fechaD+". Ya impacta en Facturación.";
     }}
     else if(s.accion==="modificar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=horarios.find(function(x){return x.id===s.horarioId;});if(h){var hoyM=(s.datos&&s.datos.fechaDesde)||new Date().toISOString().split("T")[0];var hNuevoId="h"+Date.now();saveDoc("horarios",s.horarioId,Object.assign({},h,{fechaFin:hoyM,activo:false,reemplazadoPor:hNuevoId}));var hNuevo=Object.assign({},h,s.datos,{id:hNuevoId,sede:c?c.sede:h.sede,diaSemana:Number(s.datos.diaSemana),fechaInicio:hoyM,activo:true,reemplazaA:s.horarioId});delete hNuevo.fechaFin;saveDoc("horarios",hNuevo.id,hNuevo);
@@ -1460,7 +1544,7 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
         }
         var sedeNomM=h.sede==="VL"?"Vicente Lopez":h.sede==="UY"?"Uruguay":(h.sede||"");if(sedeNomM) textoLibre=textoLibre.replace(" disponible"," ("+sedeNomM+") disponible");const anMod={id:Date.now()+1,texto:textoLibre,fecha:new Date().toISOString(),autor:"Sistema",para:"todas",excluir:s.psico,leidos:[]};
         saveDoc("anuncios",anMod.id,anMod);
-        sendPush("Horario disponible",anMod.texto,[]);
+        pushPsicos("Horario disponible",anMod.texto,s.psico);
         }}
     else if(s.accion==="agregar"&&s.tipo==="fijo"){const c=CONS.find(function(x){return x.id===s.datos.consultorio;});const h=Object.assign({},s.datos,{id:"h"+Date.now(),psico:s.psico,sede:c?c.sede:"VL",diaSemana:Number(s.datos.diaSemana)});saveDoc("horarios",h.id,h);}
     else if(s.accion==="eliminar"&&s.tipo==="extra")delDoc("reservas",s.reservaId);
@@ -2349,12 +2433,14 @@ function MisHorariosView({user,horarios,reservas,solicitudes,setSolicitudes,noti
     // Notify admin via Firebase
     const diaStr=datos&&datos.diaSemana?DIAS[datos.diaSemana]:"";
     const horStr=datos&&datos.inicio?datos.inicio+"-"+datos.fin:"";
+    const txtAviso=user+" solicito "+(accion==="agregar"?"agregar":accion==="modificar"?"modificar":"liberar")+" horario"+(diaStr?" "+diaStr:"")+(horStr?" "+horStr:"");
     saveDoc("adminNotifs","n"+Date.now(),{
       tipo:"solicitud_horario",
-      texto:user+" solicito "+(accion==="agregar"?"agregar":accion==="modificar"?"modificar":"liberar")+" horario"+(diaStr?" "+diaStr:"")+(horStr?" "+horStr:""),
+      texto:txtAviso,
       fecha:new Date().toISOString(),
       leido:false
     });
+    pushAdmin("Pedido de horario",txtAviso);
     notify("Solicitud enviada"); setMH(null);
   }
 
@@ -2755,6 +2841,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
     if(totalHoras<minHoras){notify("Minimo "+minHoras+"hs semanales en total","err");return;}
     const s={id:Date.now(),tipo:"invitada",nombre:nombre,tel:tel,email:email,slots:slots,totalHoras:totalHoras,costoSemanal:calcCostoSemanal(),estado:"pendiente",fechaSol:new Date().toISOString()};
     saveDoc("solHor",s.id,s);
+    pushAdmin("Solicitud de invitada",nombre+" pidio "+slots.length+" horario(s), "+totalHoras+" hs semanales");
     notify("Solicitud enviada!");
     setEnviado(true);
   }

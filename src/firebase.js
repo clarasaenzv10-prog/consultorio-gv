@@ -35,25 +35,31 @@ export async function seedIfEmpty(col, items) {
   await batch.commit();
 }
 
-export async function requestNotifPermission(userName) {
+// Pide permiso (si falta), registra el service worker de FCM y guarda el token del
+// dispositivo en Firestore (fcmTokens) con el usuario y su rol.
+// IMPORTANTE: en iPhone hay que llamarla desde un toque del usuario (boton) y la app
+// tiene que estar abierta desde el icono de la pantalla de inicio.
+// Devuelve { status: "granted"|"denied"|"default"|"unsupported"|"error", token?, error? }
+export async function requestNotifPermission(userName, role) {
   try {
-    if (typeof Notification === "undefined") return null;
-    const perm = await Notification.requestPermission();
-    if (perm !== "granted") return null;
+    if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) return { status: "unsupported" };
+    let perm = Notification.permission;
+    if (perm === "default") perm = await Notification.requestPermission();
+    if (perm !== "granted") return { status: perm };
+    await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const reg = await navigator.serviceWorker.ready;
     const { getMessaging, getToken } = await import("firebase/messaging");
     const messaging = getMessaging(app);
-    const reg = await navigator.serviceWorker.ready;
     const token = await getToken(messaging, {
       vapidKey: "BEOUqU1iowa8d-fZZkmIn44GmXyp6e4EMAfflzia-w_RqQw-E_QJJDdWHjRliXmWDktJb9PvPLHbqT27kNX2SMc",
       serviceWorkerRegistration: reg
     });
-    if (token && userName) {
-      await setDoc(doc(db, "fcmTokens", token.substring(0, 100)), { token, user: userName, ts: new Date().toISOString() }, { merge: true });
-    }
-    return token;
-  } catch(e) {
+    if (!token) return { status: "error", error: "FCM no devolvio token" };
+    await setDoc(doc(db, "fcmTokens", token.substring(0, 100)), { token: token, user: userName || "", role: role || "", ts: new Date().toISOString() }, { merge: true });
+    return { status: "granted", token: token };
+  } catch (e) {
     console.log("FCM error:", e);
-    return null;
+    return { status: "error", error: String((e && e.message) || e) };
   }
 }
 
