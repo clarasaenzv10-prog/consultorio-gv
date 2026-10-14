@@ -766,7 +766,7 @@ export default function App() {
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
           {tab==="consultorios" && <ConsultoriosView config={config} horarios={horarios}/>}
-          {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor}/>}
+          {tab==="solicitar" && role==="invitada" && <SolicitudInvitadaView horarios={horarios} reservas={reservas} config={config} notify={notify} setSolHor={setSolHor} P={getP(new Date().toISOString().split("T")[0])}/>}
           {tab==="misreservas" && role==="psico" && <MisReservasView reservas={reservas.filter(function(r){return r.psico===user||r.solicitante===user;})} onNew={function(){setMod({type:"nueva"});}}/>}
           {tab==="mishorarios" && role==="psico" && <MisHorariosView user={user} horarios={horarios} reservas={reservas} solicitudes={solHor} setSolicitudes={setSolHor} notify={notify}/>}
         </main>
@@ -2922,7 +2922,7 @@ function ConsultoriosView({config,horarios}) {
 }
 
 // ─── Solicitud Invitada ────────────────────────────────────────
-function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
+function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor,P}) {
   const [nombre,setNombre] = useState("");
   const [tel,setTel] = useState("");
   const [email,setEmail] = useState("");
@@ -2966,7 +2966,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
   function removeSlot(i){setSlots(function(p){return p.filter(function(_,idx){return idx!==i;});});}
 
   function calcCostoSemanal() {
-    return slots.reduce(function(acc,s){return acc+calcPrecio(s.ini,s.fin).sub;},0);
+    return slots.reduce(function(acc,s){return acc+calcPrecio(s.ini,s.fin,P).sub;},0);
   }
 
   function enviar() {
@@ -3013,7 +3013,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
             <div key={i} style={{background:ob,border:"1px solid #A7E3C0",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1}}>
                 <div style={{color:tx,fontWeight:700,fontSize:13}}>{DIAS[s.dia]} - {s.cons} {CONS.find(function(c){return c.id===s.cons;})?("("+(CONS.find(function(c){return c.id===s.cons;}).sede==="VL"?"Vic. Lopez":"Uruguay")+")"):"" }</div>
-                <div style={{color:mu,fontSize:12}}>{s.ini}-{s.fin} - {Math.max((toMin(s.fin)-toMin(s.ini))/60,0).toFixed(1)}hs - {ars(calcPrecio(s.ini,s.fin).sub)}/sem</div>
+                <div style={{color:mu,fontSize:12}}>{s.ini}-{s.fin} - {Math.max((toMin(s.fin)-toMin(s.ini))/60,0).toFixed(1)}hs - {ars(calcPrecio(s.ini,s.fin,P).sub)}/sem</div>
               </div>
               <button style={{background:"transparent",border:"none",color:er,fontSize:18,cursor:"pointer",padding:"0 4px",fontFamily:"inherit"}} onClick={function(){removeSlot(i);}}>X</button>
             </div>
@@ -3058,7 +3058,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor}) {
             </div>
           )}
           {!addConflicto && toMin(addFin)>toMin(addIni) && (
-            <div style={{color:ok,fontSize:12,marginBottom:8}}>Disponible - {ars(calcPrecio(addIni,addFin).sub)}/sem</div>
+            <div style={{color:ok,fontSize:12,marginBottom:8}}>Disponible - {ars(calcPrecio(addIni,addFin,P).sub)}/sem</div>
           )}
           <button style={Object.assign({},btnO(wh,br,"1.5px solid #4BA3C3"),{width:"100%",padding:"8px",fontSize:13})} onClick={addSlot}>
             + Agregar este dia
