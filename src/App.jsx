@@ -616,6 +616,7 @@ export default function App() {
   const nav = role==="invitada" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
+    {id:"precios",icon:"💵",label:"Precios",badge:0},
     {id:"solicitar",icon:"✉",label:"Solicitar",badge:0},
   ] : role==="admin" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
@@ -760,6 +761,7 @@ export default function App() {
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
+          {tab==="precios" && role==="invitada" && <PreciosInvitadaView tabP={tabP}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} bloques={bloques} setBloques={setBloques} notify={notify}/>}
           {tab==="estadisticas" && role==="admin" && <EstadisticasView psicos={psicos} horarios={horarios} reservas={reservas} calcFact={calcFact}/>}
           {tab==="configuracion" && role==="admin" && <ConfigView config={config} setConfig={setConfig} notify={notify}/>}
@@ -1398,15 +1400,74 @@ function PerfilesView({psicos,setPsicos,gc,role,notify,perfilSel,setPerfilSel,ho
   );
 }
 
+// Adjuntos de anuncios: se guardan dentro del propio doc de Firestore (limite 1 MB por doc).
+// Fotos: se achican a max 1000px y JPEG 0.7. PDFs: se guardan tal cual si pesan poco.
+var ADJ_MAX_TOTAL = 900000;  // caracteres base64 maximos entre todos los adjuntos de un anuncio
+var ADJ_MAX_PDF = 650000;    // bytes maximos de un PDF
+function leerAdjunto(file, cb, onErr) {
+  if(!file) return;
+  var esImg = /^image\//.test(file.type||"");
+  var esPdf = file.type==="application/pdf" || /\.pdf$/i.test(file.name||"");
+  if(!esImg && !esPdf){ onErr("Solo se pueden subir fotos o PDF"); return; }
+  if(esPdf && file.size>ADJ_MAX_PDF){ onErr("El PDF pesa demasiado (maximo ~650 KB). Comprimilo o subilo como foto."); return; }
+  var fr = new FileReader();
+  fr.onerror = function(){ onErr("No se pudo leer el archivo"); };
+  fr.onload = function() {
+    if(esPdf){ cb({tipo:"pdf",nombre:file.name||"documento.pdf",data:fr.result}); return; }
+    var im = new Image();
+    im.onerror = function(){ onErr("No se pudo abrir la imagen"); };
+    im.onload = function() {
+      var mx = 1000, w = im.width, h = im.height;
+      if(w>mx||h>mx){ var k = mx/Math.max(w,h); w = Math.round(w*k); h = Math.round(h*k); }
+      var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(im,0,0,w,h);
+      cb({tipo:"img",nombre:file.name||"foto.jpg",data:cv.toDataURL("image/jpeg",0.7)});
+    };
+    im.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+function abrirDoc(d) {
+  try {
+    var parts = String(d.data).split(",");
+    var bin = atob(parts[1]||"");
+    var arr = new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([arr],{type:"application/pdf"}));
+    openLink(url);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  } catch(e) { openLink(d.data); }
+}
+
 function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
-  const [imgs,setImgs] = useState(["","",""]);
+  const [adj,setAdj] = useState([]);   // adjuntos nuevos: [{tipo,nombre,data}]
   const [txt,setTxt] = useState("");
+  const [subiendo,setSubiendo] = useState(false);
+  function adjTotal(lista){ return lista.reduce(function(s,x){return s+(x.data||"").length;},0); }
+  function onFiles(e) {
+    var files = Array.prototype.slice.call(e.target.files||[]);
+    e.target.value = "";
+    if(!files.length) return;
+    if(adj.length+files.length>3){ notify("Maximo 3 adjuntos por anuncio","err"); return; }
+    setSubiendo(true);
+    var pend = files.length;
+    files.forEach(function(f){
+      leerAdjunto(f, function(x){
+        setAdj(function(prev){
+          if(adjTotal(prev)+(x.data||"").length>ADJ_MAX_TOTAL){ notify("Los adjuntos pesan demasiado en total. Saca alguno.","err"); return prev; }
+          return prev.concat([x]);
+        });
+        pend--; if(pend<=0) setSubiendo(false);
+      }, function(msg){ notify(msg,"err"); pend--; if(pend<=0) setSubiendo(false); });
+    });
+  }
   function pub() {
-    if(!txt.trim()) return;
-    var imgList=imgs.map(function(u){return u.trim();}).filter(Boolean);const a={id:Date.now(),texto:txt.trim(),fotos:imgList,fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
+    if(!txt.trim() && !adj.length) return;
+    if(subiendo) { notify("Espera que termine de cargar el archivo","err"); return; }
+    const a={id:Date.now(),texto:txt.trim(),fotos:adj.filter(function(x){return x.tipo==="img";}).map(function(x){return x.data;}),docs:adj.filter(function(x){return x.tipo==="pdf";}).map(function(x){return {nombre:x.nombre,data:x.data};}),fecha:new Date().toISOString(),autor:user,para:"todas",excluir:null,leidos:[user]};
     saveDoc("anuncios",a.id,a);
-    pushPsicos("Anuncio - Consultorio GV",a.texto.substring(0,120),null);
-        setTxt(""); notify("Anuncio publicado");
+    pushPsicos("Anuncio - Consultorio GV",(a.texto||"Nuevo adjunto").substring(0,120),null);
+    setTxt(""); setAdj([]); notify("Anuncio publicado");
   }
   function sWA(p,t) {
     if(!p.wa){notify("Sin WA: "+p.nombre,"err");return;}
@@ -1420,6 +1481,27 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
         <div style={Object.assign({},sPanel,{marginBottom:20})}>
           <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:12}}>Nuevo anuncio</div>
           <textarea style={Object.assign({},sInp,{minHeight:80,resize:"vertical"})} value={txt} onChange={function(e){setTxt(e.target.value);}} placeholder="Ej: Se corto la luz en Uruguay, vuelve en 2 horas..."/>
+          <div style={{marginTop:12}}>
+            <label style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{display:"inline-block",fontSize:13,padding:"8px 14px",cursor:"pointer"})}>
+              {subiendo?"Cargando...":"📎 Adjuntar foto o PDF"}
+              <input type="file" accept="image/*,application/pdf" multiple style={{display:"none"}} onChange={onFiles}/>
+            </label>
+            <span style={{color:mu,fontSize:11,marginLeft:8}}>Hasta 3 archivos (PDF max ~650 KB)</span>
+            {adj.length>0 && (
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                {adj.map(function(x,i){
+                  return (
+                    <div key={i} style={{position:"relative",border:"1.5px solid #C9E4EF",borderRadius:10,padding:6,background:lt,maxWidth:140}}>
+                      {x.tipo==="img"
+                        ? <img src={x.data} style={{width:"100%",maxHeight:80,objectFit:"cover",borderRadius:6,display:"block"}}/>
+                        : <div style={{color:tx,fontSize:12,padding:"8px 4px",wordBreak:"break-all"}}>📄 {x.nombre}</div>}
+                      <button style={{position:"absolute",top:-8,right:-8,width:22,height:22,borderRadius:"50%",border:"none",background:er,color:wh,fontSize:12,cursor:"pointer",lineHeight:"22px",padding:0}} onClick={function(){setAdj(function(p){return p.filter(function(_,j){return j!==i;});});}}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div style={{display:"flex",gap:10,marginTop:12,flexWrap:"wrap"}}>
             <button style={btn(br,wh)} onClick={pub}>Publicar en app</button>
             <button style={{background:"#25D366",color:wh,border:"none",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){if(txt.trim())psicos.filter(function(p){return p.wa;}).forEach(function(p,i){setTimeout(function(){sWA(p,txt);},i*700);});}}>WA a todas</button>
@@ -1443,7 +1525,8 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
               </div>
             </div>
             <div style={{color:tx,fontSize:14,lineHeight:1.6}}>{a.texto}
-              {(a.fotos||[]).filter(Boolean).map(function(url,fi){return <div key={fi} style={{marginTop:6}}><img src={url} style={{maxWidth:"100%",borderRadius:8,maxHeight:180,objectFit:"contain"}} onError={function(e){e.target.style.display="none";}}/></div>;})}
+              {(a.fotos||[]).filter(Boolean).map(function(url,fi){return <div key={fi} style={{marginTop:6}}><img src={/^data:/.test(url)?url:gdUrl(url)} style={{maxWidth:"100%",borderRadius:8,maxHeight:260,objectFit:"contain"}} onError={function(e){e.target.style.display="none";}}/></div>;})}
+              {(a.docs||[]).filter(function(d){return d&&d.data;}).map(function(d,di){return <div key={"d"+di} style={{marginTop:6}}><button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"6px 12px",textAlign:"left"})} onClick={function(){abrirDoc(d);}}>📄 {d.nombre||"Documento"}</button></div>;})}
 </div>
           </div>
         );
@@ -2016,6 +2099,40 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Precios (vista solo lectura para invitadas) ──────────────
+function PreciosInvitadaView({tabP}) {
+  const hoy = new Date().toISOString().split("T")[0];
+  const lista = (tabP||[]).filter(function(t){return t&&t.vigencia&&t.p;});
+  const act = lista.filter(function(t){return t.vigencia<=hoy;}).sort(function(a,b){return b.vigencia.localeCompare(a.vigencia);})[0];
+  const P = act ? act.p : PD;
+  const FILAS = [
+    {t:"Horas sueltas",items:[{k:"man",l:"Manana (8-14hs)",u:"/hs"},{k:"tar",l:"Tarde (14-18hs)",u:"/hs"},{k:"noc",l:"Noche (18-21hs)",u:"/hs"}]},
+    {t:"Modulos",items:[{k:"m1",l:"Modulo 1 Manana (8-14hs)",u:""},{k:"m2",l:"Modulo 2 Tarde (14-18hs)",u:""},{k:"m3",l:"Modulo 3 Noche (18-21hs)",u:""},{k:"dia",l:"Por dia (8-21hs)",u:""}]},
+    {t:"Sabados",items:[{k:"sM",l:"Sabado manana",u:""},{k:"sT",l:"Sabado tarde",u:""}]}
+  ];
+  return (
+    <div>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:4}}>Precios</h2>
+      <div style={{color:mu,fontSize:12,marginBottom:16}}>{act?("Vigentes desde "+new Date(act.vigencia+"T12:00:00").toLocaleDateString("es-AR")):"Valores de referencia"}</div>
+      {FILAS.map(function(g){
+        return (
+          <div key={g.t} style={Object.assign({},sPanel,{marginBottom:14})}>
+            <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:6}}>{g.t}</div>
+            {g.items.map(function(c){
+              return (
+                <div key={c.k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #C9E4EF"}}>
+                  <div style={{color:tx,fontSize:13}}>{c.l}</div>
+                  <div style={{color:ok,fontWeight:700,fontSize:15}}>{ars(P[c.k]||0)}{c.u}</div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }
