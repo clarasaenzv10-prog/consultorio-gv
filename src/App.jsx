@@ -123,8 +123,11 @@ function toMin(t) { const [h,m] = t.split(":").map(Number); return h*60+m; }
 function calcHrs(a,b) { return (toMin(b)-toMin(a))/60; }
 function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",minimumFractionDigits:0}).format(n); }
 
+// PD_VIG: tabla de precios vigente HOY. La setea App() en cada render desde tabP (variable de modulo,
+// mismo patron que FCM_TOKENS). Todo calcPrecio sin 3er argumento usa esta tabla; PD queda solo de respaldo.
+var PD_VIG = null;
 function calcPrecio(ini,fin,P) {
-  const p = P || PD;
+  const p = P || PD_VIG || PD;
   const s = toMin(ini), e = toMin(fin);
   const M1s=480,M1e=840,M2s=840,M2e=1080,M3s=1080,M3e=1260;
   // Module is "used" only when the schedule FULLY covers it
@@ -488,6 +491,7 @@ export default function App() {
     return act ? act.p : PD;
   }
   function getPM(mes,anio) { return getP(anio+"-"+String(mes+1).padStart(2,"0")+"-01"); }
+  PD_VIG = getP(new Date().toISOString().split("T")[0]);
 
   function calcFact(psico,mes,anio) {
     const pr = getPM(mes,anio);
