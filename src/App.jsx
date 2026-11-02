@@ -1785,6 +1785,37 @@ function CambiosView({solicitudes,setSolicitudes,horarios,setHorarios,reservas,s
 }
 
 // ─── Facturacion ──────────────────────────────────────────────
+// ─── Excel para el contador (xlsx real, resumen por profesional) ─────────────
+async function descargarExcelContador(psicos,calcFact,mes,anio,notify) {
+  try {
+    var XLSX = await import("xlsx");
+    var filas = [];
+    (psicos||[]).forEach(function(p){
+      if(!p||!p.nombre) return;
+      var r = calcFact(p,mes,anio);
+      var total = Number(r&&r.total)||0;
+      if(total>0) filas.push({cuit:p.cuit||"",nombre:p.nombre,total:total});
+    });
+    if(!filas.length){ notify("No hay facturacion en "+MESES[mes]+" "+anio,"err"); return; }
+    var aoa = [["CUIT","Profesional","Monto a pagar"]];
+    filas.forEach(function(f){ aoa.push([f.cuit,f.nombre,f.total]); });
+    var suma = filas.reduce(function(a,f){return a+f.total;},0);
+    aoa.push(["","TOTAL",suma]);
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    for(var i=1;i<aoa.length;i++){
+      var c = ws["C"+(i+1)];
+      if(c){ c.t="n"; c.z='"$" #,##0'; }
+    }
+    ws["!cols"] = [{wch:16},{wch:34},{wch:18}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,(MESES[mes]+" "+anio).substring(0,31));
+    XLSX.writeFile(wb,"Facturacion_"+MESES[mes]+"_"+anio+".xlsx");
+    notify("Excel descargado: "+filas.length+" profesionales");
+  } catch(e) {
+    notify("No se pudo generar el Excel","err");
+  }
+}
+
 function FactView({psicos,calcFact,genMsg,notify}) {
   // Historial: last 6 months data for selected psico
   const now = new Date();
@@ -1885,6 +1916,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
           <select style={Object.assign({},sInp,{width:"auto"})} value={mes} onChange={function(e){setMes(Number(e.target.value));}}>{MESES.map(function(m,i){return <option key={i} value={i}>{m}</option>;})}</select>
           <select style={Object.assign({},sInp,{width:"auto"})} value={anio} onChange={function(e){setAnio(Number(e.target.value));}}>{[2025,2026,2027].map(function(y){return <option key={y}>{y}</option>;})}</select>
           <button style={{background:"#25D366",color:wh,border:"none",borderRadius:10,padding:"9px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={sAllWA}>WA a todas</button>
+          <button style={{background:ok,color:wh,border:"none",borderRadius:10,padding:"9px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){descargarExcelContador(psicos,calcFact,mes,anio,notify);}}>Excel contador</button>
         </div>
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         <div style={sPanel}>
