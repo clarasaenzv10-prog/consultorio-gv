@@ -122,6 +122,10 @@ function parseLocalDate(str) {
 function toMin(t) { const [h,m] = t.split(":").map(Number); return h*60+m; }
 function calcHrs(a,b) { return (toMin(b)-toMin(a))/60; }
 function ars(n) { return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",minimumFractionDigits:0}).format(n); }
+// "2026-11-12" -> "12/11"
+function fechaCorta(s) { const p=String(s||"").split("-"); return p.length===3?(p[2]+"/"+p[1]):String(s||""); }
+// "12/11" , "12/11 y 13/11" , "12/11, 13/11 y 14/11"
+function unirFechas(arr) { const a=(arr||[]).map(fechaCorta); if(a.length<=1) return a.join(""); return a.slice(0,-1).join(", ")+" y "+a[a.length-1]; }
 
 // PD_VIG: tabla de precios vigente HOY. La setea App() en cada render desde tabP (variable de modulo,
 // mismo patron que FCM_TOKENS). Todo calcPrecio sin 3er argumento usa esta tabla; PD queda solo de respaldo.
@@ -423,6 +427,7 @@ export default function App() {
   const [anuncios,setAnunciosLocal] = useState([]);
   const [mensajes,setMensajesLocal] = useState([]);
   const [solHor,setSolHorLocal] = useState([]);
+  const [descSes,setDescSesLocal] = useState([]); // descuentos por sesiones no atendidas (ej: corte de luz)
   const [tabP,setTabPLocal] = useState([{id:"tp1",label:"Tabla mar-26",vigencia:"2026-03-01",p:Object.assign({},PD)}]);
   const [adminNotifs,setAdminNotifsLocal] = useState([]);
   const [config,setConfigLocal] = useState({
@@ -452,6 +457,7 @@ export default function App() {
       listenCol("bloques", function(d){ setBloquesLocal(d); }),
       listenCol("anuncios", function(d){ setAnunciosLocal(d.sort(function(a,b){return b.fecha.localeCompare(a.fecha);})); }),
       listenCol("solHor", function(d){ setSolHorLocal(d); }),
+      listenCol("descSesiones", function(d){ setDescSesLocal(d||[]); }),
       listenCol("tabP", function(d){ setTabPLocal(d.sort(function(a,b){return a.vigencia.localeCompare(b.vigencia);})); }),
       listenCol("adminNotifs", function(d){
         setAdminNotifsLocal(d.filter(function(n){return !n.leido;}).sort(function(a,b){return b.fecha.localeCompare(a.fecha);}));
@@ -509,6 +515,7 @@ export default function App() {
       return true;
     });
     let tf=0; const df=[];
+    const sesFijas=[]; // una entrada por cada dia efectivamente facturado de un horario fijo (para descuentos por sesion)
     fp.forEach(function(h) {
       var allDates = mesFechas(mes,anio,Number(h.diaSemana));
       var filteredDates = allDates.filter(function(d){
@@ -521,6 +528,7 @@ export default function App() {
       const p = calcPrecio(h.inicio,h.fin,pr);
       tf += p.sub*sem;
       df.push({diaSemana:Number(h.diaSemana),cons:h.consultorio,ini:h.inicio,fin:h.fin,horas:calcHrs(h.inicio,h.fin),sem:sem,subSem:p.sub,sub:p.sub*sem,ley:p.ley,tipo:p.tipo,des:p.des,fechaFin:h.fechaFin||null,fechaInicio:h.fechaInicio||null});
+      filteredDates.forEach(function(fd){ sesFijas.push({fecha:fd,cons:h.consultorio,ini:h.inicio,fin:h.fin,sub:p.sub}); });
     });
     df.sort(function(a,b){return a.diaSemana-b.diaSemana||a.ini.localeCompare(b.ini);});
     const ep = reservas.filter(function(r){
@@ -542,8 +550,30 @@ export default function App() {
     });
     let te=0; const de=[];
     ep.forEach(function(r){const p=calcPrecio(r.inicio,r.fin,getP(r.fecha));te+=p.sub;de.push({fecha:r.fecha,cons:r.consultorio,ini:r.inicio,fin:r.fin,horas:calcHrs(r.inicio,r.fin),sub:p.sub,ley:p.ley,tipo:p.tipo,des:p.des});});
-    const bruto=tf+te, desc=psico.descuento||0, montoDesc=Math.round(bruto*desc/100);
-    return {total:bruto-montoDesc,tf:tf,te:te,df:df,de:de,bruto:bruto,desc:desc,montoDesc:montoDesc};
+    const bruto=tf+te;
+    // Descuentos por sesiones no atendidas (ej: corte de luz): por cada fecha cargada del mes se descuenta
+    // el valor de los horarios fijos facturados ese dia + las horas extra aprobadas ese dia.
+    // Una misma fecha se descuenta una sola vez aunque este cargada en dos descuentos.
+    const dsEv=[]; let dsMonto=0; const dsUsadas={};
+    (descSes||[]).forEach(function(ev){
+      if(!ev||!ev.psico||!matchHorario(psico.nombre,ev.psico)) return;
+      const enMes=(ev.fechas||[]).filter(function(f){
+        return !dsUsadas[f] && parseLocalDate(f).getMonth()===mes && parseLocalDate(f).getFullYear()===anio;
+      }).sort();
+      if(!enMes.length) return;
+      const items=[]; let monto=0;
+      enMes.forEach(function(f){
+        dsUsadas[f]=true;
+        sesFijas.forEach(function(s){ if(s.fecha===f){ items.push({tipo:"fijo",fecha:f,cons:s.cons,ini:s.ini,fin:s.fin,sub:s.sub}); monto+=s.sub; } });
+        de.forEach(function(x){ if(x.fecha===f){ items.push({tipo:"extra",fecha:f,cons:x.cons,ini:x.ini,fin:x.fin,sub:x.sub}); monto+=x.sub; } });
+      });
+      const fechasDesc=[]; items.forEach(function(it){ if(fechasDesc.indexOf(it.fecha)<0) fechasDesc.push(it.fecha); });
+      dsEv.push({id:ev.id,motivo:ev.motivo||"",fechas:enMes,fechasDesc:fechasDesc.sort(),items:items,monto:monto});
+      dsMonto+=monto;
+    });
+    // El % de descuento de la profesional se aplica sobre lo que realmente se factura (sin las sesiones descontadas)
+    const base=bruto-dsMonto, desc=psico.descuento||0, montoDesc=Math.round(base*desc/100);
+    return {total:base-montoDesc,tf:tf,te:te,df:df,de:de,bruto:bruto,desc:desc,montoDesc:montoDesc,dsMonto:dsMonto,dsEv:dsEv};
   }
 
   function genMsg(psico,mes,anio) {
@@ -553,7 +583,9 @@ export default function App() {
     if(r.de.length) { m+="ADICIONALES\n"; r.de.forEach(function(d){m+="- "+parseLocalDate(d.fecha).toLocaleDateString("es-AR")+" "+d.cons+" "+d.ini+"-"+d.fin+"\n  "+(d.ley||d.des||d.horas+"hs")+" = "+ars(d.sub)+"\n";}); m+="Subtotal: "+ars(r.te)+"\n\n"; }
     if(!r.df.length&&!r.de.length) m+="Sin horas este mes.\n\n";
     m += "----------------\n";
-    if(r.desc>0) { m+="Subtotal: "+ars(r.bruto)+"\nDescuento "+r.desc+"%: -"+ars(r.montoDesc)+"\n"; }
+    if(r.desc>0||r.dsMonto>0) { m+="Subtotal: "+ars(r.bruto)+"\n"; }
+    (r.dsEv||[]).forEach(function(ev){ if(ev.monto>0) m+="Descuento por "+(ev.motivo||"sesiones no atendidas")+" ("+unirFechas(ev.fechasDesc)+"): -"+ars(ev.monto)+"\n"; });
+    if(r.desc>0) { m+="Descuento "+r.desc+"%: -"+ars(r.montoDesc)+"\n"; }
     m += "TOTAL A PAGAR: "+ars(r.total)+"\n\nVencimiento: del 1 al 5 del mes siguiente.\nGracias!";
     return m;
   }
@@ -763,7 +795,7 @@ export default function App() {
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
-          {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify}/>}
+          {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify} descSes={descSes}/>}
           {tab==="precios" && role==="admin" && <PreciosView tabP={tabP} setTabP={setTabP} psicos={psicos} notify={notify}/>}
           {tab==="precios" && role==="invitada" && <PreciosInvitadaView tabP={tabP}/>}
           {tab==="gestion" && role==="admin" && <GestionView psicos={psicos} setPsicos={setPsicos} horarios={horarios} setHorarios={setHorarios} reservas={reservas} bloques={bloques} setBloques={setBloques} notify={notify}/>}
@@ -1816,13 +1848,40 @@ async function descargarExcelContador(psicos,calcFact,mes,anio,notify) {
   }
 }
 
-function FactView({psicos,calcFact,genMsg,notify}) {
+function FactView({psicos,calcFact,genMsg,notify,descSes}) {
   // Historial: last 6 months data for selected psico
   const now = new Date();
   const [mes,setMes] = useState(now.getMonth());
   const [anio,setAnio] = useState(now.getFullYear());
   const [sel,setSel] = useState(null);
   const [enviadas,setEnviadas] = useState({});
+  // Formulario "Descuento por sesiones no atendidas" (ej: corte de luz)
+  const [dsFechas,setDsFechas] = useState([]);
+  const [dsTmp,setDsTmp] = useState("");
+  const [dsMotivo,setDsMotivo] = useState("");
+
+  function addDsFecha(){
+    if(!dsTmp){notify("Elegi una fecha","err");return;}
+    if(dsFechas.indexOf(dsTmp)>=0){notify("Esa fecha ya esta agregada","err");return;}
+    setDsFechas(dsFechas.concat([dsTmp]).sort());
+    setDsTmp("");
+  }
+  function quitDsFecha(f){ setDsFechas(dsFechas.filter(function(x){return x!==f;})); }
+  function guardarDs(){
+    if(!sel){return;}
+    if(!dsFechas.length){notify("Agrega al menos una fecha","err");return;}
+    var mot = dsMotivo.trim();
+    if(!mot){notify("Escribi el motivo del descuento","err");return;}
+    var id = "ds"+Date.now();
+    saveDoc("descSesiones",id,{id:id,psico:sel,fechas:dsFechas,motivo:mot,creado:localDateStr(new Date())});
+    setDsFechas([]); setDsTmp(""); setDsMotivo("");
+    notify("Descuento guardado");
+  }
+  function borrarDs(ev){
+    if(!window.confirm("Eliminar el descuento \""+(ev.motivo||"")+"\" ("+unirFechas(ev.fechas)+")?")) return;
+    delDoc("descSesiones",ev.id);
+    notify("Descuento eliminado");
+  }
 
   // "Enviadas" es un check por profesional, por mes/anio (ej: ya le mande la factura de Septiembre a Marcela).
   // Se guarda en localStorage con una key por mes+anio para no mezclar meses distintos.
@@ -1852,7 +1911,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
     }
     return meses;
   }
-  const res = ps ? calcFact(ps,mes,anio) : {total:0,tf:0,te:0,df:[],de:[],bruto:0,desc:0,montoDesc:0};
+  const res = ps ? calcFact(ps,mes,anio) : {total:0,tf:0,te:0,df:[],de:[],bruto:0,desc:0,montoDesc:0,dsMonto:0,dsEv:[]};
   const msg = ps ? genMsg(ps,mes,anio) : "";
 
   function sWA() { if(!ps||!ps.wa){notify("Sin WhatsApp","err");return;} openLink("https://wa.me/"+ps.wa+"?text="+encodeURIComponent(msg),"_blank"); }
@@ -1870,7 +1929,6 @@ function FactView({psicos,calcFact,genMsg,notify}) {
 
   return (
     <div>
-      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:12}}>Facturacion</h2>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:12}}>Facturacion</h2>
       <div style={{display:"flex",borderBottom:"1.5px solid #C9E4EF",marginBottom:16}}>
         <button style={{flex:1,padding:"10px",border:"none",background:"transparent",color:vista==="mes"?br:mu,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:vista==="mes"?700:500,borderBottom:vista==="mes"?"2px solid #4BA3C3":"2px solid transparent"}} onClick={function(){setVista("mes");}}>Mes actual</button>
@@ -1890,6 +1948,7 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                     <div style={{color:mu,fontSize:12}}>
                       {r.df.length>0?"Fijos: "+ars(r.tf)+" ":""}
                       {r.de.length>0?"Extras: "+ars(r.te):""}
+                      {r.dsMonto>0?" - Desc. sesiones -"+ars(r.dsMonto):""}
                       {r.desc>0?" - Desc "+r.desc+"%":""}
                     </div>
                   </div>
@@ -1952,6 +2011,10 @@ function FactView({psicos,calcFact,genMsg,notify}) {
               <div style={{textAlign:"right"}}>
                 {ps.fijas && <div style={{color:mu,fontSize:12}}>Fijos: <b style={{color:dk}}>{ars(res.tf)}</b></div>}
                 {res.te>0 && <div style={{color:mu,fontSize:12}}>Extras: <b style={{color:dk}}>{ars(res.te)}</b></div>}
+                {res.dsMonto>0 && <div style={{color:mu,fontSize:12}}>Subtotal: <b style={{color:dk}}>{ars(res.bruto)}</b></div>}
+                {res.dsEv.filter(function(ev){return ev.monto>0;}).map(function(ev){
+                  return <div key={ev.id} style={{color:er,fontSize:12}}>Descuento por {ev.motivo||"sesiones no atendidas"} ({unirFechas(ev.fechasDesc)}): <b>-{ars(ev.monto)}</b></div>;
+                })}
                 {res.desc>0 && <div style={{color:er,fontSize:12}}>Desc {res.desc}%: <b>-{ars(res.montoDesc)}</b></div>}
                 <div style={{color:ok,fontSize:20,fontWeight:700}}>{ars(res.total)}</div>
               </div>
@@ -2002,6 +2065,46 @@ function FactView({psicos,calcFact,genMsg,notify}) {
                 })}
               </div>
             )}
+            <div style={{marginBottom:16}}>
+              <div style={{color:er,fontSize:12,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Descuento por sesiones no atendidas</div>
+              {res.dsEv.map(function(ev) {
+                return (
+                  <div key={ev.id} style={{background:bg,borderRadius:8,padding:"10px 12px",marginBottom:6,border:"1px solid #F5B8B3"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{color:tx,fontSize:13,fontWeight:600}}>Descuento por {ev.motivo||"sesiones no atendidas"}</div>
+                        <div style={{color:mu,fontSize:11}}>Fechas: {unirFechas(ev.fechas)}</div>
+                        {ev.items.map(function(it,i){
+                          return <div key={i} style={{color:mu,fontSize:11}}>{fechaCorta(it.fecha)} - {it.tipo==="extra"?"Extra ":""}{it.cons} {it.ini}-{it.fin}: -{ars(it.sub)}</div>;
+                        })}
+                        {ev.monto===0 && <div style={{color:er,fontSize:11,fontWeight:600}}>No tenia sesiones facturadas en esas fechas: no descuenta nada.</div>}
+                        {ev.monto>0 && ev.fechas.length>ev.fechasDesc.length && <div style={{color:mu,fontSize:11}}>Sin sesiones ese dia: {unirFechas(ev.fechas.filter(function(f){return ev.fechasDesc.indexOf(f)<0;}))}</div>}
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{color:er,fontWeight:700,fontSize:14}}>-{ars(ev.monto)}</div>
+                        <button style={{background:"transparent",border:"none",color:er,fontSize:11,cursor:"pointer",fontFamily:"inherit",padding:"4px 0"}} onClick={function(){borrarDs(ev);}}>Eliminar</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{background:wh,borderRadius:8,padding:"10px 12px",border:"1.5px dashed #C9E4EF"}}>
+                <div style={{color:mu,fontSize:11,marginBottom:6}}>Fechas en que no pudo atender (se descuentan sus horarios fijos y horas extra de esos dias, solo de {MESES[mes]} {anio}):</div>
+                <div style={{display:"flex",gap:6,marginBottom:8}}>
+                  <input type="date" style={Object.assign({},sInp,{flex:1})} value={dsTmp} onChange={function(e){setDsTmp(e.target.value);}}/>
+                  <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,flexShrink:0})} onClick={addDsFecha}>Agregar fecha</button>
+                </div>
+                {dsFechas.length>0 && (
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                    {dsFechas.map(function(f){
+                      return <span key={f} style={{background:lt,color:tx,borderRadius:20,padding:"4px 10px",fontSize:12,fontWeight:600}}>{fechaCorta(f)}<span style={{marginLeft:6,color:er,cursor:"pointer"}} onClick={function(){quitDsFecha(f);}}>x</span></span>;
+                    })}
+                  </div>
+                )}
+                <input style={Object.assign({},sInp,{marginBottom:8})} value={dsMotivo} onChange={function(e){setDsMotivo(e.target.value);}} placeholder="Descuento por... (ej: corte de luz)"/>
+                <button style={{background:er,color:wh,border:"none",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%",fontFamily:"inherit"}} onClick={guardarDs}>Guardar descuento</button>
+              </div>
+            </div>
             <div style={{background:bg,borderRadius:10,padding:14,marginBottom:14,border:"1px solid #C9E4EF"}}>
               <div style={{color:mu,fontSize:11,fontWeight:700,marginBottom:8}}>MENSAJE:</div>
               <pre style={{color:tx,fontSize:11,whiteSpace:"pre-wrap",fontFamily:"monospace",margin:0}}>{msg}</pre>
@@ -3152,6 +3255,10 @@ function exportarExcel(psicos,mes,anio) {
         ""
       ]);
     });
+    // Descuentos por sesiones no atendidas (monto negativo en la columna Subtotal)
+    (r.dsEv||[]).forEach(function(ev){
+      if(ev.monto>0) lines.push([p.nombre,"Descuento por "+(ev.motivo||"sesiones no atendidas"),unirFechas(ev.fechasDesc),"","","","","","",-ev.monto,"",""]);
+    });
     // Totals row per psico
     lines.push([
       p.nombre,"TOTAL","","","","","","",
@@ -3202,7 +3309,7 @@ function EstadisticasView({psicos,horarios,reservas,calcFact}) {
     return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.bruto;},0);
   }
   function totalDesc() {
-    return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.montoDesc;},0);
+    return psicos.reduce(function(acc,p){const r=calcFact(p,mes,anio);return acc+r.montoDesc+(r.dsMonto||0);},0);
   }
 
   // Psico ranking by billing
