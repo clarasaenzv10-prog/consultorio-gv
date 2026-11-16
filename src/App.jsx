@@ -616,7 +616,8 @@ export default function App() {
   const pendH = solHor.filter(function(s){return s.estado==="pendiente";});
   const nc = notifCnt();
   const wkD = wkDates(wk);
-  const adminPend = pendR.length + pendH.length + (mensajes||[]).filter(function(m){return m&&m.para==="admin"&&!m.leido;}).length;
+  const invPend = reservas.filter(function(r){return r&&r.tipo==="invitada"&&!r.revisada;}).length;
+  const adminPend = pendR.length + pendH.length + invPend + (mensajes||[]).filter(function(m){return m&&m.para==="admin"&&!m.leido;}).length;
   // Mensajes de la administracion sin leer para la psicologa logueada
   const chatUnread = role==="psico" ? (mensajes||[]).filter(function(m){return m&&!m.leido&&(m.para||"").trim().toLowerCase()===(user||"").trim().toLowerCase();}).length : 0;
 
@@ -672,6 +673,7 @@ export default function App() {
     {id:"anuncios",icon:"📢",label:"Anuncios",badge:nc},
     {id:"solicitudes",icon:"🔔",label:"Solicitudes",badge:pendR.length},
     {id:"cambios",icon:"🗓",label:"Cambios",badge:pendH.length},
+    {id:"invitadas",icon:"🧾",label:"Invitadas",badge:invPend},
     {id:"facturacion",icon:"💰",label:"Facturacion",badge:0},
     {id:"precios",icon:"💵",label:"Precios",badge:0},
     {id:"gestion",icon:"⚙",label:"Gestion",badge:0},
@@ -802,10 +804,11 @@ export default function App() {
           </div>
         )}
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
-          {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
+          {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role==="invitada"){if(!s.evento)setMod({type:"invitada",slot:s});return;}setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
           {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
           {tab==="chat" && (role==="admin"||role==="psico") && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
+          {tab==="invitadas" && role==="admin" && <InvitadasView reservas={reservas} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
           {tab==="facturacion" && role==="admin" && <FactView psicos={psicos} calcFact={calcFact} genMsg={genMsg} notify={notify} descSes={descSes}/>}
@@ -864,7 +867,7 @@ export default function App() {
             onSelectAlternativo={function(d){setMod({type:"slot",slot:{date:d.date,hour:d.hour,preIni:d.ini,preFin:d.fin,preCons:d.cons,confirmedFree:true}});}}
             onEliminar={function(ev){
               if(ev.tipo==="bloqueado") { delDoc("bloques",ev.id); notify("Eliminado"); }
-              else if(ev.tipo==="extra") { delDoc("reservas",ev.id); notify("Hora extra cancelada"); }
+              else if(ev.tipo==="extra") { delDoc("reservas",ev.id); if(ev.invitada) delDoc("comprobantes",String(ev.id)); notify("Hora extra cancelada"); }
               else if(ev.tipo==="fijo") {
                 if(role==="admin") { delDoc("horarios",ev.id); notify("Horario eliminado: "+DIAS[ev.diaSemana]+" "+ev.inicio+"-"+ev.fin+" "+ev.consultorio+" ("+ev.psico+")"); }
                 else {
@@ -877,6 +880,9 @@ export default function App() {
               setMod(null);
             }}
             onClose={function(){setMod(null);}}/>
+        )}
+        {mod && mod.type==="invitada" && (
+          <InvitadaReservaModal key={mod.slot.date+"-"+mod.slot.hour} slot={mod.slot} horarios={horarios} reservas={reservas} bloques={bloques} config={config} getP={getP} notify={notify} onClose={function(){setMod(null);}}/>
         )}
         {mod && mod.type==="nueva" && (
           <NuevaModal user={user} horarios={horarios} reservas={reservas} onReservar={function(d){const r=Object.assign({id:Date.now()},d,{estado:"pendiente",solicitante:user,tipo:"extra"});saveDoc("reservas",r.id,r);saveDoc("adminNotifs","n"+Date.now(),{tipo:"solicitud_reserva",texto:user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin,fecha:new Date().toISOString(),leido:false});pushAdmin("Nueva solicitud de hora extra",user+" solicito hora extra: "+d.consultorio+" "+d.fecha+" "+d.inicio+"-"+d.fin);notify("Solicitud enviada");setMod(null);}} onClose={function(){setMod(null);}}/>
@@ -947,6 +953,11 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
         <div style={{display:"none"}}>
         </div>
       </div>
+      {role==="invitada" && (
+        <div style={{background:lt,border:"1px solid #C9E4EF",borderRadius:10,padding:"10px 14px",color:dk,fontSize:12,lineHeight:1.5}}>
+          Tocá un horario libre del calendario para reservar una hora suelta. Se paga por transferencia y la reserva queda confirmada al subir el comprobante.
+        </div>
+      )}
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
         <div style={{display:"flex",gap:6,background:wh,borderRadius:10,padding:"4px",border:"1px solid #C9E4EF"}}>
           <button
@@ -1056,6 +1067,8 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
     const fijos=(horarios||[]).filter(function(x){
       if(x.consultorio!==consCheck) return false;
       if(Number(x.diaSemana)!==jd) return false;
+      // un horario ya liberado (fechaFin) no cuenta como ocupado: para una reserva puntual se mira la fecha del slot, para un fijo nuevo se mira hoy
+      if(tipoCheck==="reservar"?!horarioActivoEn(x,slot.date):(x.fechaFin&&x.fechaFin<=localDateStr(new Date()))) return false;
       return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
     });
     if(fijos.length) return "Ese horario esta ocupado en "+consCheck;
@@ -1108,11 +1121,11 @@ function SlotModal({slot,role,user,psicos,horarios,reservas,onReservar,onBloquea
                     if(c.id===ev.consultorio) return false;
                     // Check if clicked hour is free (not occupied by any horario)
                     return !(horarios||[]).some(function(x){
-                      return x.consultorio===c.id&&Number(x.diaSemana)===jd&&clickMin<toMin(x.fin)&&clickMinEnd>toMin(x.inicio);
+                      return x.consultorio===c.id&&Number(x.diaSemana)===jd&&horarioActivoEn(x,slot.date)&&clickMin<toMin(x.fin)&&clickMinEnd>toMin(x.inicio);
                     });
                   }).map(function(c){
                     // Find the full free window around clicked hour
-                    const hsCons=(horarios||[]).filter(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd;}).sort(function(a,b){return toMin(a.inicio)-toMin(b.inicio);});
+                    const hsCons=(horarios||[]).filter(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===jd&&horarioActivoEn(x,slot.date);}).sort(function(a,b){return toMin(a.inicio)-toMin(b.inicio);});
                     // Find free windows: gaps between occupied slots (between 08:00 and 21:00)
                     let freeStart=480, windows=[];
                     hsCons.forEach(function(x){
@@ -1248,6 +1261,7 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
     const fijos=(horarios||[]).filter(function(x){
       if(x.consultorio!==cons) return false;
       if(Number(x.diaSemana)!==jd) return false;
+      if(!horarioActivoEn(x,fecha)) return false;
       return sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
     });
     const extras=(reservas||[]).filter(function(x){
@@ -1265,7 +1279,7 @@ function NuevaModal({user,onReservar,onClose,horarios,reservas}) {
     return CONS.filter(function(c){
       if(c.id===cons) return false;
       const ocupFijo=(horarios||[]).some(function(x){
-        return x.consultorio===c.id&&Number(x.diaSemana)===jd&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+        return x.consultorio===c.id&&Number(x.diaSemana)===jd&&horarioActivoEn(x,fecha)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
       });
       const ocupExtra=(reservas||[]).some(function(x){
         return x.fecha===fecha&&x.consultorio===c.id&&(x.estado==="aprobada"||x.estado==="pendiente")&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
@@ -1588,7 +1602,7 @@ function AnunciosView({anuncios,setAnuncios,user,role,psicos,notify}) {
 // ─── Solicitudes ──────────────────────────────────────────────
 function SolicitudesView({reservas,setReservas,gc,notify}) {
   const pend = reservas.filter(function(r){return r.estado==="pendiente";}).sort(function(a,b){return (b.fecha||b.fechaSol||"").localeCompare(a.fecha||a.fechaSol||"");});
-  const hist = reservas.filter(function(r){return r.estado!=="pendiente";}).sort(function(a,b){return (b.fecha||"").localeCompare(a.fecha||"");});
+  const hist = reservas.filter(function(r){return r.estado!=="pendiente"&&r.tipo!=="invitada";}).sort(function(a,b){return (b.fecha||"").localeCompare(a.fecha||"");});
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:16}}>Solicitudes de reserva</h2>
@@ -2252,6 +2266,243 @@ function PreciosView({tabP,setTabP,psicos,notify}) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Reserva de horas sueltas por invitadas (pago por transferencia + comprobante) ───
+// Un horario fijo vale en una fecha si ya empezo (fechaInicio) y todavia no termino (fechaFin, exclusivo).
+function horarioActivoEn(h, fecha) {
+  return (!h.fechaFin||fecha<h.fechaFin)&&(!h.fechaInicio||fecha>=h.fechaInicio);
+}
+// Numero para wa.me: si son 10 digitos (area + numero) se le antepone 549 (celular de Argentina).
+function waDigits(t) {
+  var d=String(t||"").replace(/\D/g,"");
+  if(d.length===10) d="549"+d;
+  return d;
+}
+
+function InvitadaReservaModal({slot,horarios,reservas,bloques,config,getP,notify,onClose}) {
+  const [fecha,setFecha] = useState(slot.date);
+  const [ini,setIni] = useState(String(Math.max(slot.hour,8)).padStart(2,"0")+":00");
+  const [fin,setFin] = useState(String(Math.min(Math.max(slot.hour,8)+1,21)).padStart(2,"0")+":00");
+  const [cons,setCons] = useState("C1");
+  const [nombre,setNombre] = useState("");
+  const [wa,setWa] = useState("");
+  const [comp,setComp] = useState(null);
+  const [subiendo,setSubiendo] = useState(false);
+  const [guardando,setGuardando] = useState(false);
+  const [listo,setListo] = useState(null);
+  const tr = (config&&config.transferencia)||{};
+  const hoyStr = localDateStr(new Date());
+
+  function diaDe(f) { if(!f) return 0; var g=parseLocalDate(f).getDay(); return g===0?7:g; }
+  function ocupado(consId) {
+    if(!fecha||!ini||!fin||toMin(fin)<=toMin(ini)) return false;
+    var sM=toMin(ini), eM=toMin(fin), jd=diaDe(fecha);
+    var fijo=(horarios||[]).some(function(x){return x.consultorio===consId&&Number(x.diaSemana)===jd&&horarioActivoEn(x,fecha)&&sM<toMin(x.fin)&&eM>toMin(x.inicio);});
+    if(fijo) return true;
+    var extra=(reservas||[]).some(function(x){return x.fecha===fecha&&x.consultorio===consId&&(x.estado==="aprobada"||x.estado==="pendiente")&&sM<toMin(x.fin)&&eM>toMin(x.inicio);});
+    if(extra) return true;
+    return (bloques||[]).some(function(b){return b.fecha===fecha&&(!b.consultorio||b.consultorio===consId)&&(!b.inicio||!b.fin||(sM<toMin(b.fin)&&eM>toMin(b.inicio)));});
+  }
+
+  var errHorario = null;
+  if(!fecha) errHorario = "Elegí una fecha.";
+  else if(fecha<=hoyStr) errHorario = "Solo se puede reservar desde mañana.";
+  else if(diaDe(fecha)===7) errHorario = "Se puede reservar de lunes a sábado.";
+  else if(!ini||!fin||toMin(fin)<=toMin(ini)) errHorario = "El horario de fin tiene que ser mayor al de inicio.";
+  else if(toMin(ini)<480||toMin(fin)>1260) errHorario = "El horario va de 08:00 a 21:00.";
+  var hayConflicto = !errHorario && ocupado(cons);
+  var libres = hayConflicto ? CONS.filter(function(c){return c.id!==cons&&!ocupado(c.id);}) : [];
+  var pr = (!errHorario&&!hayConflicto) ? calcPrecio(ini,fin,getP(fecha)) : null;
+  var nom = nombre.trim().replace(/\s+/g," ");
+  var nombreOk = nom.length>=5 && nom.indexOf(" ")>0;
+  var waOk = String(wa).replace(/\D/g,"").length>=8;
+  var transfOk = !!(tr.alias||tr.cbu);
+  var valido = !!(pr&&nombreOk&&waOk&&comp&&transfOk&&!subiendo&&!guardando);
+
+  function onFile(e) {
+    var f = e.target.files&&e.target.files[0];
+    e.target.value = "";
+    if(!f) return;
+    setSubiendo(true);
+    leerAdjunto(f, function(x){
+      if((x.data||"").length>ADJ_MAX_TOTAL){ notify("El comprobante pesa demasiado. Subí una foto más chica.","err"); setSubiendo(false); return; }
+      setComp(x); setSubiendo(false);
+    }, function(msg){ notify(msg,"err"); setSubiendo(false); });
+  }
+
+  function confirmar() {
+    if(!valido) return;
+    if(ocupado(cons)) { notify("Ese horario se acaba de ocupar. Elegí otro.","err"); return; }
+    setGuardando(true);
+    var id = Date.now();
+    var reserva = {id:id,fecha:fecha,inicio:ini,fin:fin,consultorio:cons,psico:nom,solicitante:nom,tipo:"invitada",invitada:true,estado:"aprobada",nombre:nom,wa:wa.trim(),monto:pr.sub,fechaSol:new Date().toISOString(),revisada:false};
+    // El comprobante va en su propia coleccion (no dentro de la reserva) para no cargar
+    // todos los celulares con fotos pesadas. Si no se guarda, la reserva no se crea.
+    saveDoc("comprobantes",id,{id:id,reservaId:id,nombre:comp.nombre,tipo:comp.tipo,data:comp.data})
+      .then(function(){ return saveDoc("reservas",id,reserva); })
+      .then(function(){
+        saveDoc("adminNotifs","n"+Date.now(),{tipo:"reserva_invitada",texto:nom+" reservo "+cons+" el "+fecha+" "+ini+"-"+fin+" ("+ars(pr.sub)+")",fecha:new Date().toISOString(),leido:false});
+        pushAdmin("Reserva de invitada",nom+" reservo "+cons+" el "+fecha+" "+ini+"-"+fin+" ("+ars(pr.sub)+"). Revisá el comprobante.");
+        setListo(reserva); setGuardando(false);
+      })
+      .catch(function(){ setGuardando(false); notify("No se pudo guardar la reserva. Probá de nuevo.","err"); });
+  }
+
+  if(listo) return (
+    <div style={sOverlay} onClick={onClose}>
+      <div style={sModal} onClick={function(e){e.stopPropagation();}}>
+        <div style={{padding:28,textAlign:"center"}}>
+          <div style={{fontSize:44,marginBottom:10,color:ok}}>✓</div>
+          <div style={{color:ok,fontWeight:800,fontSize:18,marginBottom:8}}>¡Reserva confirmada!</div>
+          <div style={{color:tx,fontSize:14,lineHeight:1.6}}>
+            {listo.consultorio} · {parseLocalDate(listo.fecha).toLocaleDateString("es-AR")}<br/>
+            {listo.inicio} a {listo.fin} · {ars(listo.monto)}
+          </div>
+          <div style={{color:mu,fontSize:12,marginTop:10}}>Para cambiar o cancelar, comunicate con la administración.</div>
+          <button style={Object.assign({},btn(br,wh),{marginTop:18,width:"100%"})} onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={sOverlay} onClick={onClose}>
+      <div style={sModal} onClick={function(e){e.stopPropagation();}}>
+        <div style={sModH}>
+          <h3 style={{margin:0,color:tx}}>Reservar hora suelta</h3>
+          <button style={sXBtn} onClick={onClose}>X</button>
+        </div>
+        <div style={{padding:20,display:"flex",flexDirection:"column",gap:12}}>
+          <div><label style={sLbl}>Nombre completo</label><input style={sInp} value={nombre} onChange={function(e){setNombre(e.target.value);}} placeholder="Nombre y apellido"/></div>
+          <div><label style={sLbl}>WhatsApp</label><input style={sInp} type="tel" value={wa} onChange={function(e){setWa(e.target.value);}} placeholder="Ej: 11 1234 5678"/></div>
+          <div><label style={sLbl}>Fecha</label><input style={sInp} type="date" value={fecha} onChange={function(e){setFecha(e.target.value);}}/></div>
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:1}}><label style={sLbl}>Desde</label><input style={sInp} type="time" value={ini} onChange={function(e){setIni(e.target.value);}}/></div>
+            <div style={{flex:1}}><label style={sLbl}>Hasta</label><input style={sInp} type="time" value={fin} onChange={function(e){setFin(e.target.value);}}/></div>
+          </div>
+          <div>
+            <label style={sLbl}>Consultorio</label>
+            <select style={sInp} value={cons} onChange={function(e){setCons(e.target.value);}}>
+              {CONS.map(function(c){return <option key={c.id} value={c.id}>{c.id} - {c.sn}</option>;})}
+            </select>
+          </div>
+          {errHorario && <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13,fontWeight:600}}>{errHorario}</div>}
+          {hayConflicto && (
+            <div style={{background:eb,border:"1px solid #F5B8B3",borderRadius:8,padding:"10px 12px",color:er,fontSize:13}}>
+              <b>Ese horario está ocupado en {cons}.</b>
+              {libres.length>0 ? (
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:12,marginBottom:6,color:tx}}>Libres en ese horario:</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {libres.map(function(c){return(
+                      <button key={c.id} style={{background:ob,color:ok,border:"1px solid #A7E3C0",borderRadius:8,padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setCons(c.id);}}>
+                        {c.id} - {c.sede==="VL"?"Vic. Lopez":"Uruguay"}
+                      </button>
+                    );})}
+                  </div>
+                </div>
+              ) : <div style={{marginTop:6,fontSize:12,color:tx}}>No hay consultorios libres en ese horario. Probá con otro horario o fecha.</div>}
+            </div>
+          )}
+          {pr && (
+            <div style={{background:ob,border:"1px solid #A7E3C0",borderRadius:10,padding:"12px 14px"}}>
+              <div style={{color:ok,fontWeight:700,fontSize:13}}>Horario disponible</div>
+              <div style={{color:mu,fontSize:12,marginTop:2}}>{pr.ley||pr.des}</div>
+              <div style={{color:tx,fontWeight:800,fontSize:20,marginTop:4}}>Total a pagar: {ars(pr.sub)}</div>
+            </div>
+          )}
+          {pr && (
+            <div style={{background:bg,border:"1px solid #C9E4EF",borderRadius:10,padding:"12px 14px",fontSize:13,color:tx,lineHeight:1.7}}>
+              <div style={{color:mu,fontSize:11,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Pagá por transferencia a</div>
+              {transfOk ? (
+                <div>
+                  {tr.titular && <div>Titular: <b>{tr.titular}</b></div>}
+                  {tr.cbu && <div>CBU: <b>{tr.cbu}</b></div>}
+                  {tr.alias && <div>Alias: <b>{tr.alias}</b></div>}
+                  {tr.banco && <div>Banco: <b>{tr.banco}</b></div>}
+                </div>
+              ) : <div style={{color:er}}>Todavía no están cargados los datos de transferencia. Avisale a la administración.</div>}
+            </div>
+          )}
+          {pr && (
+            <div>
+              <label style={sLbl}>Comprobante de pago (foto o PDF)</label>
+              <input style={sInp} type="file" accept="image/*,application/pdf" onChange={onFile}/>
+              {subiendo && <div style={{color:mu,fontSize:12,marginTop:4}}>Cargando...</div>}
+              {comp && !subiendo && (
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,fontSize:12,color:ok,fontWeight:600}}>
+                  <span>✓ {comp.nombre}</span>
+                  <button style={{background:"transparent",border:"none",color:er,fontSize:12,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){setComp(null);}}>Quitar</button>
+                </div>
+              )}
+            </div>
+          )}
+          <button style={Object.assign({},btn(br,wh),{opacity:valido?1:0.4,padding:"12px 16px",fontSize:14})} disabled={!valido} onClick={confirmar}>
+            {guardando?"Guardando...":"Confirmar reserva"}
+          </button>
+          {pr && !valido && !guardando && (
+            <div style={{color:mu,fontSize:11,textAlign:"center"}}>
+              {!nombreOk?"Falta el nombre y apellido. ":""}{!waOk?"Falta el WhatsApp. ":""}{!comp?"Falta el comprobante.":""}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Admin: reservas de invitadas (por revisar / revisadas), con comprobante, WhatsApp y cancelar.
+function InvitadasView({reservas,notify}) {
+  const [comps,setComps] = useState([]);
+  const [ver,setVer] = useState(null);
+  useEffect(function(){
+    var un = listenCol("comprobantes", function(d){ setComps(d||[]); });
+    return function(){ if(un) un(); };
+  }, []);
+  var lista = (reservas||[]).filter(function(r){return r&&r.tipo==="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
+  var porRev = lista.filter(function(r){return !r.revisada;});
+  var revs = lista.filter(function(r){return r.revisada;});
+  function compDe(r) { return comps.find(function(c){return String(c.id)===String(r.id);}); }
+  function marcar(r) { saveDoc("reservas",r.id,Object.assign({},r,{revisada:true})); notify("Marcada como revisada"); }
+  function cancelar(r) {
+    if(!window.confirm("Cancelar la reserva de "+r.nombre+" ("+parseLocalDate(r.fecha).toLocaleDateString("es-AR")+" "+r.inicio+"-"+r.fin+")? Se borra del calendario y se borra el comprobante.")) return;
+    delDoc("reservas",r.id); delDoc("comprobantes",String(r.id)); notify("Reserva cancelada");
+  }
+  function tarjeta(r) {
+    var c = compDe(r);
+    return (
+      <div key={r.id} style={{background:wh,borderRadius:12,padding:"14px 16px",marginBottom:10,border:r.revisada?"1.5px solid #C9E4EF":"1.5px solid #F5B8B3"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+          <div>
+            <div style={{color:tx,fontWeight:700,fontSize:15}}>{r.nombre}</div>
+            <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha).toLocaleDateString("es-AR")} · {r.consultorio} · {r.inicio}-{r.fin}</div>
+          </div>
+          <div style={{color:ok,fontWeight:800,fontSize:16,flexShrink:0}}>{ars(r.monto||0)}</div>
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
+          <button style={{background:"#25D366",color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){openLink("https://wa.me/"+waDigits(r.wa));}}>WhatsApp {r.wa}</button>
+          <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"6px 12px"})} onClick={function(){ if(!c){notify("Cargando comprobante... probá de nuevo en un instante","err");return;} if(c.tipo==="pdf") abrirDoc(c); else setVer(ver===r.id?null:r.id); }}>
+            {c&&c.tipo==="pdf"?"Ver comprobante (PDF)":ver===r.id?"Ocultar comprobante":"Ver comprobante"}
+          </button>
+          {!r.revisada && <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"6px 12px"})} onClick={function(){marcar(r);}}>Marcar revisada</button>}
+          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"6px 12px"})} onClick={function(){cancelar(r);}}>Cancelar reserva</button>
+        </div>
+        {ver===r.id && c && c.tipo!=="pdf" && <img src={c.data} alt="comprobante" style={{width:"100%",maxHeight:420,objectFit:"contain",marginTop:10,borderRadius:8,border:"1px solid #C9E4EF"}}/>}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:4}}>Reservas de invitadas</h2>
+      <div style={{color:mu,fontSize:12,marginBottom:16}}>Reservaron y pagaron por transferencia. Revisá que el comprobante sea real; si no, cancelá la reserva.</div>
+      {!lista.length && <div style={{color:mu,textAlign:"center",padding:40}}>Todavía no hay reservas de invitadas.</div>}
+      {porRev.length>0 && <div style={{color:er,fontWeight:700,fontSize:13,marginBottom:8}}>Por revisar ({porRev.length})</div>}
+      {porRev.map(tarjeta)}
+      {revs.length>0 && <div style={{color:mu,fontWeight:700,fontSize:13,margin:"16px 0 8px"}}>Revisadas ({revs.length})</div>}
+      {revs.map(tarjeta)}
     </div>
   );
 }
@@ -3093,7 +3344,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor,P}) {
     const sMin=toMin(s.ini), eMin=toMin(s.fin);
     if(eMin<=sMin) return "Fin debe ser mayor al inicio";
     const ocu=(horarios||[]).filter(function(x){
-      return x.consultorio===s.cons&&Number(x.diaSemana)===Number(s.dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+      return x.consultorio===s.cons&&Number(x.diaSemana)===Number(s.dia)&&!(x.fechaFin&&x.fechaFin<=localDateStr(new Date()))&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
     });
     return ocu.length?"Ese horario esta ocupado en "+s.cons:null;
   }
@@ -3102,7 +3353,7 @@ function SolicitudInvitadaView({horarios,reservas,config,notify,setSolHor,P}) {
     const sMin=toMin(ini),eMin=toMin(fin);
     if(eMin<=sMin) return [];
     return CONS.filter(function(c){
-      return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
+      return !(horarios||[]).some(function(x){return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&!(x.fechaFin&&x.fechaFin<=localDateStr(new Date()))&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);});
     });
   }
 
@@ -3621,7 +3872,7 @@ function SolHorarioForm({tipo,h,horarios,user,onSol,onClose}) {
     return CONS.filter(function(c){
       if(c.id===cons) return false;
       const ocupado=(horarios||[]).some(function(x){
-        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
+        return x.consultorio===c.id&&Number(x.diaSemana)===Number(dia)&&!(x.fechaFin&&x.fechaFin<=localDateStr(new Date()))&&sMin<toMin(x.fin)&&eMin>toMin(x.inicio);
       });
       return !ocupado;
     });
