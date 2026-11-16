@@ -663,10 +663,10 @@ export default function App() {
   if(view==="login") return <AppRoot><LoginView onLogin={login} psicos={psicos} config={config}/></AppRoot>;
 
   const nav = role==="invitada" ? [
-    {id:"calendario",icon:"📅",label:"Calendario",badge:0},
+    {id:"calendario",icon:"📅",label:"Hora suelta",badge:0},
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"precios",icon:"💵",label:"Precios",badge:0},
-    {id:"solicitar",icon:"✉",label:"Solicitar",badge:0},
+    {id:"solicitar",icon:"✉",label:"Horario fijo",badge:0},
   ] : role==="admin" ? [
     {id:"calendario",icon:"📅",label:"Calendario",badge:0},
     {id:"perfiles",icon:"👩",label:"Profesionales",badge:0},
@@ -955,7 +955,7 @@ function CalView({wkD,wk,setWk,getEvts,gc,fPsico,setFPsico,psicos,onSlot,role,fS
       </div>
       {role==="invitada" && (
         <div style={{background:lt,border:"1px solid #C9E4EF",borderRadius:10,padding:"10px 14px",color:dk,fontSize:12,lineHeight:1.5}}>
-          Tocá un horario libre del calendario para reservar una hora suelta. Se paga por transferencia y la reserva queda confirmada al subir el comprobante.
+          Tocá un horario libre del calendario para reservar una hora suelta. Se paga por transferencia y la reserva queda confirmada al subir el comprobante. Si en cambio querés un horario fijo semanal, andá a la pestaña "Horario fijo" (ahí se te arma el perfil).
         </div>
       )}
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
