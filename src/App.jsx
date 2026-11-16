@@ -343,13 +343,23 @@ function ChatView({user,role,psicos,mensajes,chatOpen,setChatOpen,gc}) {
     if(!k) return;
     mensajes.filter(function(m){return (m.conv===k||m.conv===kOld)&&!m.leido&&m.de!==user;}).forEach(function(m){saveDoc("mensajes",String(m.id),Object.assign({},m,{leido:true}));});
   }
+  // La psicologa abre el chat y los mensajes de la administracion se marcan leidos solos
+  // (el useEffect va ANTES de cualquier return condicional del componente).
+  useEffect(function(){
+    if(role==="psico") markRead();
+  }, [role,msgs.length]);
   function send(){
     if(!texto.trim()||!k) return;
     var para=role==="admin"?convWith:"admin";
     var id2="msg"+Date.now();
     saveDoc("mensajes",id2,{id:id2,conv:k,de:user,para:para,texto:texto.trim(),fecha:new Date().toISOString(),leido:false});
-    saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
-    if(role!=="admin") pushAdmin("Mensaje de "+user,texto.trim().substring(0,100));
+    if(role!=="admin") {
+      saveDoc("adminNotifs","n"+Date.now(),{tipo:"mensaje",texto:user+": "+texto.trim().substring(0,60),fecha:new Date().toISOString(),leido:false});
+      pushAdmin("Mensaje de "+user,texto.trim().substring(0,100));
+    } else {
+      // Admin -> psicologa: push a los dispositivos de esa psicologa
+      pushPsico(convWith,"Mensaje de la administracion",texto.trim().substring(0,100));
+    }
     setTexto("");
   }
   if(role==="admin"&&!convWith){
@@ -607,13 +617,15 @@ export default function App() {
   const nc = notifCnt();
   const wkD = wkDates(wk);
   const adminPend = pendR.length + pendH.length + (mensajes||[]).filter(function(m){return m&&m.para==="admin"&&!m.leido;}).length;
+  // Mensajes de la administracion sin leer para la psicologa logueada
+  const chatUnread = role==="psico" ? (mensajes||[]).filter(function(m){return m&&!m.leido&&(m.para||"").trim().toLowerCase()===(user||"").trim().toLowerCase();}).length : 0;
 
   // Numero rojo en el icono: admin = reservas + cambios + mensajes pendientes; psicologa = anuncios sin leer
   useEffect(function(){
     PEND_ADMIN = adminPend;
     if(!role||role==="invitada") return;
-    setBadge(role==="admin"?adminPend:nc);
-  }, [role,adminPend,nc]);
+    setBadge(role==="admin"?adminPend:(nc+chatUnread));
+  }, [role,adminPend,nc,chatUnread]);
 
   // Si ya dio permiso, refresca el token del dispositivo al entrar (sin pedir nada de nuevo)
   useEffect(function(){
@@ -674,6 +686,7 @@ export default function App() {
     {id:"consultorios",icon:"🏢",label:"Consultorios",badge:0},
     {id:"misreservas",icon:"📋",label:"Mis Reservas",badge:0},
     {id:"mishorarios",icon:"🗓",label:"Mis Horarios",badge:0},
+    {id:"chat",icon:"💬",label:"Chat",badge:chatUnread},
   ];
 
   const nav5 = nav.slice(0,5);
@@ -791,7 +804,7 @@ export default function App() {
         <main style={{flex:1,overflowY:"auto",padding:16,paddingBottom:72,background:bg}}>
           {tab==="calendario" && <CalView wkD={wkD} wk={wk} setWk={setWk} getEvts={getEvts} gc={gc} fPsico={fPsico} setFPsico={setFPsico} psicos={psicos} onSlot={function(s){if(role!=="invitada")setMod({type:"slot",slot:s});}} role={role} fSede={fSede} setFSede={setFSede} fCons={fCons} setFCons={setFCons}/>}
           {tab==="perfiles" && <PerfilesView psicos={psicos} setPsicos={setPsicos} gc={gc} role={role} notify={notify} perfilSel={perfilSel} setPerfilSel={setPerfilSel} horarios={horarios} reservas={reservas}/>}
-          {tab==="chat" && role==="admin" && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
+          {tab==="chat" && (role==="admin"||role==="psico") && <ChatView user={user} role={role} psicos={psicos} mensajes={mensajes||[]} chatOpen={chatOpen} setChatOpen={setChatOpen} gc={gc}/>}
           {tab==="anuncios" && <AnunciosView anuncios={anuncios} setAnuncios={setAnuncios} user={user} role={role} psicos={psicos} notify={notify}/>}
           {tab==="solicitudes" && role==="admin" && <SolicitudesView reservas={reservas} setReservas={setReservas} gc={gc} notify={notify}/>}
           {tab==="cambios" && role==="admin" && <CambiosView solicitudes={solHor} setSolicitudes={setSolHor} horarios={horarios} setHorarios={setHorarios} reservas={reservas} setReservas={setReservas} setAnuncios={setAnuncios} notify={notify} config={config} psicos={psicos} setPsicos={setPsicos}/>}
@@ -829,6 +842,7 @@ export default function App() {
               <span style={{fontSize:20,marginBottom:1}}>&#9776;</span>
               <span style={{fontSize:9}}>Mas</span>
               {role==="admin"&&adminNotifs.length>0&&<span style={{position:"absolute",top:4,right:"calc(50% - 14px)",background:er,color:wh,borderRadius:"50%",width:16,height:16,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{adminNotifs.length}</span>}
+              {role==="psico"&&chatUnread>0&&<span style={{position:"absolute",top:4,right:"calc(50% - 14px)",background:er,color:wh,borderRadius:"50%",width:16,height:16,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{chatUnread}</span>}
             </button>
           )}
         </nav>
