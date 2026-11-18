@@ -616,7 +616,7 @@ export default function App() {
   const pendH = solHor.filter(function(s){return s.estado==="pendiente";});
   const nc = notifCnt();
   const wkD = wkDates(wk);
-  const invPend = reservas.filter(function(r){return r&&r.tipo==="invitada"&&!r.revisada;}).length;
+  const invPend = reservas.filter(function(r){return r&&r.tipo==="invitada"&&!r.revisada&&r.estado!=="cancelada";}).length;
   const adminPend = pendR.length + pendH.length + invPend + (mensajes||[]).filter(function(m){return m&&m.para==="admin"&&!m.leido;}).length;
   // Mensajes de la administracion sin leer para la psicologa logueada
   const chatUnread = role==="psico" ? (mensajes||[]).filter(function(m){return m&&!m.leido&&(m.para||"").trim().toLowerCase()===(user||"").trim().toLowerCase();}).length : 0;
@@ -867,7 +867,15 @@ export default function App() {
             onSelectAlternativo={function(d){setMod({type:"slot",slot:{date:d.date,hour:d.hour,preIni:d.ini,preFin:d.fin,preCons:d.cons,confirmedFree:true}});}}
             onEliminar={function(ev){
               if(ev.tipo==="bloqueado") { delDoc("bloques",ev.id); notify("Eliminado"); }
-              else if(ev.tipo==="extra") { delDoc("reservas",ev.id); if(ev.invitada) delDoc("comprobantes",String(ev.id)); notify("Hora extra cancelada"); }
+              else if(ev.tipo==="extra") {
+                if(ev.invitada) {
+                  // reserva de invitada: no se borra, queda en el historial de Invitadas como cancelada (con su WhatsApp)
+                  var _ro=(reservas||[]).find(function(x){return String(x.id)===String(ev.id);});
+                  if(_ro) saveDoc("reservas",_ro.id,Object.assign({},_ro,{estado:"cancelada",canceladaEn:new Date().toISOString()}));
+                  else delDoc("reservas",ev.id);
+                  notify("Reserva de invitada cancelada. Queda en el historial");
+                } else { delDoc("reservas",ev.id); notify("Hora extra cancelada"); }
+              }
               else if(ev.tipo==="fijo") {
                 if(role==="admin") { delDoc("horarios",ev.id); notify("Horario eliminado: "+DIAS[ev.diaSemana]+" "+ev.inicio+"-"+ev.fin+" "+ev.consultorio+" ("+ev.psico+")"); }
                 else {
@@ -2281,6 +2289,14 @@ function waDigits(t) {
   if(d.length===10) d="549"+d;
   return d;
 }
+// Mensaje de confirmacion para la invitada que reservo una hora suelta (se manda por WhatsApp desde Invitadas).
+var DIAS_MSG = ["","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+function msgReservaInvitada(r) {
+  var g = parseLocalDate(r.fecha||"").getDay();
+  var dia = DIAS_MSG[g===0?7:g]||"";
+  var primero = String(r.nombre||"").trim().split(" ")[0];
+  return "Hola"+(primero?" "+primero:"")+"! Muchas gracias por solicitar horario suelto en Consultorio Gloria Videla. Quedó reservado el horario: "+dia+" "+fechaCorta(r.fecha)+", "+r.inicio+"-"+r.fin+", "+r.consultorio;
+}
 
 function InvitadaReservaModal({slot,horarios,reservas,bloques,config,getP,notify,onClose}) {
   const [fecha,setFecha] = useState(slot.date);
@@ -2458,37 +2474,56 @@ function InvitadaReservaModal({slot,horarios,reservas,bloques,config,getP,notify
 function InvitadasView({reservas,notify}) {
   const [comps,setComps] = useState([]);
   const [ver,setVer] = useState(null);
+  const [q,setQ] = useState("");
   useEffect(function(){
     var un = listenCol("comprobantes", function(d){ setComps(d||[]); });
     return function(){ if(un) un(); };
   }, []);
-  var lista = (reservas||[]).filter(function(r){return r&&r.tipo==="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
-  var porRev = lista.filter(function(r){return !r.revisada;});
-  var revs = lista.filter(function(r){return r.revisada;});
+  // Historial completo: nunca se borra nada. Cancelar = estado "cancelada" (el horario se libera pero la invitada queda registrada).
+  var todas = (reservas||[]).filter(function(r){return r&&r.tipo==="invitada";}).sort(function(a,b){return (b.fechaSol||"").localeCompare(a.fechaSol||"");});
+  var qt = q.trim().toLowerCase();
+  var qd = q.replace(/\D/g,"");
+  var lista = !qt ? todas : todas.filter(function(r){
+    return String(r.nombre||"").toLowerCase().indexOf(qt)>=0 || (qd.length>=3 && String(r.wa||"").replace(/\D/g,"").indexOf(qd)>=0);
+  });
+  var canc = lista.filter(function(r){return r.estado==="cancelada";});
+  var porRev = lista.filter(function(r){return r.estado!=="cancelada"&&!r.revisada;});
+  var revs = lista.filter(function(r){return r.estado!=="cancelada"&&r.revisada;});
   function compDe(r) { return comps.find(function(c){return String(c.id)===String(r.id);}); }
   function marcar(r) { saveDoc("reservas",r.id,Object.assign({},r,{revisada:true})); notify("Marcada como revisada"); }
   function cancelar(r) {
-    if(!window.confirm("Cancelar la reserva de "+r.nombre+" ("+parseLocalDate(r.fecha).toLocaleDateString("es-AR")+" "+r.inicio+"-"+r.fin+")? Se borra del calendario y se borra el comprobante.")) return;
-    delDoc("reservas",r.id); delDoc("comprobantes",String(r.id)); notify("Reserva cancelada");
+    if(!window.confirm("Cancelar la reserva de "+r.nombre+" ("+parseLocalDate(r.fecha).toLocaleDateString("es-AR")+" "+r.inicio+"-"+r.fin+")? El horario se libera en el calendario y la reserva queda en el historial como cancelada.")) return;
+    saveDoc("reservas",r.id,Object.assign({},r,{estado:"cancelada",canceladaEn:new Date().toISOString()}));
+    notify("Reserva cancelada. Queda en el historial");
+  }
+  // WhatsApp: confirmacion con el mensaje armado (para una reserva activa) o chat vacio (para una cancelada)
+  function abrirWA(r) {
+    var num = waDigits(r.wa);
+    if(!num){ notify("Esta invitada no dejó WhatsApp","err"); return; }
+    var texto = r.estado==="cancelada" ? "" : "?text="+encodeURIComponent(msgReservaInvitada(r));
+    openLink("https://wa.me/"+num+texto);
   }
   function tarjeta(r) {
     var c = compDe(r);
+    var esCanc = r.estado==="cancelada";
+    var fPedido = r.fechaSol ? new Date(r.fechaSol).toLocaleDateString("es-AR") : "";
     return (
-      <div key={r.id} style={{background:wh,borderRadius:12,padding:"14px 16px",marginBottom:10,border:r.revisada?"1.5px solid #C9E4EF":"1.5px solid #F5B8B3"}}>
+      <div key={r.id} style={{background:esCanc?bg:wh,borderRadius:12,padding:"14px 16px",marginBottom:10,opacity:esCanc?0.8:1,border:esCanc?"1.5px solid #C9E4EF":(r.revisada?"1.5px solid #C9E4EF":"1.5px solid #F5B8B3")}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
           <div>
-            <div style={{color:tx,fontWeight:700,fontSize:15}}>{r.nombre}</div>
+            <div style={{color:tx,fontWeight:700,fontSize:15}}>{r.nombre} {esCanc && <span style={bge(eb,er)}>Cancelada</span>}</div>
             <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha).toLocaleDateString("es-AR")} · {r.consultorio} · {r.inicio}-{r.fin}</div>
+            <div style={{color:mu,fontSize:12,marginTop:2}}>WhatsApp: {r.wa||"(sin dato)"}{fPedido?" · Reservó el "+fPedido:""}</div>
           </div>
-          <div style={{color:ok,fontWeight:800,fontSize:16,flexShrink:0}}>{ars(r.monto||0)}</div>
+          <div style={{color:esCanc?mu:ok,fontWeight:800,fontSize:16,flexShrink:0,textDecoration:esCanc?"line-through":"none"}}>{ars(r.monto||0)}</div>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
-          <button style={{background:"#25D366",color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){openLink("https://wa.me/"+waDigits(r.wa));}}>WhatsApp {r.wa}</button>
+          <button style={{background:"#25D366",color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){abrirWA(r);}}>{esCanc?"Abrir WhatsApp":"WhatsApp: enviar confirmación"}</button>
           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"6px 12px"})} onClick={function(){ if(!c){notify("Cargando comprobante... probá de nuevo en un instante","err");return;} if(c.tipo==="pdf") abrirDoc(c); else setVer(ver===r.id?null:r.id); }}>
             {c&&c.tipo==="pdf"?"Ver comprobante (PDF)":ver===r.id?"Ocultar comprobante":"Ver comprobante"}
           </button>
-          {!r.revisada && <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"6px 12px"})} onClick={function(){marcar(r);}}>Marcar revisada</button>}
-          <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"6px 12px"})} onClick={function(){cancelar(r);}}>Cancelar reserva</button>
+          {!esCanc && !r.revisada && <button style={Object.assign({},btn(ok,wh),{fontSize:12,padding:"6px 12px"})} onClick={function(){marcar(r);}}>Marcar revisada</button>}
+          {!esCanc && <button style={Object.assign({},btnO(eb,er,"1.5px solid #F5B8B3"),{fontSize:12,padding:"6px 12px"})} onClick={function(){cancelar(r);}}>Cancelar reserva</button>}
         </div>
         {ver===r.id && c && c.tipo!=="pdf" && <img src={c.data} alt="comprobante" style={{width:"100%",maxHeight:420,objectFit:"contain",marginTop:10,borderRadius:8,border:"1px solid #C9E4EF"}}/>}
       </div>
@@ -2497,12 +2532,16 @@ function InvitadasView({reservas,notify}) {
   return (
     <div>
       <h2 style={{color:tx,fontSize:20,fontWeight:800,marginBottom:4}}>Reservas de invitadas</h2>
-      <div style={{color:mu,fontSize:12,marginBottom:16}}>Reservaron y pagaron por transferencia. Revisá que el comprobante sea real; si no, cancelá la reserva.</div>
-      {!lista.length && <div style={{color:mu,textAlign:"center",padding:40}}>Todavía no hay reservas de invitadas.</div>}
+      <div style={{color:mu,fontSize:12,marginBottom:12}}>Historial de quienes reservaron una hora suelta, con su WhatsApp. Revisá que el comprobante sea real; si no, cancelá la reserva.</div>
+      {todas.length>0 && <input style={Object.assign({},sInp,{marginBottom:14})} value={q} onChange={function(e){setQ(e.target.value);}} placeholder="Buscar por nombre o WhatsApp..."/>}
+      {!todas.length && <div style={{color:mu,textAlign:"center",padding:40}}>Todavía no hay reservas de invitadas.</div>}
+      {todas.length>0 && !lista.length && <div style={{color:mu,textAlign:"center",padding:30}}>Ninguna reserva coincide con la búsqueda.</div>}
       {porRev.length>0 && <div style={{color:er,fontWeight:700,fontSize:13,marginBottom:8}}>Por revisar ({porRev.length})</div>}
       {porRev.map(tarjeta)}
       {revs.length>0 && <div style={{color:mu,fontWeight:700,fontSize:13,margin:"16px 0 8px"}}>Revisadas ({revs.length})</div>}
       {revs.map(tarjeta)}
+      {canc.length>0 && <div style={{color:mu,fontWeight:700,fontSize:13,margin:"16px 0 8px"}}>Canceladas ({canc.length})</div>}
+      {canc.map(tarjeta)}
     </div>
   );
 }
