@@ -2502,6 +2502,12 @@ function InvitadasView({reservas,notify}) {
     if(!num){ notify("Esta invitada no dejó WhatsApp","err"); return; }
     var texto = r.estado==="cancelada" ? "" : "?text="+encodeURIComponent(msgReservaInvitada(r));
     openLink("https://wa.me/"+num+texto);
+    // Al abrir el mensaje de confirmacion la reserva queda marcada como enviada (se puede desmarcar)
+    if(r.estado!=="cancelada") saveDoc("reservas",r.id,Object.assign({},r,{confirmacionEnviada:true,confirmacionEnviadaEn:new Date().toISOString()}));
+  }
+  function desmarcarEnviada(r) {
+    saveDoc("reservas",r.id,Object.assign({},r,{confirmacionEnviada:false,confirmacionEnviadaEn:null}));
+    notify("Confirmación desmarcada");
   }
   function tarjeta(r) {
     var c = compDe(r);
@@ -2514,11 +2520,14 @@ function InvitadasView({reservas,notify}) {
             <div style={{color:tx,fontWeight:700,fontSize:15}}>{r.nombre} {esCanc && <span style={bge(eb,er)}>Cancelada</span>}</div>
             <div style={{color:mu,fontSize:13}}>{parseLocalDate(r.fecha).toLocaleDateString("es-AR")} · {r.consultorio} · {r.inicio}-{r.fin}</div>
             <div style={{color:mu,fontSize:12,marginTop:2}}>WhatsApp: {r.wa||"(sin dato)"}{fPedido?" · Reservó el "+fPedido:""}</div>
+            {!esCanc && (r.confirmacionEnviada
+              ? <div style={{marginTop:4}}><span style={bge(ob,ok)}>✓ Confirmación enviada{r.confirmacionEnviadaEn?" el "+new Date(r.confirmacionEnviadaEn).toLocaleDateString("es-AR"):""}</span> <button style={{background:"transparent",border:"none",color:mu,fontSize:11,cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}} onClick={function(){desmarcarEnviada(r);}}>desmarcar</button></div>
+              : <div style={{marginTop:4}}><span style={bge(eb,er)}>Confirmación sin enviar</span></div>)}
           </div>
           <div style={{color:esCanc?mu:ok,fontWeight:800,fontSize:16,flexShrink:0,textDecoration:esCanc?"line-through":"none"}}>{ars(r.monto||0)}</div>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
-          <button style={{background:"#25D366",color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){abrirWA(r);}}>{esCanc?"Abrir WhatsApp":"WhatsApp: enviar confirmación"}</button>
+          <button style={{background:"#25D366",color:wh,border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){abrirWA(r);}}>{esCanc?"Abrir WhatsApp":(r.confirmacionEnviada?"WhatsApp: reenviar confirmación":"WhatsApp: enviar confirmación")}</button>
           <button style={Object.assign({},btnO(wh,tx,"1.5px solid #C9E4EF"),{fontSize:12,padding:"6px 12px"})} onClick={function(){ if(!c){notify("Cargando comprobante... probá de nuevo en un instante","err");return;} if(c.tipo==="pdf") abrirDoc(c); else setVer(ver===r.id?null:r.id); }}>
             {c&&c.tipo==="pdf"?"Ver comprobante (PDF)":ver===r.id?"Ocultar comprobante":"Ver comprobante"}
           </button>
